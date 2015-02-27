@@ -1,7 +1,7 @@
 package monitor
 
 import scala.concurrent.Future
-import scalaz.{ Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT }
+import scalaz.{ Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT, Applicative, Functor }
 
 trait Monitored[A] {
 	val f: Context => A
@@ -17,6 +17,8 @@ trait ListTMonitored[F[_], A] extends Monitored[F[List[A]]] {
 }
 
 object Monitored {
+	import scalaz.syntax.monad._
+
 	implicit def toOptionT[F[_], A](m: Monitored[F[Option[A]]]) = new OptionTMonitored[F, A] {
 		val f = m.f
 	}
@@ -33,6 +35,14 @@ object Monitored {
 	def optT[F[_], A] = toT[F, Option, A, OptionT](OptionT.apply _) _
 	def listT[F[_], A] = toT[F, List, A, ListT](ListT.apply _) _
 
+	trait Defered[G[_]] {
+		def apply[F[_]: Functor, A](m: Monitored[F[A]]): Monitored[F[G[A]]]
+	}
+	def lift[G[_]: Applicative] = new Defered[G] {
+		def apply[F[_]: Functor, A](m: Monitored[F[A]]): Monitored[F[G[A]]] =
+			m.map{_.map{ a => implicitly[Applicative[G]].point[A](a) }}
+	}
+
 	def apply[A](λ: Context => A): Monitored[A] =
 		new Monitored[A] {
 			val f = λ
@@ -41,9 +51,10 @@ object Monitored {
 	def id(): Id = ???
 	trait Id
 
-	implicit def monitoredInstances[A] = new Monad[Monitored] {
+	implicit def monitoredInstances[A]: Monad[Monitored] = new Monad[Monitored] {
 		def point[A](a: => A) = Monitored(_ => a)
-		def bind[A, B](fa: Monitored[A])(f: A => Monitored[B]) = ???
+		def bind[A, B](m: Monitored[A])(f: A => Monitored[B]) =
+			Monitored(c => f(m.f(c))(c))
 	}
 
 }
