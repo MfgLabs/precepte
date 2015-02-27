@@ -13,7 +13,6 @@ class ApplicationSpec extends Specification {
     import scala.concurrent.Future
     import scalaz.std.scalaFuture._
     import scalaz.std.option._
-    // import scalaz.syntax.applicative._
     import scalaz.syntax.monad._
     import scalaz.{ Kleisli, OptionT }
     import monitor.Monitored, Monitored._
