@@ -109,7 +109,7 @@ class ApplicationSpec extends Specification {
 
       val getPin =
         (for {
-          b <- lift[Option].apply(BoardComp.get()).T
+          b <- BoardComp.get().lift[Option].T
           id <- Monitored(_ => b.pin.point[Future]).T
           pin <- CardComp.getPin(id).T
         } yield pin).run

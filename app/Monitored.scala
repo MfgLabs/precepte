@@ -16,6 +16,11 @@ trait ListTMonitored[F[_], A] extends Monitored[F[List[A]]] {
 	def T = Monitored.listT[F, A](this)
 }
 
+trait LiftableMonitored[F[_], A] extends Monitored[F[A]] {
+	def lift[G[_]: Applicative](implicit fu: Functor[F]) =
+		Monitored.lift[G].apply(this)
+}
+
 object Monitored {
 	import scalaz.syntax.monad._
 
@@ -24,6 +29,10 @@ object Monitored {
 	}
 
 	implicit def toListT[F[_], A](m: Monitored[F[List[A]]]) = new ListTMonitored[F, A] {
+		val f = m.f
+	}
+
+	implicit def toLiftableT[F[_], A](m: Monitored[F[A]]) = new LiftableMonitored[F, A] {
 		val f = m.f
 	}
 
