@@ -44,10 +44,10 @@ object Monitored {
 	def optT[F[_], A] = toT[F, Option, A, OptionT](OptionT.apply _) _
 	def listT[F[_], A] = toT[F, List, A, ListT](ListT.apply _) _
 
-	trait Defered[G[_]] {
+	trait Deferred[G[_]] {
 		def apply[F[_]: Functor, A](m: Monitored[F[A]]): Monitored[F[G[A]]]
 	}
-	def lift[G[_]: Applicative] = new Defered[G] {
+	def lift[G[_]: Applicative] = new Deferred[G] {
 		def apply[F[_]: Functor, A](m: Monitored[F[A]]): Monitored[F[G[A]]] =
 			m.map{_.map{ a => implicitly[Applicative[G]].point[A](a) }}
 	}

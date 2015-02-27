@@ -114,6 +114,14 @@ class ApplicationSpec extends Specification {
           pin <- CardComp.getPin(id).T
         } yield pin).run
 
+
+      // for {
+      //   pin <- getPin
+      //   cs <- card.rank(request.ctx.creds.map(_._1), pagination, types)
+      //   cards <- card.cardsInfos(cs, pin.map(_._1), cacheStrat)
+      //   availableTypes <- count
+      //   h <- high
+      // } yield (pin, cs, cards, availableTypes, h)
       ok
     }
 
