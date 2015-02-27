@@ -8,6 +8,11 @@ import play.api.test.Helpers._
 @RunWith(classOf[JUnitRunner])
 class ApplicationSpec extends Specification {
 
+  trait Log {
+    def debug(s: String): Unit
+  }
+  case class Context(logger: Log)
+
   "Application" should {
     import play.api.libs.concurrent.Execution.Implicits._
     import scala.concurrent.Future
@@ -18,8 +23,8 @@ class ApplicationSpec extends Specification {
     import monitor.Monitored, Monitored._
 
     "Simple" in {
-      def f1 = Monitored{_ => 1}
-      def f2(i: Int) = Monitored{_ => s"foo $i"}
+      def f1 = Monitored{(_: Context) => 1}
+      def f2(i: Int) = Monitored{(_: Context) => s"foo $i"}
 
       val res = for {
         i <- f1
@@ -30,9 +35,9 @@ class ApplicationSpec extends Specification {
     }
 
     "optT" in {
-      val f1 = Monitored(_ => Option("foo").point[Future])
-      val f2 = Monitored(_ => Option(1).point[Future])
-      val f3 = Monitored(_ => (None: Option[Int]).point[Future])
+      val f1 = Monitored((_: Context) => Option("foo").point[Future])
+      val f2 = Monitored((_: Context) => Option(1).point[Future])
+      val f3 = Monitored((_: Context) => (None: Option[Int]).point[Future])
 
       val res = for {
         e1 <- f1.T
@@ -57,9 +62,9 @@ class ApplicationSpec extends Specification {
     }
 
     "listT" in {
-      val f1 = Monitored(_ => List("foo", "bar").point[Future])
-      val f2 = Monitored(_ => List(1, 2).point[Future])
-      val f3 = Monitored(_ => List[Int]().point[Future])
+      val f1 = Monitored((_: Context) => List("foo", "bar").point[Future])
+      val f2 = Monitored((_: Context) => List(1, 2).point[Future])
+      val f3 = Monitored((_: Context) => List[Int]().point[Future])
 
       val res = for {
         e1 <- f1.T
@@ -87,11 +92,11 @@ class ApplicationSpec extends Specification {
       import scalaz.{ \/ , \/-, -\/}
       import EitherT.eitherTFunctor
 
-      val f1: Monitored[Future[String \/ String]] =
+      val f1: Monitored[Context, Future[String \/ String]] =
         Monitored(_ => \/-("foo").point[Future])
-      val f2: Monitored[Future[String \/ Int]] =
+      val f2: Monitored[Context, Future[String \/ Int]] =
         Monitored(_ => \/-(1).point[Future])
-      val f3: Monitored[Future[String \/ String]] =
+      val f3: Monitored[Context, Future[String \/ String]] =
         Monitored(_ => -\/("Error").point[Future])
 
       val res = for {
@@ -119,7 +124,7 @@ class ApplicationSpec extends Specification {
 
     case class Board(pin: Option[Int])
     object BoardComp {
-      def get(): Monitored[Future[Board]] = Monitored{ m =>
+      def get(): Monitored[Context, Future[Board]] = Monitored{ m =>
         m.logger.debug("BoardComp.get")
         Board(Some(1)).point[Future]
       }
@@ -129,22 +134,22 @@ class ApplicationSpec extends Specification {
     case class Card(name: String)
 
     object CardComp {
-      def getPin(id: Int): Monitored[Future[Option[(Int, Card)]]] = Monitored { m =>
+      def getPin(id: Int): Monitored[Context, Future[Option[(Int, Card)]]] = Monitored { m =>
         m.logger.debug("CardComp.getPin")
         Some(1 -> Card("card 1")).point[Future]
       }
 
-      def countAll(): Monitored[Future[Set[String]]] = Monitored { m =>
+      def countAll(): Monitored[Context, Future[Set[String]]] = Monitored { m =>
         m.logger.debug("CardComp.countAll")
         Set("Edito", "Video").point[Future]
       }
 
-      def rank(): Monitored[Future[List[(Int, Card)]]] = Monitored { m =>
+      def rank(): Monitored[Context, Future[List[(Int, Card)]]] = Monitored { m =>
         m.logger.debug("CardComp.rank")
         List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
       }
 
-      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Future[List[(Card, List[Community])]]] = Monitored { m =>
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Context, Future[List[(Card, List[Community])]]] = Monitored { m =>
         m.logger.debug("CardComp.cardsInfos")
         List(
           Card("foo") -> List(Community("community 1"), Community("community 2")),
@@ -155,7 +160,7 @@ class ApplicationSpec extends Specification {
     import java.net.URL
     case class Highlight(title: String, cover: URL)
     object HighlightComp {
-      def get(): Monitored[Future[Highlight]] = Monitored { m =>
+      def get(): Monitored[Context, Future[Highlight]] = Monitored { m =>
         m.logger.debug("HighlightComp.get")
         Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
       }
@@ -166,26 +171,22 @@ class ApplicationSpec extends Specification {
 
       val logs = scala.collection.mutable.ArrayBuffer[String]()
 
-      val logger = new monitor.Log {
+      val logger = new Log {
         def debug(s: String): Unit = logs += s"[DEBUG] $s"
       }
 
-      val timer = new monitor.Monitor {
-         def time[A](f: => Future[A]): Future[A] = f
-      }
-
-      val context = monitor.Context(logger, timer)
+      val context = Context(logger)
 
       val getPin =
         (for {
           b <- BoardComp.get().lift[Option].T
-          id <- Monitored(_ => b.pin.point[Future]).T
+          id <- Monitored((_: Context) => b.pin.point[Future]).T
           pin <- CardComp.getPin(id).T
         } yield pin).run
 
 
       val res = for {
-        pin <- Monitored(getPin(_).run).K
+        pin <- Monitored(getPin(_: Context).run).K
         cs <- CardComp.rank().K
         cards <- CardComp.cardsInfos(cs, pin.map(_._1)).K
         availableTypes <- CardComp.countAll().K
