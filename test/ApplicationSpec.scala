@@ -13,9 +13,22 @@ class ApplicationSpec extends Specification {
     import scala.concurrent.Future
     import scalaz.std.scalaFuture._
     import scalaz.std.option._
-    import scalaz.syntax.applicative._
+    // import scalaz.syntax.applicative._
+    import scalaz.syntax.monad._
     import scalaz.{ Kleisli, OptionT }
     import monitor.Monitored, Monitored._
+
+    "Simple" in {
+      def f1 = Monitored{_ => 1}
+      def f2(i: Int) = Monitored{_ => s"foo $i"}
+
+      val res = for {
+        i <- f1
+        r <- f2(i)
+      } yield r
+
+      res(null) must be_==("foo 1")
+    }
 
     "optT" in {
       val f1 = Monitored(_ => Option("foo").point[Future])
@@ -104,8 +117,7 @@ class ApplicationSpec extends Specification {
         Monitored { _ => Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future] }
     }
 
-
-    "real world" in {
+    "real world wb.fr home" in {
 
       val getPin =
         (for {
