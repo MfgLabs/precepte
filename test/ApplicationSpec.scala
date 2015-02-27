@@ -119,24 +119,33 @@ class ApplicationSpec extends Specification {
 
     case class Board(pin: Option[Int])
     object BoardComp {
-      def get(): Monitored[Future[Board]] =
-        Monitored{ _ => Board(Some(1)).point[Future] }
+      def get(): Monitored[Future[Board]] = Monitored{ m =>
+        m.logger.debug("BoardComp.get")
+        Board(Some(1)).point[Future]
+      }
     }
 
     case class Community(name: String)
     case class Card(name: String)
 
     object CardComp {
-      def getPin(id: Int): Monitored[Future[Option[(Int, Card)]]] =
-        Monitored { _ => Some(1 -> Card("card 1")).point[Future] }
+      def getPin(id: Int): Monitored[Future[Option[(Int, Card)]]] = Monitored { m =>
+        m.logger.debug("CardComp.getPin")
+        Some(1 -> Card("card 1")).point[Future]
+      }
 
-      def countAll(): Monitored[Future[Set[String]]] =
-        Monitored { _ => Set("Edito", "Video").point[Future] }
+      def countAll(): Monitored[Future[Set[String]]] = Monitored { m =>
+        m.logger.debug("CardComp.countAll")
+        Set("Edito", "Video").point[Future]
+      }
 
-      def rank(): Monitored[Future[List[(Int, Card)]]] =
-        Monitored { _ => List(1 -> Card("foo"), 1 -> Card("bar")).point[Future] }
+      def rank(): Monitored[Future[List[(Int, Card)]]] = Monitored { m =>
+        m.logger.debug("CardComp.rank")
+        List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
+      }
 
-      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Future[List[(Card, List[Community])]]] = Monitored { _ =>
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Future[List[(Card, List[Community])]]] = Monitored { m =>
+        m.logger.debug("CardComp.cardsInfos")
         List(
           Card("foo") -> List(Community("community 1"), Community("community 2")),
           Card("bar") -> List(Community("community 2"))).point[Future]
@@ -146,11 +155,26 @@ class ApplicationSpec extends Specification {
     import java.net.URL
     case class Highlight(title: String, cover: URL)
     object HighlightComp {
-      def get(): Monitored[Future[Highlight]] =
-        Monitored { _ => Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future] }
+      def get(): Monitored[Future[Highlight]] = Monitored { m =>
+        m.logger.debug("HighlightComp.get")
+        Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
+      }
     }
 
+
     "real world wb.fr home" in {
+
+      val logs = scala.collection.mutable.ArrayBuffer[String]()
+
+      val logger = new monitor.Log {
+        def debug(s: String): Unit = logs += s"[DEBUG] $s"
+      }
+
+      val timer = new monitor.Monitor {
+         def time[A](f: => Future[A]): Future[A] = f
+      }
+
+      val context = monitor.Context(logger, timer)
 
       val getPin =
         (for {
@@ -168,7 +192,7 @@ class ApplicationSpec extends Specification {
         h <- HighlightComp.get().K
       } yield (pin, cs, cards, availableTypes, h)
 
-      res.run(null) must be_==(
+      res.run(context) must be_==(
         (Some((1, Card("card 1"))),
           List((1, Card("foo")), (1, Card("bar"))),
           List(
@@ -180,7 +204,10 @@ class ApplicationSpec extends Specification {
           Set("Edito", "Video"),
           Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")))
       ).await
+
+      logs must be_==(Seq("[DEBUG] BoardComp.get", "[DEBUG] CardComp.getPin", "[DEBUG] CardComp.rank", "[DEBUG] CardComp.cardsInfos", "[DEBUG] CardComp.countAll", "[DEBUG] HighlightComp.get"))
     }
+
 
   }
 }
