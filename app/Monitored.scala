@@ -6,6 +6,7 @@ import scalaz.{ Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT, Applicative
 trait Monitored[A] {
 	val f: Context => A
 	def apply(c: Context) = f(c)
+	def run(c: Context) = apply(c)
 }
 
 trait OptionTMonitored[F[_], A] extends Monitored[F[Option[A]]] {

@@ -27,7 +27,7 @@ class ApplicationSpec extends Specification {
         r <- f2(i)
       } yield r
 
-      res(null) must be_==("foo 1")
+      res.run(null) must be_==("foo 1")
     }
 
     "optT" in {
