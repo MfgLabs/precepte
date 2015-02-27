@@ -1,7 +1,7 @@
 package monitor
 
 import scala.concurrent.Future
-import scalaz.{ Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT, Applicative, Functor }
+import scalaz.{ Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT, Applicative, Functor, ∨ }
 
 trait Monitored[A] {
   val f: Context => A
@@ -15,6 +15,10 @@ trait OptionTMonitored[F[_], A] extends Monitored[F[Option[A]]] {
 
 trait ListTMonitored[F[_], A] extends Monitored[F[List[A]]] {
   def T = Monitored.listT[F, A](this)
+}
+
+trait EitherTMonitored[F[_], A, B] extends Monitored[F[A ∨ B]] {
+  def T = Monitored.eitherT[F, A, B](this)
 }
 
 trait LiftableMonitored[F[_], A] extends Monitored[F[A]] {
@@ -37,6 +41,10 @@ object Monitored {
     val f = m.f
   }
 
+  implicit def toEitherT[F[_], A, B](m: Monitored[F[A ∨ B]]) = new EitherTMonitored[F, A, B] {
+    val f = m.f
+  }
+
   implicit def toLiftableT[F[_], A](m: Monitored[F[A]]) = new LiftableMonitored[F, A] {
     val f = m.f
   }
@@ -55,6 +63,12 @@ object Monitored {
 
   def optT[F[_], A] = toT[F, Option, A, OptionT](OptionT.apply _) _
   def listT[F[_], A] = toT[F, List, A, ListT](ListT.apply _) _
+
+  def eitherT[F[_], A, B](m: Monitored[F[A ∨ B]]): Kleisli[({ type λ[α] = EitherT[F, A, α] })#λ, Context, B] = {
+    type Trans[α] = EitherT[F, A, α]
+    toK(m).mapK[Trans, B](EitherT.apply _)
+  }
+
 
   trait Deferred[G[_]] {
     def apply[F[_]: Functor, A](m: Monitored[F[A]]): Monitored[F[G[A]]]

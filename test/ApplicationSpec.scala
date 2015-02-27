@@ -14,7 +14,7 @@ class ApplicationSpec extends Specification {
     import scalaz.std.scalaFuture._
     import scalaz.std.option._
     import scalaz.syntax.monad._
-    import scalaz.{ Kleisli, OptionT }
+    import scalaz.{ Kleisli, OptionT, EitherT }
     import monitor.Monitored, Monitored._
 
     "Simple" in {
@@ -81,6 +81,40 @@ class ApplicationSpec extends Specification {
       } yield (e1, e2)
 
       res3.run(null).run must be_==(List()).await
+    }
+
+    "EitherT" in {
+      import scalaz.{ \/ , \/-, -\/}
+      import EitherT.eitherTFunctor
+
+      val f1: Monitored[Future[String \/ String]] =
+        Monitored(_ => \/-("foo").point[Future])
+      val f2: Monitored[Future[String \/ Int]] =
+        Monitored(_ => \/-(1).point[Future])
+      val f3: Monitored[Future[String \/ String]] =
+        Monitored(_ => -\/("Error").point[Future])
+
+      val res = for {
+        e1 <- f1.T
+        e2 <- f2.T
+      } yield (e1, e2)
+
+      res.run(null).run must be_==(\/-("foo" -> 1)).await
+
+      val error = -\/("Error")
+      val res2 = for {
+        e1 <- f1.T
+        e2 <- f3.T
+      } yield (e1, e2)
+
+      res2.run(null).run must be_==(error).await
+
+      val res3 = for {
+        e1 <- f3.T
+        e2 <- f2.T
+      } yield (e1, e2)
+
+      res3.run(null).run must be_==(error).await
     }
 
     case class Board(pin: Option[Int])
