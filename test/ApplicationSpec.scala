@@ -8,10 +8,10 @@ import play.api.test.Helpers._
 @RunWith(classOf[JUnitRunner])
 class ApplicationSpec extends Specification {
 
+  import monitor.{ Monitored, Context }, Monitored._
   trait Log {
     def debug(s: String): Unit
   }
-  case class Context(logger: Log)
 
   "Application" should {
     import play.api.libs.concurrent.Execution.Implicits._
@@ -20,11 +20,10 @@ class ApplicationSpec extends Specification {
     import scalaz.std.option._
     import scalaz.syntax.monad._
     import scalaz.{ Kleisli, OptionT, EitherT }
-    import monitor.Monitored, Monitored._
 
     "Simple" in {
-      def f1 = Monitored{(_: Context) => 1}
-      def f2(i: Int) = Monitored{(_: Context) => s"foo $i"}
+      def f1 = Monitored{(_: Context[Log]) => 1}
+      def f2(i: Int) = Monitored{(_: Context[Log]) => s"foo $i"}
 
       val res = for {
         i <- f1
@@ -35,9 +34,9 @@ class ApplicationSpec extends Specification {
     }
 
     "optT" in {
-      val f1 = Monitored((_: Context) => Option("foo").point[Future])
-      val f2 = Monitored((_: Context) => Option(1).point[Future])
-      val f3 = Monitored((_: Context) => (None: Option[Int]).point[Future])
+      val f1 = Monitored((_: Context[Log]) => Option("foo").point[Future])
+      val f2 = Monitored((_: Context[Log]) => Option(1).point[Future])
+      val f3 = Monitored((_: Context[Log]) => (None: Option[Int]).point[Future])
 
       val res = for {
         e1 <- f1.T
@@ -62,9 +61,9 @@ class ApplicationSpec extends Specification {
     }
 
     "listT" in {
-      val f1 = Monitored((_: Context) => List("foo", "bar").point[Future])
-      val f2 = Monitored((_: Context) => List(1, 2).point[Future])
-      val f3 = Monitored((_: Context) => List[Int]().point[Future])
+      val f1 = Monitored((_: Context[Log]) => List("foo", "bar").point[Future])
+      val f2 = Monitored((_: Context[Log]) => List(1, 2).point[Future])
+      val f3 = Monitored((_: Context[Log]) => List[Int]().point[Future])
 
       val res = for {
         e1 <- f1.T
@@ -92,11 +91,11 @@ class ApplicationSpec extends Specification {
       import scalaz.{ \/ , \/-, -\/}
       import EitherT.eitherTFunctor
 
-      val f1: Monitored[Context, Future[String \/ String]] =
+      val f1: Monitored[Log, Future[String \/ String]] =
         Monitored(_ => \/-("foo").point[Future])
-      val f2: Monitored[Context, Future[String \/ Int]] =
+      val f2: Monitored[Log, Future[String \/ Int]] =
         Monitored(_ => \/-(1).point[Future])
-      val f3: Monitored[Context, Future[String \/ String]] =
+      val f3: Monitored[Log, Future[String \/ String]] =
         Monitored(_ => -\/("Error").point[Future])
 
       val res = for {
@@ -124,8 +123,8 @@ class ApplicationSpec extends Specification {
 
     case class Board(pin: Option[Int])
     object BoardComp {
-      def get(): Monitored[Context, Future[Board]] = Monitored{ m =>
-        m.logger.debug("BoardComp.get")
+      def get(): Monitored[Log, Future[Board]] = Monitored{ c =>
+        c.value.debug("BoardComp.get")
         Board(Some(1)).point[Future]
       }
     }
@@ -134,23 +133,23 @@ class ApplicationSpec extends Specification {
     case class Card(name: String)
 
     object CardComp {
-      def getPin(id: Int): Monitored[Context, Future[Option[(Int, Card)]]] = Monitored { m =>
-        m.logger.debug("CardComp.getPin")
+      def getPin(id: Int): Monitored[Log, Future[Option[(Int, Card)]]] = Monitored { c =>
+        c.value.debug("CardComp.getPin")
         Some(1 -> Card("card 1")).point[Future]
       }
 
-      def countAll(): Monitored[Context, Future[Set[String]]] = Monitored { m =>
-        m.logger.debug("CardComp.countAll")
+      def countAll(): Monitored[Log, Future[Set[String]]] = Monitored { c =>
+        c.value.debug("CardComp.countAll")
         Set("Edito", "Video").point[Future]
       }
 
-      def rank(): Monitored[Context, Future[List[(Int, Card)]]] = Monitored { m =>
-        m.logger.debug("CardComp.rank")
+      def rank(): Monitored[Log, Future[List[(Int, Card)]]] = Monitored { c =>
+        c.value.debug("CardComp.rank")
         List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
       }
 
-      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Context, Future[List[(Card, List[Community])]]] = Monitored { m =>
-        m.logger.debug("CardComp.cardsInfos")
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Log, Future[List[(Card, List[Community])]]] = Monitored { c =>
+        c.value.debug("CardComp.cardsInfos")
         List(
           Card("foo") -> List(Community("community 1"), Community("community 2")),
           Card("bar") -> List(Community("community 2"))).point[Future]
@@ -160,8 +159,8 @@ class ApplicationSpec extends Specification {
     import java.net.URL
     case class Highlight(title: String, cover: URL)
     object HighlightComp {
-      def get(): Monitored[Context, Future[Highlight]] = Monitored { m =>
-        m.logger.debug("HighlightComp.get")
+      def get(): Monitored[Log, Future[Highlight]] = Monitored { c =>
+        c.value.debug("HighlightComp.get")
         Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
       }
     }
@@ -180,13 +179,13 @@ class ApplicationSpec extends Specification {
       val getPin =
         (for {
           b <- BoardComp.get().lift[Option].T
-          id <- Monitored((_: Context) => b.pin.point[Future]).T
+          id <- Monitored((_: Context[Log]) => b.pin.point[Future]).T
           pin <- CardComp.getPin(id).T
         } yield pin).run
 
 
       val res = for {
-        pin <- Monitored(getPin(_: Context).run).K
+        pin <- Monitored(getPin(_: Context[Log]).run).K
         cs <- CardComp.rank().K
         cards <- CardComp.cardsInfos(cs, pin.map(_._1)).K
         availableTypes <- CardComp.countAll().K
@@ -206,7 +205,13 @@ class ApplicationSpec extends Specification {
           Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")))
       ).await
 
-      logs must be_==(Seq("[DEBUG] BoardComp.get", "[DEBUG] CardComp.getPin", "[DEBUG] CardComp.rank", "[DEBUG] CardComp.cardsInfos", "[DEBUG] CardComp.countAll", "[DEBUG] HighlightComp.get"))
+      logs must be_==(Seq(
+        "[DEBUG] BoardComp.get",
+        "[DEBUG] CardComp.getPin",
+        "[DEBUG] CardComp.rank",
+        "[DEBUG] CardComp.cardsInfos",
+        "[DEBUG] CardComp.countAll",
+        "[DEBUG] HighlightComp.get"))
     }
 
 
