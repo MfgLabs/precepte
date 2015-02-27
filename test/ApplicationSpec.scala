@@ -87,13 +87,13 @@ class ApplicationSpec extends Specification {
       def countAll(): Monitored[Future[Set[String]]] =
         Monitored { _ => Set("Edito", "Video").point[Future] }
 
-      def rank(): Monitored[Future[Seq[(Int, Card)]]] =
-        Monitored { _ => Seq(1 -> Card("foo"), 1 -> Card("bar")).point[Future] }
+      def rank(): Monitored[Future[List[(Int, Card)]]] =
+        Monitored { _ => List(1 -> Card("foo"), 1 -> Card("bar")).point[Future] }
 
-      def cardsInfos(cs: Seq[(Int, Card)], pin: Option[Int]): Monitored[Future[Seq[(Card, Seq[Community])]]] = Monitored { _ =>
-        Seq(
-          Card("foo") -> Seq(Community("community 1"), Community("community 2")),
-          Card("bar") -> Seq(Community("community 2"))).point[Future]
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Future[List[(Card, List[Community])]]] = Monitored { _ =>
+        List(
+          Card("foo") -> List(Community("community 1"), Community("community 2")),
+          Card("bar") -> List(Community("community 2"))).point[Future]
       }
     }
 
@@ -115,14 +115,26 @@ class ApplicationSpec extends Specification {
         } yield pin).run
 
 
-      // for {
-      //   pin <- getPin
-      //   cs <- card.rank(request.ctx.creds.map(_._1), pagination, types)
-      //   cards <- card.cardsInfos(cs, pin.map(_._1), cacheStrat)
-      //   availableTypes <- count
-      //   h <- high
-      // } yield (pin, cs, cards, availableTypes, h)
-      ok
+      val res = for {
+        pin <- Monitored(getPin(_).run).K
+        cs <- CardComp.rank().K
+        cards <- CardComp.cardsInfos(cs, pin.map(_._1)).K
+        availableTypes <- CardComp.countAll().K
+        h <- HighlightComp.get().K
+      } yield (pin, cs, cards, availableTypes, h)
+
+      res.run(null) must be_==(
+        (Some((1, Card("card 1"))),
+          List((1, Card("foo")), (1, Card("bar"))),
+          List(
+            (Card("foo"), List(
+              Community("community 1"),
+              Community("community 2"))),
+            (Card("bar"),List(
+              Community("community 2")))),
+          Set("Edito", "Video"),
+          Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")))
+      ).await
     }
 
   }

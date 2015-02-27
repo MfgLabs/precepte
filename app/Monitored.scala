@@ -21,6 +21,10 @@ trait LiftableMonitored[F[_], A] extends Monitored[F[A]] {
 		Monitored.lift[G].apply(this)
 }
 
+trait ToKleisliMonitored[F[_], A] extends Monitored[F[A]] {
+	def K = Monitored.toK(this)
+}
+
 object Monitored {
 	import scalaz.syntax.monad._
 
@@ -36,10 +40,17 @@ object Monitored {
 		val f = m.f
 	}
 
-	private def toT[F[_], G[_], A, T[_[_], _]](f: F[G[A]] => T[F, A])(m: Monitored[F[G[A]]]): Kleisli[({ type λ[α] = T[F, α] })#λ, Context, A] = {
-		type Trans[α] = T[F, α]
-		Kleisli(m.f).mapK[Trans, A](f)
+	implicit def toToKleisliMonitored[F[_], A](m: Monitored[F[A]]) = new ToKleisliMonitored[F, A] {
+		val f = m.f
 	}
+
+	def toT[F[_], G[_], A, T[_[_], _]](f: F[G[A]] => T[F, A])(m: Monitored[F[G[A]]]): Kleisli[({ type λ[α] = T[F, α] })#λ, Context, A] = {
+		type Trans[α] = T[F, α]
+		toK(m).mapK[Trans, A](f)
+	}
+
+	def toK[F[_], A](m: Monitored[F[A]]) =
+		Kleisli(m.f)
 
 	def optT[F[_], A] = toT[F, Option, A, OptionT](OptionT.apply _) _
 	def listT[F[_], A] = toT[F, List, A, ListT](ListT.apply _) _
