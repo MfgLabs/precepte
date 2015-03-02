@@ -46,19 +46,19 @@ class ApplicationSpec extends Specification {
 
       res(null).run must be_==(Some(("foo",1))).await
 
-      // val res2 = for {
-      //   e1 <- f1.T
-      //   e2 <- f3.T
-      // } yield (e1, e2)
+      val res2 = for {
+        e1 <- trans(f1)
+        e2 <- trans(f3)
+      } yield (e1, e2)
 
-      // res2.run(null).run must be_==(None).await
+      res2(null).run must be_==(None).await
 
-      // val res3 = for {
-      //   e1 <- f3.T
-      //   e2 <- f2.T
-      // } yield (e1, e2)
+      val res3 = for {
+        e1 <- trans(f3)
+        e2 <- trans(f2)
+      } yield (e1, e2)
 
-      // res3.run(null).run must be_==(None).await
+      res3(null).run must be_==(None).await
     }
 
     // "listT" in {

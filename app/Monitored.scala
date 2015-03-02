@@ -19,14 +19,14 @@ object HasHoist {
     def lift[F[_], A](f: F[Option[A]]): OptionT[F, A] = OptionT.apply(f)
   }
 
-  // implicit def listHasHoist(implicit h: Hoist[ListT]) = new HasHoist[List, ListT] {
-  //   def hoist = h
-  //   def lift[F[_], A](f: F[List[A]]): ListT[F, A] = ListT.apply(f)
-  // }
+  implicit object listHasHoist extends HasHoist[List] {
+    type T[F[_], A] = ListT[F, A]
+    def lift[F[_], A](f: F[List[A]]): ListT[F, A] = ListT.apply(f)
+  }
 
-  // implicit def eitherHasHoist[A](implicit h: Hoist[({ type λ[α[_], β] = EitherT[α, A, β] })#λ]) =
-  //   new HasHoist[({ type λ[α] = A ∨ α })#λ, ({ type λ[α[_], β] = EitherT[α, A, β] })#λ] {
-  //     def hoist = h
+  // implicit def eitherHasHoist[A] =
+  //   new HasHoist[({ type λ[α] = A ∨ α })#λ] {
+  //     type T[F[_], B] = EitherT[F, A, B]
   //     def lift[F[_], B](f: F[A ∨ B]): EitherT[F, A, B] = EitherT.apply(f)
   //   }
 }
