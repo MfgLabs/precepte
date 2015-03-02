@@ -61,32 +61,32 @@ class ApplicationSpec extends Specification {
       res3(null).run must be_==(None).await
     }
 
-    // "listT" in {
-    //   val f1 = Monitored((_: Context[Log]) => List("foo", "bar").point[Future])
-    //   val f2 = Monitored((_: Context[Log]) => List(1, 2).point[Future])
-    //   val f3 = Monitored((_: Context[Log]) => List[Int]().point[Future])
+    "listT" in {
+      val f1 = Monitored((_: Log) => List("foo", "bar").point[Future])
+      val f2 = Monitored((_: Log) => List(1, 2).point[Future])
+      val f3 = Monitored((_: Log) => List[Int]().point[Future])
 
-    //   val res = for {
-    //     e1 <- f1.T
-    //     e2 <- f2.T
-    //   } yield (e1, e2)
+      val res = for {
+        e1 <- trans(f1)
+        e2 <- trans(f2)
+      } yield (e1, e2)
 
-    //   res.run(null).run must be_==(List(("foo",1), ("foo",2), ("bar",1), ("bar",2))).await
+      res(null).run must be_==(List(("foo",1), ("foo",2), ("bar",1), ("bar",2))).await
 
-    //   val res2 = for {
-    //     e1 <- f1.T
-    //     e2 <- f3.T
-    //   } yield (e1, e2)
+      val res2 = for {
+        e1 <- trans(f1)
+        e2 <- trans(f3)
+      } yield (e1, e2)
 
-    //   res2.run(null).run must be_==(List()).await
+      res2(null).run must be_==(List()).await
 
-    //   val res3 = for {
-    //     e1 <- f3.T
-    //     e2 <- f2.T
-    //   } yield (e1, e2)
+      val res3 = for {
+        e1 <- trans(f3)
+        e2 <- trans(f2)
+      } yield (e1, e2)
 
-    //   res3.run(null).run must be_==(List()).await
-    // }
+      res3(null).run must be_==(List()).await
+    }
 
     // "EitherT" in {
     //   import scalaz.{ \/ , \/-, -\/}
