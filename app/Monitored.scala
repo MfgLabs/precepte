@@ -40,10 +40,14 @@ trait Monitored[C, FA] {
   val f: C => FA
   def apply(c: C) = f(c)
   def run(c: C) = apply(c)
+
+  def flatMap[B](f: A => Monitored[C, F[B]])(implicit m: Monad[({ type λ[α] = Monitored[C, F[α]] })#λ]) =
+    m.bind(this.asInstanceOf[Monitored[C, F[A]]])(f)
 }
 
 object Monitored {
   import scalaz.syntax.monad._
+  import scalaz.Id._
 
   def apply1[C, F0[_], A0](λ: C => F0[A0]): Monitored[C, F0[A0]] =
     new Monitored[C, F0[A0]] {
@@ -53,13 +57,8 @@ object Monitored {
       def leibniz = refl
     }
 
-  def apply0[C, A0](λ: C => A0): Monitored[C, A0] =
-    new Monitored[C, A0] {
-      type F[X] = scalaz.Id.Id[X]
-      type A = A0
-      val f = λ
-      def leibniz = refl
-    }
+  def apply0[C, A0](λ: C => A0) =
+    apply1[C, Id, A0](λ)
 
   def trans[C, F[_], G[_], A](m: Monitored[C, F[G[A]]])(implicit hh: HasHoist[G]) =
     Monitored.apply1[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { c =>
@@ -67,11 +66,12 @@ object Monitored {
     }
 
 
-  // implicit def monitoredInstances[C, A]: Monad[({ type λ[α] = Monitored[C, α] })#λ] =
-  //   new Monad[({ type λ[α] = Monitored[C, α] })#λ] {
-  //     def point[A](a: => A) = Monitored(_ => a)
-  //     def bind[A, B](m: Monitored[C, A])(f: A => Monitored[C, B]) =
-  //       Monitored(c => f(m(c))(c))
-  //   }
-
+  implicit def monitoredInstances[C, F[_]: Monad, A] =
+    new Monad[({ type λ[α] = Monitored[C, F[α]] })#λ] {
+      def point[A](a: => A) = Monitored.apply1[C, F, A](_ => implicitly[Monad[F]].point(a))
+      def bind[A, B](m: Monitored[C, F[A]])(f: A => Monitored[C, F[B]]) =
+        Monitored.apply1[C, F, B] { c =>
+          m(c).flatMap(f(_)(c))
+        }
+    }
 }

@@ -8,6 +8,40 @@ import play.api.test.Helpers._
 @RunWith(classOf[JUnitRunner])
 class ApplicationSpec extends Specification {
 
+  import monitor.{ Monitored }, Monitored._
+  trait Log {
+    def debug(s: String): Unit
+  }
+
+  "Application" should {
+    import play.api.libs.concurrent.Execution.Implicits._
+    import scala.concurrent.Future
+    import scalaz.std.scalaFuture._
+    import scalaz.std.option._
+    import scalaz.syntax.monad._
+
+    import scalaz.Monad
+
+    "Simple" in {
+      def f1 = Monitored.apply0{(_: Log) => 1}
+      def f2(i: Int) = Monitored.apply0{(_: Log) => s"foo $i"}
+
+      f1.flatMap(f2)
+
+      val res = for {
+        i <- f1
+        r <- f2(i)
+      } yield r
+
+      res.run(null) must be_==("foo 1")
+    }
+  }
+}
+
+/*
+@RunWith(classOf[JUnitRunner])
+class ApplicationSpec extends Specification {
+
   import monitor.{ Monitored, Context }, Monitored._
   trait Log {
     def debug(s: String): Unit
@@ -213,7 +247,6 @@ class ApplicationSpec extends Specification {
         "[DEBUG] CardComp.countAll",
         "[DEBUG] HighlightComp.get"))
     }
-
-
   }
 }
+*/
