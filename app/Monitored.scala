@@ -2,6 +2,7 @@ package monitor
 
 import scala.concurrent.Future
 import scalaz.{ Hoist, Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT, Applicative, Functor, ∨ }
+import scalaz.Leibniz.{===, refl}
 
 trait HasHoist[M[_]] {
   type T[_[_], _]
@@ -11,8 +12,7 @@ trait HasHoist[M[_]] {
 object HasHoist {
   def apply[M[_]](implicit h: HasHoist[M]): HasHoist[M] = h
 
-  implicit def optionHasHoist =
-  new HasHoist[Option] {
+  implicit object optionHasHoist extends HasHoist[Option] {
     type T[F[_], A] = OptionT[F, A]
     def lift[F[_], A](f: F[Option[A]]): OptionT[F, A] = OptionT.apply(f)
   }
@@ -34,28 +34,36 @@ trait Monitored[C, FA] {
   type F[_]
   type A
 
+  /** Evidence that MA =:= M[A] */
+  def leibniz: FA === F[A]
+
   val f: C => FA
   def apply(c: C) = f(c)
   def run(c: C) = apply(c)
-
-  def T(implicit hh: HasHoist[F]) = ???
 }
 
 object Monitored {
   import scalaz.syntax.monad._
 
-  def apply[F0[_], C, A0](λ: C => F0[A0]): Monitored[C, F0[A0]] =
+  def apply1[C, F0[_], A0](λ: C => F0[A0]): Monitored[C, F0[A0]] =
     new Monitored[C, F0[A0]] {
       type F[X] = F0[X]
       type A = A0
       val f = λ
+      def leibniz = refl
     }
 
-  def lift[C, A0](λ: C => A0): Monitored[C, A0] =
+  def apply0[C, A0](λ: C => A0): Monitored[C, A0] =
     new Monitored[C, A0] {
       type F[X] = scalaz.Id.Id[X]
       type A = A0
       val f = λ
+      def leibniz = refl
+    }
+
+  def trans[C, F[_], G[_], A](m: Monitored[C, F[G[A]]])(implicit hh: HasHoist[G]) =
+    Monitored.apply1[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { c =>
+      hh.lift[F, A](m.f(c))
     }
 
 
