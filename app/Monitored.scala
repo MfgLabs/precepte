@@ -76,8 +76,7 @@ object Monitored {
 
   def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
     type λ[α] = G[A, α]
-    implicit val kev: *->*[λ] = new *->*[λ] {}
-    trans[C, F, λ, B](m)(kev, hh)
+    trans[C, F, λ, B](m)(new *->*[λ] {}, hh)
   }
 
   // implicit def monitoredInstances[C, F[_]: Monad, A] =
