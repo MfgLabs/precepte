@@ -125,97 +125,95 @@ class ApplicationSpec extends Specification {
       res3(null).run must be_==(error).await
     }
 
-    // case class Board(pin: Option[Int])
-    // object BoardComp {
-    //   def get(): Monitored[Log, Future[Board]] = Monitored{ c =>
-    //     c.value.debug("BoardComp.get")
-    //     Board(Some(1)).point[Future]
-    //   }
-    // }
+    case class Board(pin: Option[Int])
+    object BoardComp {
+      def get(): Monitored[Log, Future, Board] = Monitored{ logger =>
+        logger.debug("BoardComp.get")
+        Board(Some(1)).point[Future]
+      }
+    }
 
-    // case class Community(name: String)
-    // case class Card(name: String)
+    case class Community(name: String)
+    case class Card(name: String)
 
-    // object CardComp {
-    //   def getPin(id: Int): Monitored[Log, Future[Option[(Int, Card)]]] = Monitored { c =>
-    //     c.value.debug("CardComp.getPin")
-    //     Some(1 -> Card("card 1")).point[Future]
-    //   }
+    object CardComp {
+      def getPin(id: Int): Monitored[Log, Future, Option[(Int, Card)]] = Monitored { logger =>
+        logger.debug("CardComp.getPin")
+        Some(1 -> Card("card 1")).point[Future]
+      }
 
-    //   def countAll(): Monitored[Log, Future[Set[String]]] = Monitored { c =>
-    //     c.value.debug("CardComp.countAll")
-    //     Set("Edito", "Video").point[Future]
-    //   }
+      def countAll(): Monitored[Log, Future, Set[String]] = Monitored { logger =>
+        logger.debug("CardComp.countAll")
+        Set("Edito", "Video").point[Future]
+      }
 
-    //   def rank(): Monitored[Log, Future[List[(Int, Card)]]] = Monitored { c =>
-    //     c.value.debug("CardComp.rank")
-    //     List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
-    //   }
+      def rank(): Monitored[Log, Future, List[(Int, Card)]] = Monitored { logger =>
+        logger.debug("CardComp.rank")
+        List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
+      }
 
-    //   def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Log, Future[List[(Card, List[Community])]]] = Monitored { c =>
-    //     c.value.debug("CardComp.cardsInfos")
-    //     List(
-    //       Card("foo") -> List(Community("community 1"), Community("community 2")),
-    //       Card("bar") -> List(Community("community 2"))).point[Future]
-    //   }
-    // }
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Log, Future, List[(Card, List[Community])]] = Monitored { logger =>
+        logger.debug("CardComp.cardsInfos")
+        List(
+          Card("foo") -> List(Community("community 1"), Community("community 2")),
+          Card("bar") -> List(Community("community 2"))).point[Future]
+      }
+    }
 
-    // import java.net.URL
-    // case class Highlight(title: String, cover: URL)
-    // object HighlightComp {
-    //   def get(): Monitored[Log, Future[Highlight]] = Monitored { c =>
-    //     c.value.debug("HighlightComp.get")
-    //     Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
-    //   }
-    // }
-
-
-    // "real world wb.fr home" in {
-
-    //   val logs = scala.collection.mutable.ArrayBuffer[String]()
-
-    //   val logger = new Log {
-    //     def debug(s: String): Unit = logs += s"[DEBUG] $s"
-    //   }
-
-    //   val context = Context(logger)
-
-    //   val getPin =
-    //     (for {
-    //       b <- BoardComp.get().lift[Option].T
-    //       id <- Monitored((_: Context[Log]) => b.pin.point[Future]).T
-    //       pin <- CardComp.getPin(id).T
-    //     } yield pin).run
+    import java.net.URL
+    case class Highlight(title: String, cover: URL)
+    object HighlightComp {
+      def get(): Monitored[Log, Future, Highlight] = Monitored { logger =>
+        logger.debug("HighlightComp.get")
+        Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
+      }
+    }
 
 
-    //   val res = for {
-    //     pin <- Monitored(getPin(_: Context[Log]).run).K
-    //     cs <- CardComp.rank().K
-    //     cards <- CardComp.cardsInfos(cs, pin.map(_._1)).K
-    //     availableTypes <- CardComp.countAll().K
-    //     h <- HighlightComp.get().K
-    //   } yield (pin, cs, cards, availableTypes, h)
+    "real world wb.fr home" in {
 
-    //   res.run(context) must be_==(
-    //     (Some((1, Card("card 1"))),
-    //       List((1, Card("foo")), (1, Card("bar"))),
-    //       List(
-    //         (Card("foo"), List(
-    //           Community("community 1"),
-    //           Community("community 2"))),
-    //         (Card("bar"),List(
-    //           Community("community 2")))),
-    //       Set("Edito", "Video"),
-    //       Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")))
-    //   ).await
+      val logs = scala.collection.mutable.ArrayBuffer[String]()
 
-    //   logs must be_==(Seq(
-    //     "[DEBUG] BoardComp.get",
-    //     "[DEBUG] CardComp.getPin",
-    //     "[DEBUG] CardComp.rank",
-    //     "[DEBUG] CardComp.cardsInfos",
-    //     "[DEBUG] CardComp.countAll",
-    //     "[DEBUG] HighlightComp.get"))
-    // }
+      val logger = new Log {
+        def debug(s: String): Unit = logs += s"[DEBUG] $s"
+      }
+
+      val getPin =
+        (for {
+          b   <- trans(BoardComp.get().map(Option.apply _))
+          id  <- trans(Monitored((_: Log) => b.pin.point[Future]))
+          pin <- trans(CardComp.getPin(id))
+        } yield pin)
+
+
+      val res = for {
+        pin            <- Monitored(getPin(_: Log).run)
+        cs             <- CardComp.rank()
+        cards          <- CardComp.cardsInfos(cs, pin.map(_._1))
+        availableTypes <- CardComp.countAll()
+        h              <- HighlightComp.get()
+      } yield (pin, cs, cards, availableTypes, h)
+
+      res(logger) must be_==(
+        (Some((1, Card("card 1"))),
+          List((1, Card("foo")), (1, Card("bar"))),
+          List(
+            (Card("foo"), List(
+              Community("community 1"),
+              Community("community 2"))),
+            (Card("bar"),List(
+              Community("community 2")))),
+          Set("Edito", "Video"),
+          Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")))
+      ).await
+
+      logs must be_==(Seq(
+        "[DEBUG] BoardComp.get",
+        "[DEBUG] CardComp.getPin",
+        "[DEBUG] CardComp.rank",
+        "[DEBUG] CardComp.cardsInfos",
+        "[DEBUG] CardComp.countAll",
+        "[DEBUG] HighlightComp.get"))
+    }
   }
 }
