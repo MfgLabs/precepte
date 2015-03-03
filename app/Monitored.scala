@@ -99,7 +99,13 @@ object Monitored {
   import scalaz.Id._
   import scalaz.Unapply
 
-  case class Context[C](value: C)
+  case class Context[C](value: C, span: Context.Span, parent: Array[Context.Id])
+  object Context {
+    case class Span(value: String) extends AnyVal
+    case class Id(value: String) extends AnyVal
+    object Id { def gen = Id(java.util.UUID.randomUUID.toString) }
+    object Span { def gen = Span(java.util.UUID.randomUUID.toString) }
+  }
 
   trait *->*[F[_]] {}
   trait *->*->*[F[_, _]] {}

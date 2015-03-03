@@ -206,7 +206,7 @@ class ApplicationSpec extends Specification {
         h              <- HighlightComp.get()
       } yield (pin, cs, cards, availableTypes, h)
 
-      res(Context(logger)) must be_==(
+      res(Context(logger, Context.Span.gen, Array())) must be_==(
         (Some((1, Card("card 1"))),
           List((1, Card("foo")), (1, Card("bar"))),
           List(
