@@ -5,6 +5,7 @@ import scalaz.{ Hoist, Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT, Appl
 import scalaz.Leibniz.{===, refl}
 import scalaz.Id._
 import scalaz.Unapply
+import shapeless.{ HList, :: }
 
 trait HasHoist[M[_]] {
   type T[_[_], _]
@@ -67,7 +68,7 @@ object CoHasHoist {
   }
 }
 
-trait Monitored[C, F[_], A] {
+trait Monitored[C <: HList, F[_], A] {
   import Monitored.Context
 
   val f: Context[C] => F[A]
@@ -103,9 +104,8 @@ object Monitored {
   import scalaz.syntax.monad._
   import scalaz.Id._
   import scalaz.Unapply
-  import shapeless.{ HList, :: }
 
-  case class Context[C](value: C, span: Context.Span, parents: Array[Context.Id])
+  case class Context[C <: HList](value: C, span: Context.Span, parents: Array[Context.Id])
   object Context {
     case class Span(value: String) extends AnyVal
     case class Id(value: String) extends AnyVal
@@ -119,28 +119,28 @@ object Monitored {
   implicit def fKindEv[F0[_]] = new *->*[F0] {}
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 
-  def apply0[C, A0](λ: Context[C] => A0): Monitored[C, Id, A0] =
+  def apply0[C <: HList, A0](λ: Context[C] => A0): Monitored[C, Id, A0] =
     apply[C, Id, A0](λ)
 
-  def apply[C, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
+  def apply[C <: HList, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
       val f = λ
     }
 
-  def apply[C, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
+  def apply[C <: HList, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
     m.contramap(c => c.copy(parents = c.parents :+ Context.Id.gen))
 
-  def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
+  def trans[C <: HList, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
     Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { (c: Context[C]) =>
       hh.lift[F, A](m.f(c))
     }
 
-  def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
+  def trans[C <: HList, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
     type λ[α] = G[A, α]
     trans[C, F, λ, B](m)(new *->*[λ] {}, hh)
   }
 
-  implicit def monitoredInstances[C, F[_]: Monad, A] =
+  implicit def monitoredInstances[C <: HList, F[_]: Monad, A] =
     new Monad[({ type λ[α] = Monitored[C, F, α] })#λ] {
       def point[A](a: => A): Monitored[C, F, A] = Monitored[C, F, A]((_: Context[C]) => implicitly[Monad[F]].point(a))
       def bind[A, B](m: Monitored[C, F, A])(f: A => Monitored[C, F, B]): Monitored[C, F, B] =
