@@ -109,20 +109,20 @@ class ApplicationSpec extends Specification {
 
       res(null).run must be_==(\/-("foo" -> 1)).await
 
-      // val error = -\/("Error")
-      // val res2 = for {
-      //   e1 <- trans(f1)
-      //   e2 <- trans(f3)
-      // } yield (e1, e2)
+      val error = -\/("Error")
+      val res2 = for {
+        e1 <- trans(f1)
+        e2 <- trans(f3)
+      } yield (e1, e2)
 
-      // res2(null).run must be_==(error).await
+      res2(null).run must be_==(error).await
 
-      // val res3 = for {
-      //   e1 <- trans(f3)
-      //   e2 <- trans(f2)
-      // } yield (e1, e2)
+      val res3 = for {
+        e1 <- trans(f3)
+        e2 <- trans(f2)
+      } yield (e1, e2)
 
-      // res3(null).run must be_==(error).await
+      res3(null).run must be_==(error).await
     }
 
     // case class Board(pin: Option[Int])
