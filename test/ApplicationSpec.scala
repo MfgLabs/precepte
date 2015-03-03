@@ -22,7 +22,7 @@ class ApplicationSpec extends Specification {
     import scalaz.syntax.monad._
     import scalaz.{ Kleisli, OptionT, EitherT }
 
-    "Simple" in {
+    "trivial" in {
       def f1 = Monitored.apply0{(_: Log) => 1}
       def f2(i: Int) = Monitored.apply0{(_: Log) => s"foo $i"}
 
@@ -32,6 +32,18 @@ class ApplicationSpec extends Specification {
       } yield r
 
       res(null) must be_==("foo 1")
+    }
+
+    "simple" in {
+      def f1 = Monitored{(_: Log) => 1.point[Future]}
+      def f2(i: Int) = Monitored{(_: Log) => s"foo $i".point[Future]}
+
+      val res = for {
+        i <- f1
+        r <- f2(i)
+      } yield r
+
+      res(null) must be_==("foo 1").await
     }
 
     "optT" in {
