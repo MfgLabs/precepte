@@ -180,7 +180,7 @@ class ApplicationSpec extends Specification {
 
       val getPin =
         (for {
-          b   <- trans(BoardComp.get().map(Option.apply _))
+          b   <- trans(BoardComp.get().lift[Option])
           id  <- trans(Monitored((_: Log) => b.pin.point[Future]))
           pin <- trans(CardComp.getPin(id))
         } yield pin)

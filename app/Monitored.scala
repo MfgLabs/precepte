@@ -48,6 +48,9 @@ trait Monitored[C, F[_], A] {
     Monitored[C, F, B] { (c: C) =>
       m.map(f(c))(fu)
     }
+
+  def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Monitored[C, F, AP[A]] =
+    this.map(a => ap.point(a))
 }
 
 object Monitored {
