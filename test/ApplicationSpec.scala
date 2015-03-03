@@ -195,7 +195,7 @@ class ApplicationSpec extends Specification {
           b   <- trans(BoardComp.get().lift[Option])
           id  <- trans(Monitored((_: Log) => b.pin.point[Future]))
           pin <- trans(CardComp.getPin(id))
-        } yield pin).map0(_.run)
+        } yield pin).run
 
 
       val res = for {
