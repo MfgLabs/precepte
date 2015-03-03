@@ -83,6 +83,11 @@ trait Monitored[C, F[_], A] {
       m.map(f(c))(fu)
     }
 
+  def contramap(endo: Context[C] => Context[C]) =
+    Monitored[C, F, A]{ (c: Context[C]) =>
+      f(endo(c))
+    }
+
   def map0[G[_], B](fu: F[A] => G[B]) =
     Monitored[C, G, B] { (c: Context[C]) =>
       fu(f(c))
@@ -98,8 +103,9 @@ object Monitored {
   import scalaz.syntax.monad._
   import scalaz.Id._
   import scalaz.Unapply
+  import shapeless.{ HList, :: }
 
-  case class Context[C](value: C, span: Context.Span, parent: Array[Context.Id])
+  case class Context[C](value: C, span: Context.Span, parents: Array[Context.Id])
   object Context {
     case class Span(value: String) extends AnyVal
     case class Id(value: String) extends AnyVal
@@ -121,6 +127,9 @@ object Monitored {
       val f = λ
     }
 
+  def apply[C, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
+    m.contramap(c => c.copy(parents = c.parents :+ Context.Id.gen))
+
   def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
     Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { (c: Context[C]) =>
       hh.lift[F, A](m.f(c))
@@ -133,7 +142,7 @@ object Monitored {
 
   implicit def monitoredInstances[C, F[_]: Monad, A] =
     new Monad[({ type λ[α] = Monitored[C, F, α] })#λ] {
-      def point[A](a: => A): Monitored[C, F, A] = Monitored[C, F, A](_ => implicitly[Monad[F]].point(a))
+      def point[A](a: => A): Monitored[C, F, A] = Monitored[C, F, A]((_: Context[C]) => implicitly[Monad[F]].point(a))
       def bind[A, B](m: Monitored[C, F, A])(f: A => Monitored[C, F, B]): Monitored[C, F, B] =
         m.flatMap(f)
     }

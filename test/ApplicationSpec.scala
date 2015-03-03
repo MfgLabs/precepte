@@ -181,6 +181,26 @@ class ApplicationSpec extends Specification {
       }
     }
 
+    "stack contexts" in {
+      def f1 = Monitored{(_: Context[Log]) => 1.point[Future]}
+      def f2(i: Int) = Monitored{(_: Context[Log]) => s"foo $i".point[Future]}
+
+      val logs = scala.collection.mutable.ArrayBuffer[String]()
+
+      val logger = new Log {
+        def debug(s: String): Unit = logs += s"[DEBUG] $s"
+      }
+
+      val res = Monitored {
+        for {
+          i <- f1
+          r <- f2(i)
+        } yield r
+      }
+
+      res(Context(logger, Context.Span.gen, Array())) must be_==("foo 1").await
+    }
+
 
     "real world wb.fr home" in {
 
