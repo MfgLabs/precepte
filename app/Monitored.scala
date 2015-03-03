@@ -68,22 +68,23 @@ object CoHasHoist {
 }
 
 trait Monitored[C, F[_], A] {
+  import Monitored.Context
 
-  val f: C => F[A]
-  def apply(c: C): F[A] = f(c)
+  val f: Context[C] => F[A]
+  def apply(c: Context[C]): F[A] = f(c)
 
   def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]) =
-    Monitored[C, F, B] { (c: C) =>
+    Monitored[C, F, B] { (c: Context[C]) =>
       m.bind(apply(c))(a => fr(a)(c))
     }
 
   def map[B](fu: A => B)(implicit m: Functor[F]) =
-    Monitored[C, F, B] { (c: C) =>
+    Monitored[C, F, B] { (c: Context[C]) =>
       m.map(f(c))(fu)
     }
 
   def map0[G[_], B](fu: F[A] => G[B]) =
-    Monitored[C, G, B] { (c: C) =>
+    Monitored[C, G, B] { (c: Context[C]) =>
       fu(f(c))
     }
 
@@ -98,22 +99,24 @@ object Monitored {
   import scalaz.Id._
   import scalaz.Unapply
 
+  case class Context[C](value: C)
+
   trait *->*[F[_]] {}
   trait *->*->*[F[_, _]] {}
 
   implicit def fKindEv[F0[_]] = new *->*[F0] {}
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 
-  def apply0[C, A0](λ: C => A0): Monitored[C, Id, A0] =
+  def apply0[C, A0](λ: Context[C] => A0): Monitored[C, Id, A0] =
     apply[C, Id, A0](λ)
 
-  def apply[C, F0[_], A0](λ: C => F0[A0]): Monitored[C, F0, A0] =
+  def apply[C, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
       val f = λ
     }
 
   def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
-    Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { (c: C) =>
+    Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { (c: Context[C]) =>
       hh.lift[F, A](m.f(c))
     }
 
@@ -122,10 +125,10 @@ object Monitored {
     trans[C, F, λ, B](m)(new *->*[λ] {}, hh)
   }
 
-  // implicit def monitoredInstances[C, F[_]: Monad, A] =
-  //   new Monad[({ type λ[α] = Monitored[C, F[α]] })#λ] {
-  //     def point[A](a: => A): Monitored[C, F[A]] = Monitored.apply1[C, F, A](_ => implicitly[Monad[F]].point(a))
-  //     def bind[A, B](m: Monitored[C, F[A]])(f: A => Monitored[C, F[B]]): Monitored[C, F[B]] =
-  //       m.flatMap(f)
-  //   }
+  implicit def monitoredInstances[C, F[_]: Monad, A] =
+    new Monad[({ type λ[α] = Monitored[C, F, α] })#λ] {
+      def point[A](a: => A): Monitored[C, F, A] = Monitored[C, F, A](_ => implicitly[Monad[F]].point(a))
+      def bind[A, B](m: Monitored[C, F, A])(f: A => Monitored[C, F, B]): Monitored[C, F, B] =
+        m.flatMap(f)
+    }
 }

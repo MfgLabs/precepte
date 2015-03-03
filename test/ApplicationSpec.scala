@@ -23,8 +23,8 @@ class ApplicationSpec extends Specification {
     import scalaz.{ Kleisli, OptionT, EitherT }
 
     "trivial" in {
-      def f1 = Monitored.apply0{(_: Log) => 1}
-      def f2(i: Int) = Monitored.apply0{(_: Log) => s"foo $i"}
+      def f1 = Monitored.apply0{(_: Context[Log]) => 1}
+      def f2(i: Int) = Monitored.apply0{(_: Context[Log]) => s"foo $i"}
 
       val res = for {
         i <- f1
@@ -35,8 +35,8 @@ class ApplicationSpec extends Specification {
     }
 
     "simple" in {
-      def f1 = Monitored{(_: Log) => 1.point[Future]}
-      def f2(i: Int) = Monitored{(_: Log) => s"foo $i".point[Future]}
+      def f1 = Monitored{(_: Context[Log]) => 1.point[Future]}
+      def f2(i: Int) = Monitored{(_: Context[Log]) => s"foo $i".point[Future]}
 
       val res = for {
         i <- f1
@@ -47,9 +47,9 @@ class ApplicationSpec extends Specification {
     }
 
     "optT" in {
-      val f1 = Monitored((_: Log) => Option("foo").point[Future])
-      val f2 = Monitored((_: Log) => Option(1).point[Future])
-      val f3 = Monitored((_: Log) => (None: Option[Int]).point[Future])
+      val f1 = Monitored((_: Context[Log]) => Option("foo").point[Future])
+      val f2 = Monitored((_: Context[Log]) => Option(1).point[Future])
+      val f3 = Monitored((_: Context[Log]) => (None: Option[Int]).point[Future])
 
       val res = for {
         e1 <- trans(f1)
@@ -74,9 +74,9 @@ class ApplicationSpec extends Specification {
     }
 
     "listT" in {
-      val f1 = Monitored((_: Log) => List("foo", "bar").point[Future])
-      val f2 = Monitored((_: Log) => List(1, 2).point[Future])
-      val f3 = Monitored((_: Log) => List[Int]().point[Future])
+      val f1 = Monitored((_: Context[Log]) => List("foo", "bar").point[Future])
+      val f2 = Monitored((_: Context[Log]) => List(1, 2).point[Future])
+      val f3 = Monitored((_: Context[Log]) => List[Int]().point[Future])
 
       val res = for {
         e1 <- trans(f1)
@@ -139,8 +139,8 @@ class ApplicationSpec extends Specification {
 
     case class Board(pin: Option[Int])
     object BoardComp {
-      def get(): Monitored[Log, Future, Board] = Monitored{ logger =>
-        logger.debug("BoardComp.get")
+      def get(): Monitored[Log, Future, Board] = Monitored{ c =>
+        c.value.debug("BoardComp.get")
         Board(Some(1)).point[Future]
       }
     }
@@ -149,23 +149,23 @@ class ApplicationSpec extends Specification {
     case class Card(name: String)
 
     object CardComp {
-      def getPin(id: Int): Monitored[Log, Future, Option[(Int, Card)]] = Monitored { logger =>
-        logger.debug("CardComp.getPin")
+      def getPin(id: Int): Monitored[Log, Future, Option[(Int, Card)]] = Monitored { c =>
+        c.value.debug("CardComp.getPin")
         Some(1 -> Card("card 1")).point[Future]
       }
 
-      def countAll(): Monitored[Log, Future, Set[String]] = Monitored { logger =>
-        logger.debug("CardComp.countAll")
+      def countAll(): Monitored[Log, Future, Set[String]] = Monitored { c =>
+        c.value.debug("CardComp.countAll")
         Set("Edito", "Video").point[Future]
       }
 
-      def rank(): Monitored[Log, Future, List[(Int, Card)]] = Monitored { logger =>
-        logger.debug("CardComp.rank")
+      def rank(): Monitored[Log, Future, List[(Int, Card)]] = Monitored { c =>
+        c.value.debug("CardComp.rank")
         List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
       }
 
-      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Log, Future, List[(Card, List[Community])]] = Monitored { logger =>
-        logger.debug("CardComp.cardsInfos")
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]): Monitored[Log, Future, List[(Card, List[Community])]] = Monitored { c =>
+        c.value.debug("CardComp.cardsInfos")
         List(
           Card("foo") -> List(Community("community 1"), Community("community 2")),
           Card("bar") -> List(Community("community 2"))).point[Future]
@@ -175,8 +175,8 @@ class ApplicationSpec extends Specification {
     import java.net.URL
     case class Highlight(title: String, cover: URL)
     object HighlightComp {
-      def get(): Monitored[Log, Future, Highlight] = Monitored { logger =>
-        logger.debug("HighlightComp.get")
+      def get(): Monitored[Log, Future, Highlight] = Monitored { c =>
+        c.value.debug("HighlightComp.get")
         Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
       }
     }
@@ -193,7 +193,7 @@ class ApplicationSpec extends Specification {
       val getPin =
         (for {
           b   <- trans(BoardComp.get().lift[Option])
-          id  <- trans(Monitored((_: Log) => b.pin.point[Future]))
+          id  <- trans(Monitored((_: Context[Log]) => b.pin.point[Future]))
           pin <- trans(CardComp.getPin(id))
         } yield pin).run
 
@@ -206,7 +206,7 @@ class ApplicationSpec extends Specification {
         h              <- HighlightComp.get()
       } yield (pin, cs, cards, availableTypes, h)
 
-      res(logger) must be_==(
+      res(Context(logger)) must be_==(
         (Some((1, Card("card 1"))),
           List((1, Card("foo")), (1, Card("bar"))),
           List(
