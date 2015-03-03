@@ -53,6 +53,11 @@ object Monitored {
   import scalaz.Id._
   import scalaz.Unapply
 
+  trait *->*[F[_]] {}
+  trait *->*->*[F[_, _]] {}
+
+  implicit def fKindEv[F0[_], A0] = new *->*[F0] {}
+  implicit def fKindEv2[F0[_, _], A0] = new *->*->*[F0] {}
 
   def apply0[C, A0](λ: C => A0): Monitored[C, Id, A0] =
     apply[C, Id, A0](λ)
@@ -62,12 +67,16 @@ object Monitored {
       val f = λ
     }
 
-
-  def trans[C, F[_], G[_], A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]) =
+  def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
     Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { (c: C) =>
       hh.lift[F, A](m.f(c))
     }
 
+  def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
+    type λ[α] = G[A, α]
+    implicit val kev: *->*[λ] = new *->*[λ] {}
+    trans[C, F, λ, B](m)(kev, hh)
+  }
 
   // implicit def monitoredInstances[C, F[_]: Monad, A] =
   //   new Monad[({ type λ[α] = Monitored[C, F[α]] })#λ] {
