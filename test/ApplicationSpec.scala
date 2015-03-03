@@ -88,39 +88,42 @@ class ApplicationSpec extends Specification {
       res3(null).run must be_==(List()).await
     }
 
-    // "EitherT" in {
-    //   import scalaz.{ \/ , \/-, -\/}
-    //   import EitherT.eitherTFunctor
+    "EitherT" in {
+      import scalaz.{ \/ , \/-, -\/}
+      import EitherT.eitherTFunctor
 
-    //   val f1: Monitored[Log, Future[String \/ String]] =
-    //     Monitored(_ => \/-("foo").point[Future])
-    //   val f2: Monitored[Log, Future[String \/ Int]] =
-    //     Monitored(_ => \/-(1).point[Future])
-    //   val f3: Monitored[Log, Future[String \/ String]] =
-    //     Monitored(_ => -\/("Error").point[Future])
+      val f1: Monitored[Log, Future, String \/ String] =
+        Monitored(_ => \/-("foo").point[Future])
+      val f2: Monitored[Log, Future, String \/ Int] =
+        Monitored(_ => \/-(1).point[Future])
+      val f3: Monitored[Log, Future, String \/ String] =
+        Monitored(_ => -\/("Error").point[Future])
 
-    //   val res = for {
-    //     e1 <- f1.T
-    //     e2 <- f2.T
-    //   } yield (e1, e2)
+      type Foo[A] = EitherT[Future, String, A]
+      implicitly[scalaz.Functor[Foo]]
 
-    //   res.run(null).run must be_==(\/-("foo" -> 1)).await
+      val res = for {
+        e1 <- trans(f1)
+        e2 <- trans(f2)
+      } yield (e1, e2)
 
-    //   val error = -\/("Error")
-    //   val res2 = for {
-    //     e1 <- f1.T
-    //     e2 <- f3.T
-    //   } yield (e1, e2)
+      res(null).run must be_==(\/-("foo" -> 1)).await
 
-    //   res2.run(null).run must be_==(error).await
+      // val error = -\/("Error")
+      // val res2 = for {
+      //   e1 <- trans(f1)
+      //   e2 <- trans(f3)
+      // } yield (e1, e2)
 
-    //   val res3 = for {
-    //     e1 <- f3.T
-    //     e2 <- f2.T
-    //   } yield (e1, e2)
+      // res2(null).run must be_==(error).await
 
-    //   res3.run(null).run must be_==(error).await
-    // }
+      // val res3 = for {
+      //   e1 <- trans(f3)
+      //   e2 <- trans(f2)
+      // } yield (e1, e2)
+
+      // res3(null).run must be_==(error).await
+    }
 
     // case class Board(pin: Option[Int])
     // object BoardComp {

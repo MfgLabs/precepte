@@ -12,7 +12,9 @@ trait HasHoist[M[_]] {
 }
 
 object HasHoist {
-  def apply[M[_]](implicit h: HasHoist[M]): HasHoist[M] = h
+  type Aux[M[_], T0[_[_], _]] = HasHoist[M] { type T[F[_], A] = T0[F, A] }
+
+  def apply[M[_]](implicit h: HasHoist[M]): Aux[M, h.T] = h
 
   implicit object optionHasHoist extends HasHoist[Option] {
     type T[F[_], A] = OptionT[F, A]
@@ -29,7 +31,7 @@ object HasHoist {
     def lift[F[_], B](f: F[A ∨ B]): EitherT[F, A, B] = EitherT.apply(f)
   }
 
-  implicit def eitherHasHoist[A]: HasHoist[({ type λ[α] = A ∨ α })#λ] = new EitherHasHoist[A]
+  implicit def eitherHasHoist[A]: HasHoist.Aux[({ type λ[α] = A ∨ α })#λ, ({ type λ[F[_], B] = EitherT[F, A, B] })#λ] = new EitherHasHoist[A]
 }
 
 trait Monitored[C, F[_], A] {
@@ -56,8 +58,8 @@ object Monitored {
   trait *->*[F[_]] {}
   trait *->*->*[F[_, _]] {}
 
-  implicit def fKindEv[F0[_], A0] = new *->*[F0] {}
-  implicit def fKindEv2[F0[_, _], A0] = new *->*->*[F0] {}
+  implicit def fKindEv[F0[_]] = new *->*[F0] {}
+  implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 
   def apply0[C, A0](λ: C => A0): Monitored[C, Id, A0] =
     apply[C, Id, A0](λ)
