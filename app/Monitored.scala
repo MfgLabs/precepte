@@ -24,11 +24,12 @@ object HasHoist {
     def lift[F[_], A](f: F[List[A]]): ListT[F, A] = ListT.apply(f)
   }
 
-  // implicit def eitherHasHoist[A] =
-  //   new HasHoist[({ type λ[α] = A ∨ α })#λ] {
-  //     type T[F[_], B] = EitherT[F, A, B]
-  //     def lift[F[_], B](f: F[A ∨ B]): EitherT[F, A, B] = EitherT.apply(f)
-  //   }
+  private[this] class EitherHasHoist[A] extends HasHoist[({ type λ[α] = A ∨ α })#λ] {
+    type T[F[_], B] = EitherT[F, A, B]
+    def lift[F[_], B](f: F[A ∨ B]): EitherT[F, A, B] = EitherT.apply(f)
+  }
+
+  implicit def eitherHasHoist[A]: HasHoist[({ type λ[α] = A ∨ α })#λ] = new EitherHasHoist[A]
 }
 
 trait Monitored[C, F[_], A] {
