@@ -5,6 +5,7 @@ import scalaz.{ Hoist, Monad, Kleisli, OptionT, MonadTrans, ListT, EitherT, Appl
 import scalaz.Leibniz.{===, refl}
 import scalaz.Id._
 import scalaz.Unapply
+import scalaz.State
 import shapeless.{ HList, :: }
 
 trait HasHoist[M[_]] {
@@ -69,32 +70,36 @@ object CoHasHoist {
 }
 
 trait Monitored[C <: HList, F[_], A] {
+  self =>
   import Monitored.Context
 
-  val f: Context[C] => F[A]
-  def apply(c: Context[C]): F[A] = f(c)
+  val f: State[Context[C], F[A]]
 
-  def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]) =
-    Monitored[C, F, B] { (c: Context[C]) =>
-      m.bind(apply(c))(a => fr(a)(c))
+  def apply(fc: Context.State => C): F[A] = {
+    lazy val span = Context.Span.gen
+    lazy val c = Context(fc, (span, Array()))
+    f(c)._2
+  }
+
+  def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] =
+    Monitored[C, F, B](State[Context[C], F[B]]{ c =>
+      val (s0, fa) = f(c)
+      ???
+    })
+
+  def map[B](fu: A => B)(implicit m: Functor[F]): Monitored[C, F, B] =
+    Monitored[C, F, B] {
+      for { fa <- f }
+      yield m.map(fa)(fu)
     }
 
-  def map[B](fu: A => B)(implicit m: Functor[F]) =
-    Monitored[C, F, B] { (c: Context[C]) =>
-      m.map(f(c))(fu)
+  def mapK[G[_], B](fu: F[A] => G[B]): Monitored[C, G, B] =
+    Monitored[C, G, B] {
+      for { fa <- f }
+      yield fu(fa)
     }
 
-  def contramap(endo: Context[C] => Context[C]) =
-    Monitored[C, F, A]{ (c: Context[C]) =>
-      f(endo(c))
-    }
-
-  def map0[G[_], B](fu: F[A] => G[B]) =
-    Monitored[C, G, B] { (c: Context[C]) =>
-      fu(f(c))
-    }
-
-  def run(implicit ch: CoHasHoist[F]) = map0(a => ch.unlift(a))
+  def run(implicit ch: CoHasHoist[F]) = mapK(a => ch.unlift(a))
 
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Monitored[C, F, AP[A]] =
     this.map(a => ap.point(a))
@@ -105,12 +110,20 @@ object Monitored {
   import scalaz.Id._
   import scalaz.Unapply
 
-  case class Context[C <: HList](value: C, span: Context.Span, parents: Array[Context.Id])
+  case class Context[C <: HList](builder: ((Context.Span, Array[Context.Id])) => C, state: Context.State) {
+    val value = builder(state)
+  }
+
   object Context {
+    type State = (Context.Span,  Array[Context.Id])
     case class Span(value: String) extends AnyVal
     case class Id(value: String) extends AnyVal
-    object Id { def gen = Id(java.util.UUID.randomUUID.toString) }
-    object Span { def gen = Span(java.util.UUID.randomUUID.toString) }
+    object Id {
+      def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)
+    }
+    object Span {
+      def gen = Span(java.util.UUID.randomUUID.toString)
+    }
   }
 
   trait *->*[F[_]] {}
@@ -124,15 +137,25 @@ object Monitored {
 
   def apply[C <: HList, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
-      val f = λ
+      val f = State[Context[C], F0[A0]](c => (c, λ(c)))
+    }
+
+  def apply[C <: HList, F0[_], A0](state: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
+    new Monitored[C, F0, A0] {
+      val f = state
     }
 
   def apply[C <: HList, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
-    m.contramap(c => c.copy(parents = c.parents :+ Context.Id.gen))
+    new Monitored[C, F, A] {
+      val f = m.f.bimap{ c =>
+        val (span, ids) = c.state
+        c.copy(state = (span, Context.Id.gen +: ids))
+      }(identity)
+    }
 
   def trans[C <: HList, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
     Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { (c: Context[C]) =>
-      hh.lift[F, A](m.f(c))
+      hh.lift[F, A](m.f(c)._2)
     }
 
   def trans[C <: HList, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
