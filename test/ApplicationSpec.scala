@@ -191,26 +191,114 @@ class ApplicationSpec extends Specification {
       }
     }
 
+    "have context" in {
+      def f1 = Monitored{ (_: Context[HNil]) => 1.point[Future] }
+      val ctx = Context(nocontext, Context.Span("span") -> Array[Context.Id]())
+      val (span, ids) = f1.f(ctx)._1.state
+      span must be_==(Context.Span("span"))
+      ids must not(beEmpty)
+    }
+
+    "preserve context on map" in {
+      def f1 = Monitored{ (_: Context[HNil]) => 1.point[Future] }.map(identity)
+      val ctx = Context(nocontext, Context.Span("span") -> Array[Context.Id]())
+      val (span, ids) = f1.f(ctx)._1.state
+      span must be_==(Context.Span("span"))
+      ids.length must be_==(1)
+    }
+
+    "preserve context on flatMap" in {
+      def f1 = Monitored{ (_: Context[HNil]) => 1.point[Future] }
+      def f2(i: Int) = Monitored{ (_: Context[HNil]) => s"foo $i".point[Future] }
+
+      val f = f1.flatMap(i => f2(i))
+
+      val ctx = Context(nocontext, Context.Span("span") -> Array[Context.Id]())
+      val (span, ids) = f.f(ctx)._1.state
+      span must be_==(Context.Span("span"))
+      ids.length must be_==(1)
+    }
+
     "stack contexts" in {
-      def f1 = Monitored{ (_: Context[Log :: HNil]) => 1.point[Future] }
-      def f2(i: Int) = Monitored{ (_: Context[Log :: HNil]) => s"foo $i".point[Future] }
+      def f1 = Monitored{ (_: Context[HNil]) => 1.point[Future] }
+      val stacked = Monitored(f1)
+      val ctx = Context(nocontext, Context.Span("span") -> Array[Context.Id]())
+      val (span, ids) = stacked.f(ctx)._1.state
+      span must be_==(Context.Span("span"))
+      ids.length must be_==(2)
+    }
 
-      val logs = scala.collection.mutable.ArrayBuffer[String]()
+    "provide context to C" in {
+      val ctxs = scala.collection.mutable.ArrayBuffer[Context.State]()
 
-      case class Logger(state: Context.State) extends Log {
-        def debug(s: String): Unit = logs += s"[DEBUG] ${state._1.value} -> /${state._2.map(_.value).mkString("/")} $s"
+      case class ContextTester(state: Context.State) {
+        def push(): Unit = ctxs += state
       }
 
-      val res = Monitored {
+      def f1 = Monitored { (c: Context[ContextTester :: HNil]) =>
+        val tester :: HNil = c.value
+        tester.push()
+        1.point[Future]
+      }
+
+      def f2(i: Int) = Monitored{ (c: Context[ContextTester :: HNil]) =>
+        val tester :: HNil = c.value
+        tester.push()
+        s"foo $i".point[Future]
+      }
+
+      f1(s => ContextTester(s) :: HNil) must be_==(1).await
+      ctxs.length must be_==(1)
+      ctxs.head._2.length must be_==(1)
+
+      ctxs.clear()
+
+      val res2 = f1.map(identity)
+      res2(s => ContextTester(s) :: HNil)
+
+      ctxs must have length(1)
+      ctxs.map(_._2.length == 1) must (beTrue).foreach
+
+      ctxs.clear()
+
+      val res = for {
+        i <- f1
+        r <- f2(i)
+      } yield r
+
+      res(s => ContextTester(s) :: HNil) must be_==("foo 1").await
+
+      ctxs must have length(2)
+      ctxs.map(_._1).toSet must have length(1) // span is unique
+      ctxs.map(_._2.length == 1) must (beTrue).foreach
+
+      ctxs.clear()
+
+      val res3 = Monitored(f1)
+      res3(s => ContextTester(s) :: HNil) must be_==(1).await
+
+      ctxs must have length(1)
+      ctxs.map(_._1).toSet must have length(1) // span is unique
+      ctxs.map(_._2.length == 2) must (beTrue).foreach
+
+      ctxs.clear()
+
+      val res4 = Monitored {
         for {
           i <- f1
           r <- f2(i)
         } yield r
       }
+      res4(s => ContextTester(s) :: HNil) must be_==("foo 1").await
 
-      res(state => Logger(state) :: HNil) must be_==("foo 1").await
+      ctxs.foreach { case (span, ids) =>
+        println(s"$span -> ${ids.toList}")
+      }
+
+      ctxs must have length(2)
+      ctxs.map(_._1).toSet must have length(1) // span is unique
+      ctxs.map(_._2.length == 2) must (beTrue).foreach
     }
-
 
     "real world wb.fr home" in {
 
@@ -250,7 +338,7 @@ class ApplicationSpec extends Specification {
           Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")))
       ).await
 
-      logs.foreach(println)
+      // logs.foreach(println)
 
       ok
 

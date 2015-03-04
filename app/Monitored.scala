@@ -77,7 +77,7 @@ trait Monitored[C <: HList, F[_], A] {
 
   def apply(fc: Context.State => C): F[A] = {
     lazy val span = Context.Span.gen
-    lazy val c = Context(fc, (span, Array()))
+    lazy val c = Context(fc, (span, Array(Context.Id.gen)))
     f(c)._2
   }
 
@@ -85,7 +85,7 @@ trait Monitored[C <: HList, F[_], A] {
     Monitored[C, F, B](State[Context[C], F[B]]{ c =>
       val (s0, fa) = f(c)
       val ffb = (a: A) => fr(a){ s =>
-        val newState = (c.state._1, c.state._2 ++ s._2)
+        val newState = (c.state._1, c.state._2 /*++ s._2*/)
         c.copy(state = newState).value
       }
       s0 -> m.bind(fa)(ffb)
@@ -146,15 +146,15 @@ object Monitored {
 
   def apply[C <: HList, F0[_], A0](st: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
-      val f = st.bimap(c => c.copy(state = (c.state._1, c.state._2 :+ Context.Id.gen)))(identity)
+      val f = st
     }
 
   def apply[C <: HList, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
     new Monitored[C, F, A] {
-      val f = m.f.bimap{ c =>
+      val f = m.f.contramap{ (c: Context[C]) =>
         val (span, ids) = c.state
         c.copy(state = (span, Context.Id.gen +: ids))
-      }(identity)
+      }
     }
 
   def trans[C <: HList, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
