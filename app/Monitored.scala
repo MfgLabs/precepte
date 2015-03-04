@@ -141,12 +141,12 @@ object Monitored {
 
   def apply[C <: HList, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
-      val f = State[Context[C], F0[A0]](c => (c, λ(c)))
+      val f = State[Context[C], F0[A0]](c => (c.copy(state = (c.state._1, c.state._2 :+ Context.Id.gen)), λ(c)))
     }
 
-  def apply[C <: HList, F0[_], A0](state: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
+  def apply[C <: HList, F0[_], A0](st: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
-      val f = state
+      val f = st.bimap(c => c.copy(state = (c.state._1, c.state._2 :+ Context.Id.gen)))(identity)
     }
 
   def apply[C <: HList, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
