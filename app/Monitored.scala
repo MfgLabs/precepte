@@ -84,8 +84,10 @@ trait Monitored[C <: HList, F[_], A] {
   def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] =
     Monitored[C, F, B](State[Context[C], F[B]]{ c =>
       val (s0, fa) = f(c)
-      val ffb = (a: A) => fr(a){ s =>
-        val newState = (c.state._1, s._2)
+      println("s0 = " + s0.state._2.toList)
+      val ffb = fr(_: A){ s =>
+        val newState = (c.state._1, c.state._2 ++ s._2)
+        println("s = " + s._2.toList) // THIS IS LOGGUED TWICE PER FLATMAP CALL WTF ???
         c.copy(state = newState).value
       }
       c -> m.bind(fa)(ffb)
@@ -141,10 +143,12 @@ object Monitored {
 
   def apply[C <: HList, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
-      val f = State[Context[C], F0[A0]](c => (c.copy(state = (c.state._1, c.state._2 :+ Context.Id.gen)), λ(c)))
+      val f = State[Context[C], F0[A0]]{ c =>
+        (c, λ(c))
+      }.contramap((c: Context[C]) => c.copy(state = (c.state._1, c.state._2 :+ Context.Id.gen)))
     }
 
-  def apply[C <: HList, F0[_], A0](st: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
+  private def apply[C <: HList, F0[_], A0](st: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
       val f = st
     }
