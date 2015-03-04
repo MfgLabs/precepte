@@ -76,9 +76,9 @@ trait Monitored[C <: HList, F[_], A] {
   val f: State[Context[C], F[A]]
 
   def apply(fc: Context.State => C): F[A] = {
-    lazy val span = Context.Span.gen
-    lazy val c = Context(fc, (span, Array(Context.Id.gen)))
-    f(c)._2
+    val span = Context.Span.gen
+    val c = Context(fc, (span, Array(Context.Id.gen)))
+    f.eval(c)
   }
 
   def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] =
