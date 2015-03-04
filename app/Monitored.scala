@@ -85,10 +85,10 @@ trait Monitored[C <: HList, F[_], A] {
     Monitored[C, F, B](State[Context[C], F[B]]{ c =>
       val (s0, fa) = f(c)
       val ffb = (a: A) => fr(a){ s =>
-        val newState = (c.state._1, c.state._2 /*++ s._2*/)
+        val newState = (c.state._1, s._2)
         c.copy(state = newState).value
       }
-      s0 -> m.bind(fa)(ffb)
+      c -> m.bind(fa)(ffb)
     })
 
   def map[B](fu: A => B)(implicit m: Functor[F]): Monitored[C, F, B] =
