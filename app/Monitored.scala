@@ -75,23 +75,22 @@ trait Monitored[C <: HList, F[_], A] {
 
   val f: State[Context[C], F[A]]
 
-  def apply(fc: Context.State => C): F[A] = {
+  def apply(fc: Context.State => C, path: Array[Context.Id] = Array(Context.Id.gen)): F[A] = {
     val span = Context.Span.gen
-    val c = Context(fc, (span, Array(Context.Id.gen)))
+    val c = Context(fc, (span, path))
     f.eval(c)
   }
 
-  def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] =
+  def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] = {
     Monitored[C, F, B](State[Context[C], F[B]]{ c =>
       val (s0, fa) = f(c)
-      println("s0 = " + s0.state._2.toList)
-      val ffb = fr(_: A){ s =>
-        val newState = (c.state._1, c.state._2 ++ s._2)
-        println("s = " + s._2.toList) // THIS IS LOGGUED TWICE PER FLATMAP CALL WTF ???
+      val ffb = fr(_: A)({ (s: Context.State) =>
+        val newState = (c.state._1, s._2)
         c.copy(state = newState).value
-      }
+      }, c.state._2)
       c -> m.bind(fa)(ffb)
     })
+  }
 
   def map[B](fu: A => B)(implicit m: Functor[F]): Monitored[C, F, B] =
     Monitored[C, F, B] {
@@ -117,7 +116,7 @@ object Monitored {
   import scalaz.Unapply
 
   case class Context[C <: HList](builder: ((Context.Span, Array[Context.Id])) => C, state: Context.State) {
-    val value = builder(state)
+    def value = builder(state)
   }
 
   object Context {
@@ -145,7 +144,7 @@ object Monitored {
     new Monitored[C, F0, A0] {
       val f = State[Context[C], F0[A0]]{ c =>
         (c, λ(c))
-      }.contramap((c: Context[C]) => c.copy(state = (c.state._1, c.state._2 :+ Context.Id.gen)))
+      }
     }
 
   private def apply[C <: HList, F0[_], A0](st: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
