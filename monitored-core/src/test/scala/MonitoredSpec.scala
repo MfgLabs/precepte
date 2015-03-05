@@ -231,7 +231,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     f1.eval(s => ContextTester(s)).futureValue should ===(1)
 
     ctxs.length should ===(1)
-    ctxs.head._2.length should ===(2)
+    ctxs.head._2.length should ===(1)
   }
 
   it should "preserve context on flatMap" in {
@@ -290,7 +290,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     val stacked = Monitored(f1)
     stacked.eval(s => ContextTester(s)).futureValue should ===(1)
     ctxs.length should ===(1)
-    ctxs.head._2.length should ===(3)
+    ctxs.head._2.length should ===(2)
   }
 
   it should "provide context to C" in {
@@ -317,7 +317,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     f1.eval(s => ContextTester(s)).futureValue should ===(1)
     ctxs.length should ===(1)
-    ctxs.head._2.length should ===(2)
+    ctxs.head._2.length should ===(1)
 
 
     ctxs.clear()
@@ -326,7 +326,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     res2.eval(s => ContextTester(s))
 
     ctxs should have length(1)
-    forAll(ctxs.map(_._2.length == 2)){_  should ===(true) }
+    forAll(ctxs.map(_._2.length == 1)){_  should ===(true) }
 
 
     ctxs.clear()
@@ -349,7 +349,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     ctxs should have length(1)
     ctxs.map(_._1).toSet.size should ===(1) // span is unique
-    forAll(ctxs.map(_._2.length == 3)){ _ should ===(true) }
+    forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
 
     ctxs.clear()
 

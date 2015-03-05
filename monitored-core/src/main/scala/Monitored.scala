@@ -87,9 +87,10 @@ trait Monitored[C, F[_], A] {
 
   def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] = {
     Monitored[C, F, B](State[Context[C], F[B]]{ c =>
-      val (s0, fa) = f(c)
+      val ns1 = (c.state._1, c.state._2 :+ Context.Id.gen)
+      val (s0, fa) = f(c.copy(state = ns1))
       val ffb = fr(_: A).eval({ (s: Context.State) =>
-        val newState = (c.state._1, s._2)
+        val newState = (c.state._1, c.state._2 :+ Context.Id.gen)
         c.copy(state = newState).value
       }, c.state)
       c -> m.bind(fa)(ffb)
@@ -146,9 +147,7 @@ object Monitored {
   def apply[C, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
       val f = State[Context[C], F0[A0]]{ c =>
-        val (span, ids) = c.state
-        val newC = c.copy(state = (span, ids :+ Context.Id.gen))
-        (c, λ(newC))
+        (c, λ(c))
       }
     }
 
