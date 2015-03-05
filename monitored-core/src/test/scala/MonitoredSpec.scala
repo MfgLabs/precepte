@@ -383,7 +383,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
         b   <- trans(BoardComp.get().lift[Option])
         id  <- trans(Monitored((_: Context[Log]) => b.pin.point[Future]))
         pin <- trans(CardComp.getPin(id))
-      } yield pin).run
+      } yield pin).cotrans
 
 
     val res = for {
