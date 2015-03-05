@@ -146,7 +146,9 @@ object Monitored {
   def apply[C, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
       val f = State[Context[C], F0[A0]]{ c =>
-        (c, λ(c))
+        val (span, ids) = c.state
+        val newC = c.copy(state = (span, ids :+ Context.Id.gen))
+        (c, λ(newC))
       }
     }
 
