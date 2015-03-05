@@ -5,8 +5,6 @@ import org.junit.runner._
 import play.api.test._
 import play.api.test.Helpers._
 
-import shapeless.{ HList, ::, HNil }
-
 
 @RunWith(classOf[JUnitRunner])
 class ApplicationSpec extends Specification {
@@ -24,11 +22,11 @@ class ApplicationSpec extends Specification {
     import scalaz.syntax.monad._
     import scalaz.{ Kleisli, OptionT, EitherT }
 
-    val nocontext: Context.State => HNil = _ => HNil
+    val nocontext: Context.State => Unit = _ => ()
 
     "trivial" in {
-      def f1 = Monitored.apply0{(_: Context[HNil]) => 1}
-      def f2(i: Int) = Monitored.apply0{(_: Context[HNil]) => s"foo $i"}
+      def f1 = Monitored.apply0{(_: Context[Unit]) => 1}
+      def f2(i: Int) = Monitored.apply0{(_: Context[Unit]) => s"foo $i"}
 
       val res = for {
         i <- f1
@@ -39,8 +37,8 @@ class ApplicationSpec extends Specification {
     }
 
     "simple" in {
-      def f1 = Monitored{(_: Context[HNil]) => 1.point[Future]}
-      def f2(i: Int) = Monitored{(_: Context[HNil]) => s"foo $i".point[Future]}
+      def f1 = Monitored{(_: Context[Unit]) => 1.point[Future]}
+      def f2(i: Int) = Monitored{(_: Context[Unit]) => s"foo $i".point[Future]}
 
       val res = for {
         i <- f1
@@ -51,9 +49,9 @@ class ApplicationSpec extends Specification {
     }
 
     "optT" in {
-      val f1 = Monitored((_: Context[HNil]) => Option("foo").point[Future])
-      val f2 = Monitored((_: Context[HNil]) => Option(1).point[Future])
-      val f3 = Monitored((_: Context[HNil]) => (None: Option[Int]).point[Future])
+      val f1 = Monitored((_: Context[Unit]) => Option("foo").point[Future])
+      val f2 = Monitored((_: Context[Unit]) => Option(1).point[Future])
+      val f3 = Monitored((_: Context[Unit]) => (None: Option[Int]).point[Future])
 
       val res = for {
         e1 <- trans(f1)
@@ -78,9 +76,9 @@ class ApplicationSpec extends Specification {
     }
 
     "listT" in {
-      val f1 = Monitored((_: Context[HNil]) => List("foo", "bar").point[Future])
-      val f2 = Monitored((_: Context[HNil]) => List(1, 2).point[Future])
-      val f3 = Monitored((_: Context[HNil]) => List[Int]().point[Future])
+      val f1 = Monitored((_: Context[Unit]) => List("foo", "bar").point[Future])
+      val f2 = Monitored((_: Context[Unit]) => List(1, 2).point[Future])
+      val f3 = Monitored((_: Context[Unit]) => List[Int]().point[Future])
 
       val res = for {
         e1 <- trans(f1)
@@ -108,11 +106,11 @@ class ApplicationSpec extends Specification {
       import scalaz.{ \/ , \/-, -\/}
       import EitherT.eitherTFunctor
 
-      val f1: Monitored[HNil, Future, String \/ String] =
+      val f1: Monitored[Unit, Future, String \/ String] =
         Monitored(_ => \/-("foo").point[Future])
-      val f2: Monitored[HNil, Future, String \/ Int] =
+      val f2: Monitored[Unit, Future, String \/ Int] =
         Monitored(_ => \/-(1).point[Future])
-      val f3: Monitored[HNil, Future, String \/ String] =
+      val f3: Monitored[Unit, Future, String \/ String] =
         Monitored(_ => -\/("Error").point[Future])
 
       type Foo[A] = EitherT[Future, String, A]
@@ -143,8 +141,8 @@ class ApplicationSpec extends Specification {
 
     case class Board(pin: Option[Int])
     object BoardComp {
-      def get() = Monitored { (c: Context[Log :: HNil]) =>
-        val logger :: _ = c.value
+      def get() = Monitored { (c: Context[Log]) =>
+        val logger = c.value
         logger.debug("BoardComp.get")
         Board(Option(1)).point[Future]
       }
@@ -154,26 +152,26 @@ class ApplicationSpec extends Specification {
     case class Card(name: String)
 
     object CardComp {
-      def getPin(id: Int) = Monitored { (c: Context[Log :: HNil]) =>
-        val logger :: _ = c.value
+      def getPin(id: Int) = Monitored { (c: Context[Log]) =>
+        val logger = c.value
         logger.debug("CardComp.getPin")
         Option(1 -> Card("card 1")).point[Future]
       }
 
-      def countAll() = Monitored { (c: Context[Log :: HNil]) =>
-        val logger :: _ = c.value
+      def countAll() = Monitored { (c: Context[Log]) =>
+        val logger = c.value
         logger.debug("CardComp.countAll")
         Set("Edito", "Video").point[Future]
       }
 
-      def rank() = Monitored { (c: Context[Log :: HNil]) =>
-        val logger :: _ = c.value
+      def rank() = Monitored { (c: Context[Log]) =>
+        val logger = c.value
         logger.debug("CardComp.rank")
         List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
       }
 
-      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored { (c: Context[Log :: HNil]) =>
-        val logger :: _ = c.value
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored { (c: Context[Log]) =>
+        val logger = c.value
         logger.debug("CardComp.cardsInfos")
         List(
           Card("foo") -> List(Community("community 1"), Community("community 2")),
@@ -184,8 +182,8 @@ class ApplicationSpec extends Specification {
     import java.net.URL
     case class Highlight(title: String, cover: URL)
     object HighlightComp {
-      def get() = Monitored { (c: Context[Log :: HNil]) =>
-        val logger :: _ = c.value
+      def get() = Monitored { (c: Context[Log]) =>
+        val logger = c.value
         logger.debug("HighlightComp.get")
         Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
       }
@@ -198,13 +196,13 @@ class ApplicationSpec extends Specification {
         def push(): Unit = ctxs += state
       }
 
-      def f1 = Monitored{ (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f1 = Monitored{ (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push()
         1.point[Future]
       }
 
-      f1(s => ContextTester(s) :: HNil) must be_==(1).await
+      f1(s => ContextTester(s)) must be_==(1).await
       ctxs.length must be_==(1)
     }
 
@@ -215,13 +213,13 @@ class ApplicationSpec extends Specification {
         def push(): Unit = ctxs += state
       }
 
-      def f1 = Monitored{ (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f1 = Monitored{ (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push()
         1.point[Future]
       }.map(identity).map(identity).map(identity).map(identity)
 
-      f1(s => ContextTester(s) :: HNil) must be_==(1).await
+      f1(s => ContextTester(s)) must be_==(1).await
 
       ctxs.length must be_==(1)
       ctxs.head._2.length must be_==(1)
@@ -234,20 +232,20 @@ class ApplicationSpec extends Specification {
         def push(name: String): Unit = ctxs += state
       }
 
-      def f1 = Monitored{ (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f1 = Monitored{ (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push("f1")
         1.point[Future]
       }
 
-      def f2(i: Int) = Monitored{ (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f2(i: Int) = Monitored{ (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push("f2")
         s"foo $i".point[Future]
       }
 
-      def f3(s: String) = Monitored{ (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f3(s: String) = Monitored{ (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push("f3")
         s"f3 $s".point[Future]
       }
@@ -256,7 +254,7 @@ class ApplicationSpec extends Specification {
         .flatMap(i => f2(i))
         .flatMap(s => f3(s))
 
-      f(s => ContextTester(s) :: HNil) must be_==("f3 foo 1").await
+      f(s => ContextTester(s)) must be_==("f3 foo 1").await
 
       ctxs.length must be_==(3)
     }
@@ -268,14 +266,14 @@ class ApplicationSpec extends Specification {
         def push(): Unit = ctxs += state
       }
 
-      def f1 = Monitored{ (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f1 = Monitored{ (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push()
         1.point[Future]
       }
 
       val stacked = Monitored(f1)
-      stacked(s => ContextTester(s) :: HNil) must be_==(1).await
+      stacked(s => ContextTester(s)) must be_==(1).await
       ctxs.length must be_==(1)
       ctxs.head._2.length must be_==(2)
     }
@@ -287,19 +285,19 @@ class ApplicationSpec extends Specification {
         def push(): Unit = ctxs += state
       }
 
-      def f1 = Monitored { (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f1 = Monitored { (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push()
         1.point[Future]
       }
 
-      def f2(i: Int) = Monitored{ (c: Context[ContextTester :: HNil]) =>
-        val tester :: HNil = c.value
+      def f2(i: Int) = Monitored{ (c: Context[ContextTester]) =>
+        val tester = c.value
         tester.push()
         s"foo $i".point[Future]
       }
 
-      f1(s => ContextTester(s) :: HNil) must be_==(1).await
+      f1(s => ContextTester(s)) must be_==(1).await
       ctxs.length must be_==(1)
       ctxs.head._2.length must be_==(1)
 
@@ -307,7 +305,7 @@ class ApplicationSpec extends Specification {
       ctxs.clear()
 
       val res2 = f1.map(identity)
-      res2(s => ContextTester(s) :: HNil)
+      res2(s => ContextTester(s))
 
       ctxs must have length(1)
       ctxs.map(_._2.length == 1) must (beTrue).foreach
@@ -320,7 +318,7 @@ class ApplicationSpec extends Specification {
         r <- f2(i)
       } yield r
 
-      res(s => ContextTester(s) :: HNil) must be_==("foo 1").await
+      res(s => ContextTester(s)) must be_==("foo 1").await
 
       ctxs must have length(2)
       ctxs.map(_._1).toSet must have length(1) // span is unique
@@ -329,7 +327,7 @@ class ApplicationSpec extends Specification {
       ctxs.clear()
 
       val res3 = Monitored(f1)
-      res3(s => ContextTester(s) :: HNil) must be_==(1).await
+      res3(s => ContextTester(s)) must be_==(1).await
 
       ctxs must have length(1)
       ctxs.map(_._1).toSet must have length(1) // span is unique
@@ -344,7 +342,7 @@ class ApplicationSpec extends Specification {
         } yield r
       }
 
-      res4(s => ContextTester(s) :: HNil) must be_==("foo 1").await
+      res4(s => ContextTester(s)) must be_==("foo 1").await
 
       ctxs must have length(2)
       ctxs.map(_._1).toSet must have length(1) // span is unique
@@ -362,7 +360,7 @@ class ApplicationSpec extends Specification {
       val getPin =
         (for {
           b   <- trans(BoardComp.get().lift[Option])
-          id  <- trans(Monitored((_: Context[Log :: HNil]) => b.pin.point[Future]))
+          id  <- trans(Monitored((_: Context[Log]) => b.pin.point[Future]))
           pin <- trans(CardComp.getPin(id))
         } yield pin).run
 
@@ -376,7 +374,7 @@ class ApplicationSpec extends Specification {
       } yield (pin, cs, cards, availableTypes, h)
 
 
-      res(state => Logger(state) :: HNil) must be_==(
+      res(state => Logger(state)) must be_==(
         (Some((1, Card("card 1"))),
           List((1, Card("foo")), (1, Card("bar"))),
           List(

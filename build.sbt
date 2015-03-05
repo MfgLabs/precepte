@@ -14,6 +14,5 @@ libraryDependencies ++= Seq(
   cache,
   ws,
   "org.scalaz" %% "scalaz-core" % "7.1.0",
-  "org.specs2" %% "specs2" % "2.4.9",
-  "com.chuusai" %% "shapeless" % "2.1.0"
+  "org.specs2" %% "specs2" % "2.4.9"
 )
