@@ -77,8 +77,13 @@ trait Monitored[C, F[_], A] {
   def eval(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array(Context.Id.gen))): F[A] =
     f.eval(Context(fc, state))
 
-  def run(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array(Context.Id.gen))) =
+  def run(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array(Context.Id.gen))): (Context[C], F[A]) =
     f.run(Context(fc, state))
+
+  def runMap(c: Context[C])(implicit fu: Functor[F]): F[(Context[C], A)] = {
+    val (c2, fa) = f.run(c)
+    fu(fa)(a => (c2, a))
+  }
 
   def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] = {
     Monitored[C, F, B](State[Context[C], F[B]]{ c =>
@@ -103,7 +108,7 @@ trait Monitored[C, F[_], A] {
       yield fu(fa)
     }
 
-  def run(implicit ch: CoHasHoist[F]) = mapK(a => ch.unlift(a))
+  def cotrans(implicit ch: CoHasHoist[F]) = mapK(a => ch.unlift(a))
 
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Monitored[C, F, AP[A]] =
     this.map(a => ap.point(a))
