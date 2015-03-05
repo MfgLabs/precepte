@@ -1,3 +1,5 @@
+package com.mfglab.monitoring
+
 import org.scalatest._
 import Matchers._
 import Inspectors._
@@ -8,7 +10,7 @@ import org.scalatest.time.{Millis, Seconds, Span}
 
 class MonitoredSpec extends FlatSpec with ScalaFutures {
 
-  import monitor.{ Monitored }, Monitored._
+  import Monitored._
   trait Log {
     def debug(s: String): Unit
   }
@@ -34,7 +36,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       r <- f2(i)
     } yield r
 
-    res(nocontext) should ===("foo 1")
+    res.eval(nocontext) should ===("foo 1")
   }
 
   it should "simple" in {
@@ -46,7 +48,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       r <- f2(i)
     } yield r
 
-    res(nocontext).futureValue should ===("foo 1")
+    res.eval(nocontext).futureValue should ===("foo 1")
   }
 
   it should "optT" in {
@@ -59,21 +61,21 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res(nocontext).run.futureValue should ===(Some(("foo",1)))
+    res.eval(nocontext).run.futureValue should ===(Some(("foo",1)))
 
     val res2 = for {
       e1 <- trans(f1)
       e2 <- trans(f3)
     } yield (e1, e2)
 
-    res2(nocontext).run.futureValue should ===(None)
+    res2.eval(nocontext).run.futureValue should ===(None)
 
     val res3 = for {
       e1 <- trans(f3)
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res3(nocontext).run.futureValue should ===(None)
+    res3.eval(nocontext).run.futureValue should ===(None)
   }
 
   it should "listT" in {
@@ -86,21 +88,21 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res(nocontext).run.futureValue should ===(List(("foo",1), ("foo",2), ("bar",1), ("bar",2)))
+    res.eval(nocontext).run.futureValue should ===(List(("foo",1), ("foo",2), ("bar",1), ("bar",2)))
 
     val res2 = for {
       e1 <- trans(f1)
       e2 <- trans(f3)
     } yield (e1, e2)
 
-    res2(nocontext).run.futureValue should ===(List())
+    res2.eval(nocontext).run.futureValue should ===(List())
 
     val res3 = for {
       e1 <- trans(f3)
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res3(nocontext).run.futureValue should ===(List())
+    res3.eval(nocontext).run.futureValue should ===(List())
   }
 
   it should "EitherT" in {
@@ -122,7 +124,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res(nocontext).run.futureValue should ===(\/-("foo" -> 1))
+    res.eval(nocontext).run.futureValue should ===(\/-("foo" -> 1))
 
     val error = -\/("Error")
     val res2 = for {
@@ -130,14 +132,14 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       e2 <- trans(f3)
     } yield (e1, e2)
 
-    res2(nocontext).run.futureValue should ===(error)
+    res2.eval(nocontext).run.futureValue should ===(error)
 
     val res3 = for {
       e1 <- trans(f3)
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res3(nocontext).run.futureValue should ===(error)
+    res3.eval(nocontext).run.futureValue should ===(error)
   }
 
   case class Board(pin: Option[Int])
@@ -206,7 +208,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       1.point[Future]
     }
 
-    f1(s => ContextTester(s)).futureValue should ===(1)
+    f1.eval(s => ContextTester(s)).futureValue should ===(1)
     ctxs.length should ===(1)
   }
 
@@ -226,7 +228,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       1.point[Future]
     }.map(identity).map(identity).map(identity).map(identity)
 
-    f1(s => ContextTester(s)).futureValue should ===(1)
+    f1.eval(s => ContextTester(s)).futureValue should ===(1)
 
     ctxs.length should ===(1)
     ctxs.head._2.length should ===(1)
@@ -264,7 +266,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       .flatMap(i => f2(i))
       .flatMap(s => f3(s))
 
-    f(s => ContextTester(s)).futureValue should ===("f3 foo 1")
+    f.eval(s => ContextTester(s)).futureValue should ===("f3 foo 1")
 
     ctxs.length should ===(3)
   }
@@ -286,7 +288,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     }
 
     val stacked = Monitored(f1)
-    stacked(s => ContextTester(s)).futureValue should ===(1)
+    stacked.eval(s => ContextTester(s)).futureValue should ===(1)
     ctxs.length should ===(1)
     ctxs.head._2.length should ===(2)
   }
@@ -313,7 +315,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       s"foo $i".point[Future]
     }
 
-    f1(s => ContextTester(s)).futureValue should ===(1)
+    f1.eval(s => ContextTester(s)).futureValue should ===(1)
     ctxs.length should ===(1)
     ctxs.head._2.length should ===(1)
 
@@ -321,7 +323,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     ctxs.clear()
 
     val res2 = f1.map(identity)
-    res2(s => ContextTester(s))
+    res2.eval(s => ContextTester(s))
 
     ctxs should have length(1)
     forAll(ctxs.map(_._2.length == 1)){_  should ===(true) }
@@ -334,7 +336,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       r <- f2(i)
     } yield r
 
-    res(s => ContextTester(s)).futureValue should ===("foo 1")
+    res.eval(s => ContextTester(s)).futureValue should ===("foo 1")
 
     ctxs should have length(2)
     ctxs.map(_._1).toSet.size should ===(1) // span is unique
@@ -343,7 +345,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     ctxs.clear()
 
     val res3 = Monitored(f1)
-    res3(s => ContextTester(s)).futureValue should ===(1)
+    res3.eval(s => ContextTester(s)).futureValue should ===(1)
 
     ctxs should have length(1)
     ctxs.map(_._1).toSet.size should ===(1) // span is unique
@@ -358,7 +360,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       } yield r
     }
 
-    res4(s => ContextTester(s)).futureValue should ===("foo 1")
+    res4.eval(s => ContextTester(s)).futureValue should ===("foo 1")
 
     ctxs should have length(2)
     ctxs.map(_._1).toSet.size should ===(1) // span is unique
@@ -393,7 +395,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     } yield (pin, cs, cards, availableTypes, h)
 
 
-    res(state => Logger(state)).futureValue should ===(
+    res.eval(state => Logger(state)).futureValue should ===(
       (Some((1, Card("card 1"))),
         List((1, Card("foo")), (1, Card("bar"))),
         List(
