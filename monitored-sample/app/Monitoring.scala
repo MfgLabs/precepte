@@ -2,6 +2,7 @@ package commons
 
 object Monitoring {
 	import scala.concurrent.Future
+	import scala.concurrent.ExecutionContext.Implicits.global
 
 	import play.api.{ Logger => PLog, _ }
 	import play.api.mvc._
@@ -32,9 +33,27 @@ object Monitoring {
 	  def error(message: => String): Unit = PLog.error(format("error", message))
 	}
 
+	case class Timer(state: Context.State) {
+		lazy val path = s"""${state.span} -> / ${state.path.mkString(" / ")}"""
+		def timed[A](f: Future[A]) = {
+			val t0 = System.nanoTime()
+			f.map { x =>
+				val t1 = System.nanoTime()
+				PLog.debug(s"TIMED: $path: ${(t1 -t0) / 1000000}ms")
+				x
+			}
+		}
+	}
+
 	case class MonitoringContext(state: Context.State) {
 		val logger = Logger(state)
+		val timer = Timer(state)
 	}
+
+	def Timed[A](t: Context.Tags)(f: Context[MonitoringContext] => Future[A]) =
+		Monitored(t){ (c: Context[MonitoringContext]) =>
+			c.value.timer.timed(f(c))
+		}
 
 	object TimedAction {
 		def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[MonitoringContext, Future, Result]): Action[A] =
@@ -47,8 +66,12 @@ object Monitoring {
 				  a <- ts.get(ROUTE_ACTION_METHOD)
 				} yield s"$c.$a").getOrElse(request.toString)
 
-				// TODO: Monitor execution timed
-				Monitored(Context.Tags(Context.Tags.Callee(name)))(block(request)).eval(MonitoringContext.apply _)
+				Monitored(Context.Tags(Context.Tags.Callee(name))){
+					(c: Context[MonitoringContext]) =>
+						block(request).mapK(c.value.timer.timed _).eval{ st =>
+							c.copy(state = Context.State(c.state.span, c.state.path ++ st.path)).value
+						}
+				}.eval(MonitoringContext.apply _)
 			}
 
 		def apply(block: Request[AnyContent] => Monitored[MonitoringContext, Future, Result]): Action[AnyContent] =

@@ -131,12 +131,15 @@ object Monitored {
       override def toString = s"Tags(${values.toList})"
     }
 
+    type Path = Array[Segment]
+    type Segment = (Id, Tags)
+
     object Tags {
       val empty = Tags()
       def Callee(n: String) = ("callee", n)
     }
 
-    case class State(span: Span, path: Array[(Id, Tags)])
+    case class State(span: Span, path: Array[Segment])
 
     object Id {
       def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)
