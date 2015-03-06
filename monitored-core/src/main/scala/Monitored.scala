@@ -122,6 +122,9 @@ object Monitored {
 
   case class Context[C](builder: Context.State => C, state: Context.State) {
     def value = builder(state)
+
+    def /(s: Context.Segment): Context[C] = Context(builder, Context.State(state.span, state.path :+ s))
+    def /(ts: Context.Tags): Context[C] = /(Context.Id.gen -> ts)
   }
 
   object Context {
