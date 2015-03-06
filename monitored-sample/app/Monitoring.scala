@@ -34,7 +34,7 @@ object Monitoring {
 	}
 
 	case class Timer(state: Context.State) {
-		lazy val path = s"""${state.span} -> / ${state.path.mkString(" / ")}"""
+		lazy val path = s"""${state.span} -> / ${state.path.map { case (id, tags) => tags.values.mkString("[", ", ", "]") + "(id.value)" }.mkString(" / ") }"""
 		def timed[A](f: Future[A]) = {
 			val t0 = System.nanoTime()
 			f.map { x =>
