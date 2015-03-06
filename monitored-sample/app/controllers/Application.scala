@@ -49,7 +49,7 @@ object Application extends Controller {
    * Handle default path requests, redirect to computers list
    */
   def index = TimedAction{ _ =>
-    Monitored{ _ =>
+    Monitored(Context.Tags.empty){ _ =>
       Future.successful(Home)
     }
   }

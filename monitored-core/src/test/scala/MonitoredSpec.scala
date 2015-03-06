@@ -28,8 +28,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   val nocontext: Context.State => Unit = _ => ()
 
   "Monitored" should  "trivial" in {
-    def f1 = Monitored.apply0{(_: Context[Unit]) => 1}
-    def f2(i: Int) = Monitored.apply0{(_: Context[Unit]) => s"foo $i"}
+    def f1 = Monitored(Context.Tags.empty).apply0{(_: Context[Unit]) => 1}
+    def f2(i: Int) = Monitored(Context.Tags.empty).apply0{(_: Context[Unit]) => s"foo $i"}
 
     val res = for {
       i <- f1
@@ -40,8 +40,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "simple" in {
-    def f1 = Monitored{(_: Context[Unit]) => 1.point[Future]}
-    def f2(i: Int) = Monitored{(_: Context[Unit]) => s"foo $i".point[Future]}
+    def f1 = Monitored(Context.Tags.empty){(_: Context[Unit]) => 1.point[Future]}
+    def f2(i: Int) = Monitored(Context.Tags.empty){(_: Context[Unit]) => s"foo $i".point[Future]}
 
     val res = for {
       i <- f1
@@ -52,9 +52,9 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "optT" in {
-    val f1 = Monitored((_: Context[Unit]) => Option("foo").point[Future])
-    val f2 = Monitored((_: Context[Unit]) => Option(1).point[Future])
-    val f3 = Monitored((_: Context[Unit]) => (None: Option[Int]).point[Future])
+    val f1 = Monitored(Context.Tags.empty)((_: Context[Unit]) => Option("foo").point[Future])
+    val f2 = Monitored(Context.Tags.empty)((_: Context[Unit]) => Option(1).point[Future])
+    val f3 = Monitored(Context.Tags.empty)((_: Context[Unit]) => (None: Option[Int]).point[Future])
 
     val res = for {
       e1 <- trans(f1)
@@ -79,9 +79,9 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "listT" in {
-    val f1 = Monitored((_: Context[Unit]) => List("foo", "bar").point[Future])
-    val f2 = Monitored((_: Context[Unit]) => List(1, 2).point[Future])
-    val f3 = Monitored((_: Context[Unit]) => List[Int]().point[Future])
+    val f1 = Monitored(Context.Tags.empty)((_: Context[Unit]) => List("foo", "bar").point[Future])
+    val f2 = Monitored(Context.Tags.empty)((_: Context[Unit]) => List(1, 2).point[Future])
+    val f3 = Monitored(Context.Tags.empty)((_: Context[Unit]) => List[Int]().point[Future])
 
     val res = for {
       e1 <- trans(f1)
@@ -110,11 +110,11 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     import EitherT.eitherTFunctor
 
     val f1: Monitored[Unit, Future, String \/ String] =
-      Monitored(_ => \/-("foo").point[Future])
+      Monitored(Context.Tags.empty)(_ => \/-("foo").point[Future])
     val f2: Monitored[Unit, Future, String \/ Int] =
-      Monitored(_ => \/-(1).point[Future])
+      Monitored(Context.Tags.empty)(_ => \/-(1).point[Future])
     val f3: Monitored[Unit, Future, String \/ String] =
-      Monitored(_ => -\/("Error").point[Future])
+      Monitored(Context.Tags.empty)(_ => -\/("Error").point[Future])
 
     type Foo[A] = EitherT[Future, String, A]
     implicitly[scalaz.Functor[Foo]]
@@ -144,7 +144,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
   case class Board(pin: Option[Int])
   object BoardComp {
-    def get() = Monitored { (c: Context[Log]) =>
+    def get() = Monitored(Context.Tags.empty) { (c: Context[Log]) =>
       val logger = c.value
       logger.debug("BoardComp.get")
       Board(Option(1)).point[Future]
@@ -155,25 +155,25 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   case class Card(name: String)
 
   object CardComp {
-    def getPin(id: Int) = Monitored { (c: Context[Log]) =>
+    def getPin(id: Int) = Monitored(Context.Tags.empty) { (c: Context[Log]) =>
       val logger = c.value
       logger.debug("CardComp.getPin")
       Option(1 -> Card("card 1")).point[Future]
     }
 
-    def countAll() = Monitored { (c: Context[Log]) =>
+    def countAll() = Monitored(Context.Tags.empty) { (c: Context[Log]) =>
       val logger = c.value
       logger.debug("CardComp.countAll")
       Set("Edito", "Video").point[Future]
     }
 
-    def rank() = Monitored { (c: Context[Log]) =>
+    def rank() = Monitored(Context.Tags.empty) { (c: Context[Log]) =>
       val logger = c.value
       logger.debug("CardComp.rank")
       List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
     }
 
-    def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored { (c: Context[Log]) =>
+    def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored(Context.Tags.empty) { (c: Context[Log]) =>
       val logger = c.value
       logger.debug("CardComp.cardsInfos")
       List(
@@ -185,7 +185,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   import java.net.URL
   case class Highlight(title: String, cover: URL)
   object HighlightComp {
-    def get() = Monitored { (c: Context[Log]) =>
+    def get() = Monitored(Context.Tags.empty) { (c: Context[Log]) =>
       val logger = c.value
       logger.debug("HighlightComp.get")
       Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
@@ -202,7 +202,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       }
     }
 
-    def f1 = Monitored{ (c: Context[ContextTester]) =>
+    def f1 = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push()
       1.point[Future]
@@ -222,7 +222,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       }
     }
 
-    def f1 = Monitored{ (c: Context[ContextTester]) =>
+    def f1 = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push()
       1.point[Future]
@@ -231,7 +231,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     f1.eval(s => ContextTester(s)).futureValue should ===(1)
 
     ctxs.length should ===(1)
-    ctxs.head._2.length should ===(1)
+    ctxs.head.path.length should ===(1)
   }
 
   it should "preserve context on flatMap" in {
@@ -244,25 +244,25 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       }
     }
 
-    def f1 = Monitored{ (c: Context[ContextTester]) =>
+    def f1 = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push("f1")
       1.point[Future]
     }
 
-    def f2(i: Int) = Monitored{ (c: Context[ContextTester]) =>
+    def f2(i: Int) = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push("f2")
       s"foo $i".point[Future]
     }
 
-    def f3(s: String) = Monitored{ (c: Context[ContextTester]) =>
+    def f3(s: String) = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push("f3")
       s"f3 $s".point[Future]
     }
 
-    val f = Monitored(f1
+    val f = Monitored(Context.Tags.empty)(f1
       .flatMap(i => f2(i))
       .flatMap(s => f3(s)))
 
@@ -282,16 +282,16 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       }
     }
 
-    def f1 = Monitored{ (c: Context[ContextTester]) =>
+    def f1 = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push()
       1.point[Future]
     }
 
-    val stacked = Monitored(f1)
+    val stacked = Monitored(Context.Tags.empty)(f1)
     stacked.eval(s => ContextTester(s)).futureValue should ===(1)
     ctxs.length should ===(1)
-    ctxs.head._2.length should ===(2)
+    ctxs.head.path.length should ===(2)
   }
 
   it should "provide context to C" in {
@@ -304,13 +304,13 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       }
     }
 
-    def f1 = Monitored { (c: Context[ContextTester]) =>
+    def f1 = Monitored(Context.Tags.empty) { (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push()
       1.point[Future]
     }
 
-    def f2(i: Int) = Monitored{ (c: Context[ContextTester]) =>
+    def f2(i: Int) = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push()
       s"foo $i".point[Future]
@@ -318,7 +318,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     f1.eval(s => ContextTester(s)).futureValue should ===(1)
     ctxs.length should ===(1)
-    ctxs.head._2.length should ===(1)
+    ctxs.head.path.length should ===(1)
 
 
     ctxs.clear()
@@ -327,7 +327,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     res2.eval(s => ContextTester(s))
 
     ctxs should have length(1)
-    forAll(ctxs.map(_._2.length == 1)){_  should ===(true) }
+    forAll(ctxs.map(_.path.length == 1)){_  should ===(true) }
 
 
     ctxs.clear()
@@ -340,21 +340,21 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     res.eval(s => ContextTester(s)).futureValue should ===("foo 1")
 
     ctxs should have length(2)
-    ctxs.map(_._1).toSet.size should ===(1) // span is unique
-    forAll(ctxs.map(_._2.length == 1)){ _ should ===(true) }
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 1)){ _ should ===(true) }
 
     ctxs.clear()
 
-    val res3 = Monitored(f1)
+    val res3 = Monitored(Context.Tags.empty)(f1)
     res3.eval(s => ContextTester(s)).futureValue should ===(1)
 
     ctxs should have length(1)
-    ctxs.map(_._1).toSet.size should ===(1) // span is unique
-    forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
 
     ctxs.clear()
 
-    val res4 = Monitored {
+    val res4 = Monitored(Context.Tags.empty) {
       for {
         i <- f1
         r <- f2(i)
@@ -364,8 +364,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     res4.eval(s => ContextTester(s)).futureValue should ===("foo 1")
 
     ctxs should have length(2)
-    ctxs.map(_._1).toSet.size should ===(1) // span is unique
-    forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
   }
 
   it should "not stack context on trans" in {
@@ -378,20 +378,20 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       }
     }
 
-    def f1 = Monitored { (c: Context[ContextTester]) =>
+    def f1 = Monitored(Context.Tags.empty) { (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push()
       Option(1).point[Future]
     }
 
-    def f2(i: Int) = Monitored{ (c: Context[ContextTester]) =>
+    def f2(i: Int) = Monitored(Context.Tags.empty){ (c: Context[ContextTester]) =>
       val tester = c.value
       tester.push()
       Option(s"foo $i").point[Future]
     }
 
     type X[T] = scalaz.OptionT[Future, T]
-    val res4 = Monitored[ContextTester, X, String] { //TODO: why do I need to force the type
+    val res4 = Monitored(Context.Tags.empty)[ContextTester, X, String] { //TODO: why do I need to force the type
       for {
         i <- trans(f1)
         r <- trans(f2(i))
@@ -401,8 +401,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     res4.eval(s => ContextTester(s)).run.futureValue should ===(Some("foo 1"))
 
     ctxs should have length(2)
-    ctxs.map(_._1).toSet.size should ===(1) // span is unique
-    forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
 
   }
 
@@ -412,7 +412,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     case class Logger(state: Context.State) extends Log {
       def debug(s: String): Unit = {
-        logs += s"[DEBUG] ${state._1.value} -> /${state._2.map(_.value).mkString("/")} $s"
+        logs += s"[DEBUG] ${state.span.value} -> /${state.path.mkString("/")} $s"
         ()
       }
     }
@@ -420,7 +420,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     val getPin =
       (for {
         b   <- trans(BoardComp.get().lift[Option])
-        id  <- trans(Monitored((_: Context[Log]) => b.pin.point[Future]))
+        id  <- trans(Monitored(Context.Tags.empty)((_: Context[Log]) => b.pin.point[Future]))
         pin <- trans(CardComp.getPin(id))
       } yield pin).cotrans
 

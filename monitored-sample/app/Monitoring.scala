@@ -11,7 +11,7 @@ object Monitoring {
 	import Monitored._
 
 	case class Logger(state: Context.State) {
-		private def format(s: String) = s"${state._1.value} -> / ${state._2.map(_.value).mkString(" / ")} -> $s"
+		private def format(s: String) = s"${state.span.value} -> / ${state.path.mkString(" / ")} -> $s"
 		def debug(message: => String): Unit = PLog.debug(format(message))
 	  def info(message: => String): Unit = PLog.info(format(message))
 	  def warn(message: => String): Unit = PLog.warn(format(message))
@@ -34,7 +34,7 @@ object Monitoring {
 				} yield s"$c.$a").getOrElse(request.toString)
 
 				// TODO: Monitor execution timed
-				Monitored(block(request)).eval(MonitoringContext.apply _)
+				Monitored(Context.Tags(Array("name" -> name)))(block(request)).eval(MonitoringContext.apply _)
 			}
 
 		def apply(block: Request[AnyContent] => Monitored[MonitoringContext, Future, Result]): Action[AnyContent] =

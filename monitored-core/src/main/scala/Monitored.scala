@@ -72,12 +72,12 @@ trait Monitored[C, F[_], A] {
   self =>
   import Monitored.Context
 
-  val f: State[Context[C], F[A]]
+  protected val f: State[Context[C], F[A]]
 
-  def eval(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array())): F[A] =
+  def eval(fc: Context.State => C, state: Context.State = Context.State(Context.Span.gen, Array())): F[A] =
     f.eval(Context(fc, state))
 
-  def run(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array())): (Context[C], F[A]) =
+  def run(fc: Context.State => C, state: Context.State = Context.State(Context.Span.gen, Array())): (Context[C], F[A]) =
     f.run(Context(fc, state))
 
   def runMap(c: Context[C])(implicit fu: Functor[F]): F[(Context[C], A)] = {
@@ -91,7 +91,7 @@ trait Monitored[C, F[_], A] {
         c.copy(state = s).value
       }, c.state)
       val ffb = fr(_: A).eval({ (s: Context.State) =>
-        val s1 = (c.state._1, s._2)
+        val s1 = Context.State(c.state.span, s.path)
         c.copy(state = s1).value
       }, c.state)
       c -> m.bind(fa)(ffb)
@@ -120,14 +120,23 @@ object Monitored {
   import scalaz.Id._
   import scalaz.Unapply
 
-  case class Context[C](builder: ((Context.Span, Array[Context.Id])) => C, state: Context.State) {
+  case class Context[C](builder: Context.State => C, state: Context.State) {
     def value = builder(state)
   }
 
   object Context {
-    type State = (Context.Span,  Array[Context.Id])
     case class Span(value: String) extends AnyVal
     case class Id(value: String) extends AnyVal
+    case class Tags(values: Array[(String, String)]) {
+      override def toString = s"Tags(${values.toList})"
+    }
+
+    object Tags {
+      val empty = Tags(Array.empty)
+    }
+
+    case class State(span: Span, path: Array[(Id, Tags)])
+
     object Id {
       def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)
     }
@@ -142,15 +151,33 @@ object Monitored {
   implicit def fKindEv[F0[_]] = new *->*[F0] {}
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 
-  def apply0[C, A0](λ: Context[C] => A0): Monitored[C, Id, A0] =
-    apply[C, Id, A0](λ)
+  trait MonitoredBuilder {
+    val tags: Context.Tags
 
-  def apply[C, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
-    new Monitored[C, F0, A0] {
-      val f = State[Context[C], F0[A0]]{ c =>
-        val s2 = (c.state._1, c.state._2 :+ Context.Id.gen)
-        (c, λ(c.copy(state = s2)))
+     def apply0[C, A0](λ: Context[C] => A0): Monitored[C, Id, A0] =
+      apply[C, Id, A0](λ)
+
+    def apply[C, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] = {
+      new Monitored[C, F0, A0] {
+        val f = State[Context[C], F0[A0]]{ c =>
+          val s2 = Context.State(c.state.span, c.state.path :+ (Context.Id.gen -> tags))
+          (c, λ(c.copy(state = s2)))
+        }
       }
+    }
+
+    def apply[C, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
+      new Monitored[C, F, A] {
+        val f = m.f.contramap{ (c: Context[C]) =>
+          val Context.State(span, path) = c.state
+          c.copy(state = Context.State(span, (Context.Id.gen -> tags) +: path))
+        }
+      }
+  }
+
+  def apply(_tags: Context.Tags) =
+    new MonitoredBuilder {
+      val tags = _tags
     }
 
   private def apply[C, F0[_], A0](st: State[Context[C], F0[A0]]): Monitored[C, F0, A0] =
@@ -158,18 +185,12 @@ object Monitored {
       val f = st
     }
 
-  def apply[C, F[_], A](m: Monitored[C, F, A]): Monitored[C, F, A] =
-    new Monitored[C, F, A] {
-      val f = m.f.contramap{ (c: Context[C]) =>
-        val (span, ids) = c.state
-        c.copy(state = (span, Context.Id.gen +: ids))
-      }
-    }
-
   def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
-    Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A]{ (c: Context[C]) =>
-      hh.lift[F, A](m.eval(_ => c.value))
-    }
+    Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A](State[Context[C], hh.T[F, A]] { c =>
+      c -> hh.lift[F, A](m.eval{ st =>
+        c.copy(state = Context.State(c.state.span, c.state.path ++ st.path)).value
+      })
+    })
 
   def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
     type λ[α] = G[A, α]
@@ -178,7 +199,7 @@ object Monitored {
 
   implicit def monitoredInstances[C, F[_]: Monad] =
     new Monad[({ type λ[α] = Monitored[C, F, α] })#λ] {
-      def point[A](a: => A): Monitored[C, F, A] = Monitored[C, F, A]((_: Context[C]) => implicitly[Monad[F]].point(a))
+      def point[A](a: => A): Monitored[C, F, A] = Monitored(Context.Tags.empty)[C, F, A]((_: Context[C]) => implicitly[Monad[F]].point(a))
       def bind[A, B](m: Monitored[C, F, A])(f: A => Monitored[C, F, B]): Monitored[C, F, B] =
         m.flatMap(f)
     }
