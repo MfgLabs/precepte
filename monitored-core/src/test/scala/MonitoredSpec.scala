@@ -368,6 +368,44 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
   }
 
+  it should "not stack context on trans" in {
+    val ctxs = scala.collection.mutable.ArrayBuffer[Context.State]()
+
+    case class ContextTester(state: Context.State) {
+      def push(): Unit = {
+        ctxs += state
+        ()
+      }
+    }
+
+    def f1 = Monitored { (c: Context[ContextTester]) =>
+      val tester = c.value
+      tester.push()
+      Option(1).point[Future]
+    }
+
+    def f2(i: Int) = Monitored{ (c: Context[ContextTester]) =>
+      val tester = c.value
+      tester.push()
+      Option(s"foo $i").point[Future]
+    }
+
+    type X[T] = scalaz.OptionT[Future, T]
+    val res4 = Monitored[ContextTester, X, String] { //TODO: why do I need to force the type
+      for {
+        i <- trans(f1)
+        r <- trans(f2(i))
+      } yield r
+    }
+
+    res4.eval(s => ContextTester(s)).run.futureValue should ===(Some("foo 1"))
+
+    ctxs should have length(2)
+    ctxs.map(_._1).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
+
+  }
+
   it should "real world wb.fr home" in {
 
     val logs = scala.collection.mutable.ArrayBuffer[String]()

@@ -167,8 +167,8 @@ object Monitored {
     }
 
   def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] =
-    Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] { (c: Context[C]) =>
-      hh.lift[F, A](m.f(c)._2)
+    Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A]{ (c: Context[C]) =>
+      hh.lift[F, A](m.eval(_ => c.value))
     }
 
   def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
