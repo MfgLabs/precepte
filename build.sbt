@@ -20,7 +20,7 @@ lazy val core =
 				"-Yrangepos",
 				"-Xlint",
 				"-deprecation",
-				"-Xfatal-warnings",
+				// "-Xfatal-warnings",
 				"-feature",
 				"-encoding", "UTF-8",
 				"-unchecked",

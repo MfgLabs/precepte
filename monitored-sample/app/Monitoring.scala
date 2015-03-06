@@ -34,7 +34,7 @@ object Monitoring {
 				} yield s"$c.$a").getOrElse(request.toString)
 
 				// TODO: Monitor execution timed
-				block(request).eval(MonitoringContext.apply _)
+				Monitored(block(request)).eval(MonitoringContext.apply _)
 			}
 
 		def apply(block: Request[AnyContent] => Monitored[MonitoringContext, Future, Result]): Action[AnyContent] =

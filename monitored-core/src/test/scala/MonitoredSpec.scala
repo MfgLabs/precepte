@@ -262,13 +262,14 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       s"f3 $s".point[Future]
     }
 
-    val f = f1
+    val f = Monitored(f1
       .flatMap(i => f2(i))
-      .flatMap(s => f3(s))
+      .flatMap(s => f3(s)))
 
     f.eval(s => ContextTester(s)).futureValue should ===("f3 foo 1")
 
     ctxs.length should ===(3)
+
   }
 
   it should "stack contexts" in {
@@ -340,7 +341,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     ctxs should have length(2)
     ctxs.map(_._1).toSet.size should ===(1) // span is unique
-    forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
+    forAll(ctxs.map(_._2.length == 1)){ _ should ===(true) }
 
     ctxs.clear()
 
@@ -364,7 +365,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     ctxs should have length(2)
     ctxs.map(_._1).toSet.size should ===(1) // span is unique
-    forAll(ctxs.map(_._2.length == 3)){ _ should ===(true) }
+    forAll(ctxs.map(_._2.length == 2)){ _ should ===(true) }
   }
 
   it should "real world wb.fr home" in {
@@ -416,4 +417,5 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     //   "[DEBUG] CardComp.countAll",
     //   "[DEBUG] HighlightComp.get"))
   }
+
 }

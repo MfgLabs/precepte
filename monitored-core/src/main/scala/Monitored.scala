@@ -74,10 +74,10 @@ trait Monitored[C, F[_], A] {
 
   val f: State[Context[C], F[A]]
 
-  def eval(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array(Context.Id.gen))): F[A] =
+  def eval(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array())): F[A] =
     f.eval(Context(fc, state))
 
-  def run(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array(Context.Id.gen))): (Context[C], F[A]) =
+  def run(fc: Context.State => C, state: Context.State = (Context.Span.gen, Array())): (Context[C], F[A]) =
     f.run(Context(fc, state))
 
   def runMap(c: Context[C])(implicit fu: Functor[F]): F[(Context[C], A)] = {
@@ -87,11 +87,12 @@ trait Monitored[C, F[_], A] {
 
   def flatMap[B](fr: A => Monitored[C, F, B])(implicit m: Monad[F]): Monitored[C, F, B] = {
     Monitored[C, F, B](State[Context[C], F[B]]{ c =>
-      val ns1 = (c.state._1, c.state._2 :+ Context.Id.gen)
-      val (s0, fa) = f(c.copy(state = ns1))
+      val (s0, fa) = self.run({ s =>
+        c.copy(state = s).value
+      }, c.state)
       val ffb = fr(_: A).eval({ (s: Context.State) =>
-        val newState = (c.state._1, c.state._2 :+ Context.Id.gen)
-        c.copy(state = newState).value
+        val s1 = (c.state._1, s._2)
+        c.copy(state = s1).value
       }, c.state)
       c -> m.bind(fa)(ffb)
     })
@@ -147,7 +148,8 @@ object Monitored {
   def apply[C, F0[_], A0](λ: Context[C] => F0[A0]): Monitored[C, F0, A0] =
     new Monitored[C, F0, A0] {
       val f = State[Context[C], F0[A0]]{ c =>
-        (c, λ(c))
+        val s2 = (c.state._1, c.state._2 :+ Context.Id.gen)
+        (c, λ(c.copy(state = s2)))
       }
     }
 
