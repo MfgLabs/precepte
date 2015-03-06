@@ -13,6 +13,8 @@ import scala.concurrent.Future
 
 import com.mfglab.monitoring.Monitored
 import Monitored._
+import Context.Tags
+import Tags.Callee
 import commons.Monitoring.MonitoringContext
 
 case class Company(id: Pk[Long] = NotAssigned, name: String)
@@ -56,7 +58,7 @@ object Computer {
    * Retrieve a computer from the id.
    */
   def findById(id: Long) =
-    Monitored(Context.Tags(Array("name" -> "Computer.findById"))) { (c: Context[MonitoringContext]) =>
+    Monitored(Tags(Callee("Computer.findById"))) { (c: Context[MonitoringContext]) =>
       c.value.logger.debug(s"Finding computer with id $id")
       Future.successful {
         DB.withConnection { implicit connection =>
@@ -74,7 +76,7 @@ object Computer {
    * @param filter Filter applied on the name column
    */
   def list(page: Int = 0, pageSize: Int = 10, orderBy: Int = 1, filter: String = "%") =
-    Monitored(Context.Tags(Array("name" -> "Computer.list"))) { (c: Context[MonitoringContext]) =>
+    Monitored(Tags(Callee("Computer.list"))) { (c: Context[MonitoringContext]) =>
       c.value.logger.debug(s"Listing all computers")
       Future.successful {
         val offest = pageSize * page
@@ -118,7 +120,7 @@ object Computer {
    * @param id The computer id
    * @param computer The computer values.
    */
-  def update(id: Long, computer: Computer) = Monitored(Context.Tags(Array("name" -> "Computer.update"))) { (c: Context[MonitoringContext]) =>
+  def update(id: Long, computer: Computer) = Monitored(Tags(Callee("Computer.update"))) { (c: Context[MonitoringContext]) =>
     c.value.logger.info(s"updating computer with id $id: $computer")
     Future.successful {
       DB.withConnection { implicit connection =>
@@ -144,7 +146,7 @@ object Computer {
    *
    * @param computer The computer values.
    */
-  def insert(computer: Computer) = Monitored(Context.Tags(Array("name" -> "Computer.insert"))) { (c: Context[MonitoringContext]) =>
+  def insert(computer: Computer) = Monitored(Tags(Callee("Computer.insert"))) { (c: Context[MonitoringContext]) =>
     c.value.logger.info(s"inserting computer: $computer")
     Future.successful {
       DB.withConnection { implicit connection =>
@@ -170,7 +172,7 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long) = Monitored(Context.Tags(Array("name" -> "Computer.delete"))) { (c: Context[MonitoringContext]) =>
+  def delete(id: Long) = Monitored(Tags(Callee("Computer.delete"))) { (c: Context[MonitoringContext]) =>
     c.value.logger.info(s"deleting computer: $id")
     Future.successful {
       DB.withConnection { implicit connection =>
@@ -196,7 +198,7 @@ object Company {
   /**
    * Construct the Map[String,String] needed to fill a select options set.
    */
-  def options = Monitored(Context.Tags(Array("name" -> "Company.options"))) { (c: Context[MonitoringContext]) =>
+  def options = Monitored(Tags(Callee("Company.options"))) { (c: Context[MonitoringContext]) =>
     c.value.logger.debug("Listing options")
     Future.successful {
       DB.withConnection { implicit connection =>

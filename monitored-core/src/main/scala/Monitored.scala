@@ -127,12 +127,13 @@ object Monitored {
   object Context {
     case class Span(value: String) extends AnyVal
     case class Id(value: String) extends AnyVal
-    case class Tags(values: Array[(String, String)]) {
+    case class Tags(values: (String, String)*) {
       override def toString = s"Tags(${values.toList})"
     }
 
     object Tags {
-      val empty = Tags(Array.empty)
+      val empty = Tags()
+      def Callee(n: String) = ("callee", n)
     }
 
     case class State(span: Span, path: Array[(Id, Tags)])
