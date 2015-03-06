@@ -13,8 +13,9 @@ object Monitoring {
 	import Monitored._
 
 	case class Logger(state: Context.State) {
-		private def format(s: String) =
+		private def format(l: String, s: String) =
 			Json.prettyPrint(Json.obj(
+				"level" -> l,
 				"message" -> s,
 				"span" -> state.span.value,
 				"path" -> state.path.map { s =>
@@ -25,10 +26,10 @@ object Monitoring {
 							})
 				}))
 
-		def debug(message: => String): Unit = PLog.debug(format(message))
-	  def info(message: => String): Unit = PLog.info(format(message))
-	  def warn(message: => String): Unit = PLog.warn(format(message))
-	  def error(message: => String): Unit = PLog.error(format(message))
+		def debug(message: => String): Unit = PLog.debug(format("debug", message))
+	  def info(message: => String): Unit = PLog.info(format("info", message))
+	  def warn(message: => String): Unit = PLog.warn(format("warn", message))
+	  def error(message: => String): Unit = PLog.error(format("error", message))
 	}
 
 	case class MonitoringContext(state: Context.State) {
