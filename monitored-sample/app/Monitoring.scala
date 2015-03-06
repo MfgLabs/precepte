@@ -7,11 +7,24 @@ object Monitoring {
 	import play.api.mvc._
 	import play.api.mvc.Results._
 
+	import play.api.libs.json._
+
 	import com.mfglab.monitoring.Monitored
 	import Monitored._
 
 	case class Logger(state: Context.State) {
-		private def format(s: String) = s"${state.span.value} -> / ${state.path.mkString(" / ")} -> $s"
+		private def format(s: String) =
+			Json.prettyPrint(Json.obj(
+				"message" -> s,
+				"span" -> state.span.value,
+				"path" -> state.path.map { s =>
+					Json.obj(
+						"id" -> s._1.value,
+						"tags" -> s._2.values.map { t =>
+								Json.obj(t._1 -> t._2)
+							})
+				}))
+
 		def debug(message: => String): Unit = PLog.debug(format(message))
 	  def info(message: => String): Unit = PLog.info(format(message))
 	  def warn(message: => String): Unit = PLog.warn(format(message))
