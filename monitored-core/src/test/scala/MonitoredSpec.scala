@@ -39,7 +39,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       r <- f2(i)
     } yield r
 
-    Monitored.eval(res, Call.State(Vector.empty, ())) should ===("foo 1")
+    Monitored.run(res, Call.State(Vector.empty, ())) should ===("foo 1")
   }
 
   // it should "simple" in {

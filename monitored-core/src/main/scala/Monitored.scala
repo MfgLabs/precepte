@@ -110,7 +110,7 @@ object Monitored {
     }
     type Path = Vector[Call]
 
-    case class Graph[C](id: Call.Id, value: C, parent: () => Option[Graph[C]], children: Vector[Graph[C]])
+    case class Graph[C](id: Call.Id, value: C, children: Vector[Graph[C]])
     case class State[C](path: Path, value: C)
 
     object Id {
@@ -144,17 +144,15 @@ object Monitored {
           step.run(state).flatMap {
             case (c, mc: Free.Gosub[({ type λ[α] = Step[C, F, α] })#λ, _]) =>
               val id = Call.Id.gen
-              lazy val gn: Call.Graph[C] = graph.copy(
-                parent = graph.parent,
-                children = graph.children :+ Call.Graph(id, c, () => Some(gn), Vector.empty))
+              val gn: Call.Graph[C] = graph.copy(children = graph.children :+ Call.Graph(id, c, Vector.empty))
               go(mc, Call.State(state.path :+ Call(id), c), gn)
             case (c, mc) =>
               val id = Call.Id.gen
-              go(mc, Call.State(state.path :+ Call(id), c), Call.Graph(id, c, () => Some(graph), Vector.empty))
+              go(mc, Call.State(state.path :+ Call(id), c), Call.Graph(id, c, Vector.empty))
           }
       }
     }
-    go(m, state, Call.Graph(Call.Id.gen, state.value, () => None, Vector.empty))
+    go(m, state, Call.Graph(Call.Id.gen, state.value, Vector.empty))
   }
 
   def apply0[C, A](λ: Call.State[C] => A): Monitored[C, Id, A] =
