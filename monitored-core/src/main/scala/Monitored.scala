@@ -3,7 +3,9 @@ package com.mfglab.monitoring
 import scala.language.higherKinds
 
 import scala.concurrent.Future
-import scalaz.{ Hoist, Monad, OptionT, MonadTrans, ListT, EitherT, Applicative, Functor, ∨, Free }
+import scalaz.{ Hoist, Monad, OptionT, MonadTrans, ListT, EitherT, Applicative, Functor, ∨ }
+import com.mfglab.Free
+import scala.language.higherKinds
 import scalaz.Unapply
 import scalaz.IndexedStateT
 import scalaz.syntax.monad._
@@ -72,10 +74,12 @@ object CoHasHoist {
 case class Step[C, F[_], MC](st: IndexedStateT[F, Monitored.Call.State[C], C, MC]) {
   self =>
 
+  import Monitored.Call
+
   def map[B](fu: MC => B)(implicit ff: Functor[F]): Step[C, F, B] =
     Step[C, F, B](self.st.map(fu))
 
-  def run(state: Monitored.Call.State[C]): F[(C, MC)] = st.run(state)
+  def run(state: Call.State[C]): F[(C, MC)] = st.run(state)
 }
 
 object Step {
@@ -106,6 +110,7 @@ object Monitored {
     }
     type Path = Vector[Call]
 
+    case class Graph[C](id: Call.Id, value: C, parent: () => Option[Graph[C]], children: Vector[Graph[C]])
     case class State[C](path: Path, value: C)
 
     object Id {
@@ -130,18 +135,26 @@ object Monitored {
         }
     }
 
-  def run[C, F[_]: Monad, A](m: Monitored.Monitored[C, F, A], state: Call.State[C])(implicit fu: Functor[({ type λ[α] = Step[C, F, α] })#λ]): F[(Vector[Call.State[C]], A)] = {
-    def go(m: Monitored.Monitored[C, F, A], state: Call.State[C], graph: Vector[Call.State[C]]): F[(Vector[Call.State[C]], A)] = {
+  def run[C, F[_]: Monad, A](m: Monitored.Monitored[C, F, A], state: Call.State[C])(implicit fu: Functor[({ type λ[α] = Step[C, F, α] })#λ]): F[(Call.Graph[C], A)] = {
+    def go(m: Monitored.Monitored[C, F, A], state: Call.State[C], graph: Call.Graph[C]): F[(Call.Graph[C], A)] = {
       m.resume(fu) match {
         case \/-(a) =>
           (graph, a).point[F]
         case -\/(step) =>
-          step.run(state).flatMap { case (c, mc) =>
-            go(mc, Call.State(state.path :+ Call(Call.Id.gen), c), graph :+ state)
+          step.run(state).flatMap {
+            case (c, mc: Free.Gosub[({ type λ[α] = Step[C, F, α] })#λ, _]) =>
+              val id = Call.Id.gen
+              lazy val gn: Call.Graph[C] = graph.copy(
+                parent = graph.parent,
+                children = graph.children :+ Call.Graph(id, c, () => Some(gn), Vector.empty))
+              go(mc, Call.State(state.path :+ Call(id), c), gn)
+            case (c, mc) =>
+              val id = Call.Id.gen
+              go(mc, Call.State(state.path :+ Call(id), c), Call.Graph(id, c, () => Some(graph), Vector.empty))
           }
       }
     }
-    go(m, state, Vector.empty)
+    go(m, state, Call.Graph(Call.Id.gen, state.value, () => None, Vector.empty))
   }
 
   def apply0[C, A](λ: Call.State[C] => A): Monitored[C, Id, A] =
