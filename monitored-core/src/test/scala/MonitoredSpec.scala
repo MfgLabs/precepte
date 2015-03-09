@@ -26,267 +26,267 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  val nocontext: Call.State => Unit = _ => ()
+  val nocontext = Call(Call.Id.gen)
 
-  "Monitored" should  "trivial" in {
-    def f1 = Monitored(Call.Tags.empty).apply0{(_: Call[Unit]) => 1}
-    def f2(i: Int) = Monitored(Call.Tags.empty).apply0{(_: Call[Unit]) => s"foo $i"}
+  "Monitored" should "trivial" in {
+    def f1 = Monitored.apply0{(_: Call.State[Unit]) => 1}
+    def f2(i: Int) = Monitored.apply0{(_: Call.State[Unit]) => s"foo $i"}
 
-    f1.eval(nocontext) should ===(1)
-
-    val res = for {
-      i <- f1
-      r <- f2(i)
-    } yield r
-
-    res.eval(nocontext) should ===("foo 1")
-  }
-
-  it should "simple" in {
-    def f1 = Monitored(Call.Tags.empty){(_: Call[Unit]) => 1.point[Future]}
-    def f2(i: Int) = Monitored(Call.Tags.empty){(_: Call[Unit]) => s"foo $i".point[Future]}
+    Monitored.eval(f1, Call.State(Vector.empty, ())) should ===(1)
 
     val res = for {
       i <- f1
       r <- f2(i)
     } yield r
 
-    res.eval(nocontext).futureValue should ===("foo 1")
+    Monitored.eval(res, Call.State(Vector.empty, ())) should ===("foo 1")
   }
 
-  it should "optT" in {
-    val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => Option("foo").point[Future])
-    val f2 = Monitored(Call.Tags.empty)((_: Call[Unit]) => Option(1).point[Future])
-    val f3 = Monitored(Call.Tags.empty)((_: Call[Unit]) => (None: Option[Int]).point[Future])
+  // it should "simple" in {
+  //   def f1 = Monitored(Call.Tags.empty){(_: Call[Unit]) => 1.point[Future]}
+  //   def f2(i: Int) = Monitored(Call.Tags.empty){(_: Call[Unit]) => s"foo $i".point[Future]}
 
-    val res = for {
-      e1 <- trans(f1)
-      e2 <- trans(f2)
-    } yield (e1, e2)
+  //   val res = for {
+  //     i <- f1
+  //     r <- f2(i)
+  //   } yield r
 
-    res.eval(nocontext).run.futureValue should ===(Some(("foo",1)))
+  //   res.eval(nocontext).futureValue should ===("foo 1")
+  // }
 
-    val res2 = for {
-      e1 <- trans(f1)
-      e2 <- trans(f3)
-    } yield (e1, e2)
+  // it should "optT" in {
+  //   val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => Option("foo").point[Future])
+  //   val f2 = Monitored(Call.Tags.empty)((_: Call[Unit]) => Option(1).point[Future])
+  //   val f3 = Monitored(Call.Tags.empty)((_: Call[Unit]) => (None: Option[Int]).point[Future])
 
-    res2.eval(nocontext).run.futureValue should ===(None)
+  //   val res = for {
+  //     e1 <- trans(f1)
+  //     e2 <- trans(f2)
+  //   } yield (e1, e2)
 
-    val res3 = for {
-      e1 <- trans(f3)
-      e2 <- trans(f2)
-    } yield (e1, e2)
+  //   res.eval(nocontext).run.futureValue should ===(Some(("foo",1)))
 
-    res3.eval(nocontext).run.futureValue should ===(None)
-  }
+  //   val res2 = for {
+  //     e1 <- trans(f1)
+  //     e2 <- trans(f3)
+  //   } yield (e1, e2)
 
-  it should "listT" in {
-    val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List("foo", "bar").point[Future])
-    val f2 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List(1, 2).point[Future])
-    val f3 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List[Int]().point[Future])
+  //   res2.eval(nocontext).run.futureValue should ===(None)
 
-    val res = for {
-      e1 <- trans(f1)
-      e2 <- trans(f2)
-    } yield (e1, e2)
+  //   val res3 = for {
+  //     e1 <- trans(f3)
+  //     e2 <- trans(f2)
+  //   } yield (e1, e2)
 
-    res.eval(nocontext).run.futureValue should ===(List(("foo",1), ("foo",2), ("bar",1), ("bar",2)))
+  //   res3.eval(nocontext).run.futureValue should ===(None)
+  // }
 
-    val res2 = for {
-      e1 <- trans(f1)
-      e2 <- trans(f3)
-    } yield (e1, e2)
+  // it should "listT" in {
+  //   val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List("foo", "bar").point[Future])
+  //   val f2 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List(1, 2).point[Future])
+  //   val f3 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List[Int]().point[Future])
 
-    res2.eval(nocontext).run.futureValue should ===(List())
+  //   val res = for {
+  //     e1 <- trans(f1)
+  //     e2 <- trans(f2)
+  //   } yield (e1, e2)
 
-    val res3 = for {
-      e1 <- trans(f3)
-      e2 <- trans(f2)
-    } yield (e1, e2)
+  //   res.eval(nocontext).run.futureValue should ===(List(("foo",1), ("foo",2), ("bar",1), ("bar",2)))
 
-    res3.eval(nocontext).run.futureValue should ===(List())
-  }
+  //   val res2 = for {
+  //     e1 <- trans(f1)
+  //     e2 <- trans(f3)
+  //   } yield (e1, e2)
 
-  it should "EitherT" in {
-    import scalaz.{ \/ , \/-, -\/}
-    import EitherT.eitherTFunctor
+  //   res2.eval(nocontext).run.futureValue should ===(List())
 
-    val f1: Monitored[Unit, Future, String \/ String] =
-      Monitored(Call.Tags.empty)(_ => \/-("foo").point[Future])
-    val f2: Monitored[Unit, Future, String \/ Int] =
-      Monitored(Call.Tags.empty)(_ => \/-(1).point[Future])
-    val f3: Monitored[Unit, Future, String \/ String] =
-      Monitored(Call.Tags.empty)(_ => -\/("Error").point[Future])
+  //   val res3 = for {
+  //     e1 <- trans(f3)
+  //     e2 <- trans(f2)
+  //   } yield (e1, e2)
 
-    type Foo[A] = EitherT[Future, String, A]
-    implicitly[scalaz.Functor[Foo]]
+  //   res3.eval(nocontext).run.futureValue should ===(List())
+  // }
 
-    val res = for {
-      e1 <- trans(f1)
-      e2 <- trans(f2)
-    } yield (e1, e2)
+  // it should "EitherT" in {
+  //   import scalaz.{ \/ , \/-, -\/}
+  //   import EitherT.eitherTFunctor
 
-    res.eval(nocontext).run.futureValue should ===(\/-("foo" -> 1))
+  //   val f1: Monitored[Unit, Future, String \/ String] =
+  //     Monitored(Call.Tags.empty)(_ => \/-("foo").point[Future])
+  //   val f2: Monitored[Unit, Future, String \/ Int] =
+  //     Monitored(Call.Tags.empty)(_ => \/-(1).point[Future])
+  //   val f3: Monitored[Unit, Future, String \/ String] =
+  //     Monitored(Call.Tags.empty)(_ => -\/("Error").point[Future])
 
-    val error = -\/("Error")
-    val res2 = for {
-      e1 <- trans(f1)
-      e2 <- trans(f3)
-    } yield (e1, e2)
+  //   type Foo[A] = EitherT[Future, String, A]
+  //   implicitly[scalaz.Functor[Foo]]
 
-    res2.eval(nocontext).run.futureValue should ===(error)
+  //   val res = for {
+  //     e1 <- trans(f1)
+  //     e2 <- trans(f2)
+  //   } yield (e1, e2)
 
-    val res3 = for {
-      e1 <- trans(f3)
-      e2 <- trans(f2)
-    } yield (e1, e2)
+  //   res.eval(nocontext).run.futureValue should ===(\/-("foo" -> 1))
 
-    res3.eval(nocontext).run.futureValue should ===(error)
-  }
+  //   val error = -\/("Error")
+  //   val res2 = for {
+  //     e1 <- trans(f1)
+  //     e2 <- trans(f3)
+  //   } yield (e1, e2)
 
-  case class Board(pin: Option[Int])
-  object BoardComp {
-    def get() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-      val logger = c.value
-      logger.debug("BoardComp.get")
-      Board(Option(1)).point[Future]
-    }
-  }
+  //   res2.eval(nocontext).run.futureValue should ===(error)
 
-  case class Community(name: String)
-  case class Card(name: String)
+  //   val res3 = for {
+  //     e1 <- trans(f3)
+  //     e2 <- trans(f2)
+  //   } yield (e1, e2)
 
-  object CardComp {
-    def getPin(id: Int) = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-      val logger = c.value
-      logger.debug("CardComp.getPin")
-      Option(1 -> Card("card 1")).point[Future]
-    }
+  //   res3.eval(nocontext).run.futureValue should ===(error)
+  // }
 
-    def countAll() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-      val logger = c.value
-      logger.debug("CardComp.countAll")
-      Set("Edito", "Video").point[Future]
-    }
+  // case class Board(pin: Option[Int])
+  // object BoardComp {
+  //   def get() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
+  //     val logger = c.value
+  //     logger.debug("BoardComp.get")
+  //     Board(Option(1)).point[Future]
+  //   }
+  // }
 
-    def rank() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-      val logger = c.value
-      logger.debug("CardComp.rank")
-      List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
-    }
+  // case class Community(name: String)
+  // case class Card(name: String)
 
-    def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-      val logger = c.value
-      logger.debug("CardComp.cardsInfos")
-      List(
-        Card("foo") -> List(Community("community 1"), Community("community 2")),
-        Card("bar") -> List(Community("community 2"))).point[Future]
-    }
-  }
+  // object CardComp {
+  //   def getPin(id: Int) = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
+  //     val logger = c.value
+  //     logger.debug("CardComp.getPin")
+  //     Option(1 -> Card("card 1")).point[Future]
+  //   }
 
-  import java.net.URL
-  case class Highlight(title: String, cover: URL)
-  object HighlightComp {
-    def get() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-      val logger = c.value
-      logger.debug("HighlightComp.get")
-      Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
-    }
-  }
+  //   def countAll() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
+  //     val logger = c.value
+  //     logger.debug("CardComp.countAll")
+  //     Set("Edito", "Video").point[Future]
+  //   }
 
-  it should "have context" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+  //   def rank() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
+  //     val logger = c.value
+  //     logger.debug("CardComp.rank")
+  //     List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
+  //   }
 
-    case class ContextTester(state: Call.State) {
-      def push(): Unit = {
-        ctxs += state
-        ()
-      }
-    }
+  //   def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
+  //     val logger = c.value
+  //     logger.debug("CardComp.cardsInfos")
+  //     List(
+  //       Card("foo") -> List(Community("community 1"), Community("community 2")),
+  //       Card("bar") -> List(Community("community 2"))).point[Future]
+  //   }
+  // }
 
-    def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-      val tester = c.value
-      tester.push()
-      1.point[Future]
-    }
+  // import java.net.URL
+  // case class Highlight(title: String, cover: URL)
+  // object HighlightComp {
+  //   def get() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
+  //     val logger = c.value
+  //     logger.debug("HighlightComp.get")
+  //     Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
+  //   }
+  // }
 
-    f1.eval(s => ContextTester(s)).futureValue should ===(1)
-    ctxs.length should ===(1)
-  }
+  // it should "have context" in {
+  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
 
-  it should "preserve context on map" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+  //   case class ContextTester(state: Call.State) {
+  //     def push(): Unit = {
+  //       ctxs += state
+  //       ()
+  //     }
+  //   }
 
-    case class ContextTester(state: Call.State) {
-      def push(): Unit = {
-        ctxs += state
-        ()
-      }
-    }
+  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
+  //     val tester = c.value
+  //     tester.push()
+  //     1.point[Future]
+  //   }
 
-    def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-      val tester = c.value
-      tester.push()
-      1.point[Future]
-    }.map(identity).map(identity).map(identity).map(identity)
+  //   f1.eval(s => ContextTester(s)).futureValue should ===(1)
+  //   ctxs.length should ===(1)
+  // }
 
-    f1.eval(s => ContextTester(s)).futureValue should ===(1)
+  // it should "preserve context on map" in {
+  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
 
-    ctxs.length should ===(1)
-    ctxs.head.path.length should ===(1)
-  }
+  //   case class ContextTester(state: Call.State) {
+  //     def push(): Unit = {
+  //       ctxs += state
+  //       ()
+  //     }
+  //   }
 
-  it should "preserve context on flatMap" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
+  //     val tester = c.value
+  //     tester.push()
+  //     1.point[Future]
+  //   }.map(identity).map(identity).map(identity).map(identity)
 
-    case class ContextTester(state: Call.State) {
-      def push(name: String): Unit = {
-        ctxs += state
-        ()
-      }
-    }
+  //   f1.eval(s => ContextTester(s)).futureValue should ===(1)
 
-    def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-      val tester = c.value
-      tester.push("f1")
-      1.point[Future]
-    }
+  //   ctxs.length should ===(1)
+  //   ctxs.head.path.length should ===(1)
+  // }
 
-    def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-      val tester = c.value
-      tester.push("f2")
-      s"foo $i".point[Future]
-    }
+  // it should "preserve context on flatMap" in {
+  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
 
-    def f3(s: String) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-      val tester = c.value
-      tester.push("f3")
-      s"f3 $s".point[Future]
-    }
+  //   case class ContextTester(state: Call.State) {
+  //     def push(name: String): Unit = {
+  //       ctxs += state
+  //       ()
+  //     }
+  //   }
 
-    val f = Monitored(Call.Tags.empty)(f1
-      .flatMap(i => f2(i))
-      .flatMap(s => f3(s)))
+  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
+  //     val tester = c.value
+  //     tester.push("f1")
+  //     1.point[Future]
+  //   }
 
-    f.eval(s => ContextTester(s)).futureValue should ===("f3 foo 1")
+  //   def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
+  //     val tester = c.value
+  //     tester.push("f2")
+  //     s"foo $i".point[Future]
+  //   }
 
-    ctxs.length should ===(3)
+  //   def f3(s: String) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
+  //     val tester = c.value
+  //     tester.push("f3")
+  //     s"f3 $s".point[Future]
+  //   }
 
-  }
+  //   val f = Monitored(Call.Tags.empty)(f1
+  //     .flatMap(i => f2(i))
+  //     .flatMap(s => f3(s)))
 
-  it should "stack contexts" in {
+  //   f.eval(s => ContextTester(s)).futureValue should ===("f3 foo 1")
 
-    def f1 = Monitored(Call.Tags.empty){ (c: Call[Unit]) =>
-      1.point[Future]
-    }
+  //   ctxs.length should ===(3)
 
-    val stacked = Monitored(Call.Tags.empty)(f1)
-    val (s, r) = stacked.run(nocontext).futureValue
-    r should ===(1)
+  // }
 
-    s.children should ===(1)
-  }
+  // it should "stack contexts" in {
+
+  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[Unit]) =>
+  //     1.point[Future]
+  //   }
+
+  //   val stacked = Monitored(Call.Tags.empty)(f1)
+  //   val (s, r) = stacked.run(nocontext).futureValue
+  //   r should ===(1)
+
+  //   s.children should ===(1)
+  // }
 
   // it should "provide context to C" in {
   //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
