@@ -83,9 +83,12 @@ case class Step[C, F[_], MC](st: IndexedStateT[F, Monitored.Call.State[C], C, MC
 }
 
 object Step {
-  implicit def stepInstances[C, F[_]: Functor] =
-    new Functor[({ type λ[α] = Step[C, F, α] })#λ] {
+  implicit def stepInstances[C, F[_]: Functor: Applicative] =
+    new Functor[({ type λ[α] = Step[C, F, α] })#λ] with Applicative[({ type λ[α] = Step[C, F, α] })#λ] {
       override def map[A, B](fa: Step[C, F, A])(f: A => B) = fa map f
+      override def point[A](a: => A): Step[C,F,A] =
+        Step(IndexedStateT(call => (call.value, a).point[F]))
+      override def ap[A, B](fa: => Step[C,F,A])(f: => Step[C, F, A => B]): Step[C, F, B] = ???
     }
 }
 
@@ -143,12 +146,16 @@ object Monitored {
         case -\/(step) =>
           step.run(state).flatMap {
             case (c, mc: Free.Gosub[({ type λ[α] = Step[C, F, α] })#λ, _]) =>
+              println("gosub")
               val id = Call.Id.gen
               val gn: Call.Graph[C] = graph.copy(children = graph.children :+ Call.Graph(id, c, Vector.empty))
               go(mc, Call.State(state.path :+ Call(id), c), gn)
             case (c, mc) =>
               val id = Call.Id.gen
-              go(mc, Call.State(state.path :+ Call(id), c), Call.Graph(id, c, Vector.empty))
+              println("suspend")
+              go(mc, Call.State(state.path :+ Call(id), c), graph).map { case (g, a) =>
+                Call.Graph(id, c, Vector(g)) -> a
+              }
           }
       }
     }
@@ -158,7 +165,7 @@ object Monitored {
   def apply0[C, A](λ: Call.State[C] => A): Monitored[C, Id, A] =
     apply[C, Id, A](λ)
 
-  def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[A]): Monitored.Monitored[C, F, A] =
+  def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[A])(implicit fu: Functor[({ type λ[α] = Step[C, F, α] })#λ]): Monitored.Monitored[C, F, A] =
     Free.liftF[({ type λ[α] = Step[C, F, α] })#λ, A] {
       Step[C, F, A] {
         IndexedStateT { (st: Call.State[C]) =>
@@ -167,4 +174,8 @@ object Monitored {
         }
       }
     }
+
+  def apply[C, F[_], A](m: Monitored.Monitored[C, F, A])(implicit fu: Applicative[({ type λ[α] = Step[C, F, α] })#λ]): Monitored.Monitored[C, F, A] =
+    Free.suspend[({ type λ[α] = Step[C, F, α] })#λ, A](m)
+
 }

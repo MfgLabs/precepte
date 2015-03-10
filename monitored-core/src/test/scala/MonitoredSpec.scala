@@ -3,6 +3,7 @@ package com.mfglab.monitoring
 import org.scalatest._
 import Matchers._
 import Inspectors._
+import Inside._
 
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -34,12 +35,23 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     Monitored.eval(f1, Call.State(Vector.empty, ())) should ===(1)
 
-    val res = for {
-      i <- f1
-      r <- f2(i)
-    } yield r
+    val res =
+    Monitored {
+      Monitored {
+        for {
+          i <- f1
+          r <- f2(i)
+        } yield r
+      }
+    }
 
-    Monitored.run(res, Call.State(Vector.empty, ())) should ===("foo 1")
+    val (graph, result) = Monitored.run(res, Call.State(Vector.empty, ()))
+    result should ===("foo 1")
+    println(graph)
+    // inside(graph) { case Call.Graph(id, c, children) =>
+    //   c should ===(())
+    //   children should have length 2
+    // }
   }
 
   // it should "simple" in {
