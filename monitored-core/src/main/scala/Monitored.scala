@@ -88,7 +88,7 @@ sealed trait Monitored[C, F[_], A] {
   final def map[B](f: A => B): Monitored[C, F, B] =
     flatMap(a => Return(f(a)))
 
-  final def eval(state: Call.State[C])(implicit mo: Monad[F]): F[A] = {
+  final def eval(state: Call.State[C])(implicit mo: Monad[F]): F[A] =
     this match {
       case Return(a) => a.point[F]
       case Step(st) => st.run(state).flatMap { case(c, m) =>
@@ -99,11 +99,34 @@ sealed trait Monitored[C, F[_], A] {
           next(i).eval(state)
         }
     }
-  }
+
 
   final def run(state: Call.State[C])(implicit mo: Monad[F]): F[(Call.Graph[C], A)] = {
-    ???
+    def go[B](m: Monitored[C, F, B], state: Call.State[C], graph: Call.Graph[C]): F[(Call.Graph[C], B)] = {
+      m match {
+        case Return(a) =>
+          (graph, a).point[F]
+        case Step(step) =>
+          step.run(state).flatMap {
+            case (c, mc) =>
+              val id = Call.Id.gen
+              val g = Call.Graph(id, c, Vector.empty)
+              go(mc, Call.State(state.path :+ Call(id), c), g).map { case (g, a) =>
+                graph.copy(children = graph.children :+ g) -> a
+              }
+          }
+        case Sub(sub, next) =>
+          val id = Call.Id.gen
+          val child = Call.Graph(id, state.value, Vector.empty)
+          go(sub, state, child).flatMap { case (g, a) =>
+            go(next(a), state, graph.copy(children = graph.children :+ g))
+          }
+      }
+    }
+    val root = Call.Id.gen
+    go(this, state, Call.Graph(root, state.value, Vector.empty))
   }
+
 }
 
 case class Return[C, F[_], A](a: A) extends Monitored[C, F, A]

@@ -29,14 +29,28 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
   val nocontext = Call(Call.Id.gen)
 
+  def p[C](g: Call.Graph[C], before: String = ""): Unit = {
+    println(before  + g.id)
+    for (c <- g.children)
+    p(c, before + "  ")
+  }
+
   "Monitored" should "trivial" in {
     def f1 = Monitored.apply0{(_: Call.State[Unit]) => 1}
     def f2(i: Int) = Monitored.apply0{(_: Call.State[Unit]) => s"foo $i"}
     def f3(i: Int) = Monitored.apply0{(_: Call.State[Unit]) => i + 1}
 
-    f1.eval(Call.State(Vector.empty, ())) should ===(1)
+    val (graph0, result0) = f1.run(Call.State(Vector.empty, ()))
+    result0 should ===(1)
 
-    println(f1)
+    println("-- graph0 --")
+    p(graph0)
+    println("----")
+
+    val (graphm, _) = Monitored(Monitored(f1)).run(Call.State(Vector.empty, ()))
+    println("-- graphm --")
+    p(graphm)
+    println("----")
 
     val res =
       for {
@@ -44,13 +58,17 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
         r <- f2(i)
       } yield r
 
-    println(res)
-    println(Monitored(res))
+    val (graph, result) = res.run(Call.State(Vector.empty, ()))
+    result should ===("foo 1")
 
-    res.eval(Call.State(Vector.empty, ())) should ===("foo 1")
+    println("-- graph --")
+    p(graph)
+    println("----")
 
-    // val (graph, result) = Monitored.run(res, Call.State(Vector.empty, ()))
-    // result should ===("foo 1")
+    val (graph1, result1) = Monitored(res).run(Call.State(Vector.empty, ()))
+    println("-- graph1 --")
+    p(graph1)
+    println("----")
 
     // inside(graph) { case Call.Graph(id, c, children) =>
     //   c should ===(())
@@ -58,21 +76,16 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     //   children.head.children should have length 3
     // }
 
-    // val res2 =
-    //   for {
-    //     i <- Monitored(f1.flatMap(f3 _))
-    //     r <- f2(i)
-    //   } yield r
+    val res2 =
+      for {
+        i <- Monitored(f1)
+        r <- f2(i)
+      } yield r
 
-    // val (graph2, result2) = Monitored.run(res2, Call.State(Vector.empty, ()))
-
-    // def p[C](g: Call.Graph[C], before: String): Unit = {
-    //   println(before  + g.id)
-    //   for (c <- g.children)
-    //   p(c, before + "  ")
-    // }
-
-    // p(graph2, "")
+    val (graph2, result2) = res2.run(Call.State(Vector.empty, ()))
+    println("-- graph2 --")
+    p(graph2)
+    println("----")
   }
 
   // it should "simple" in {
