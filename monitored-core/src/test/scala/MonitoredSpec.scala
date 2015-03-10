@@ -36,22 +36,28 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     Monitored.eval(f1, Call.State(Vector.empty, ())) should ===(1)
 
     val res =
-    Monitored {
       Monitored {
         for {
           i <- f1
           r <- f2(i)
         } yield r
       }
-    }
 
     val (graph, result) = Monitored.run(res, Call.State(Vector.empty, ()))
     result should ===("foo 1")
-    println(graph)
-    // inside(graph) { case Call.Graph(id, c, children) =>
-    //   c should ===(())
-    //   children should have length 2
+
+    // def p[C](g: Call.Graph[C], before: String): Unit = {
+    //   println(before  + g.id)
+    //   for (c <- g.children)
+    //   p(c, before + "  ")
     // }
+
+    // p(graph, "")
+    inside(graph) { case Call.Graph(id, c, children) =>
+      c should ===(())
+      children should have length 1
+      children.head.children should have length 3
+    }
   }
 
   // it should "simple" in {
