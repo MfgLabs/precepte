@@ -73,6 +73,7 @@ object CoHasHoist {
 
 sealed trait Monitored[C, F[_], A] {
   self =>
+  import Monitored.Call
 
   final def resume: Monitored[C, F, A] \/ A =
     this match {
@@ -86,6 +87,23 @@ sealed trait Monitored[C, F[_], A] {
 
   final def map[B](f: A => B): Monitored[C, F, B] =
     flatMap(a => Return(f(a)))
+
+  final def eval(state: Call.State[C])(implicit mo: Monad[F]): F[A] = {
+    this match {
+      case Return(a) => a.point[F]
+      case Step(st) => st.run(state).flatMap { case(c, m) =>
+        m.eval(Call.State(state.path :+ Call(Call.Id.gen), c))
+      }
+      case Sub(sub, next) =>
+        sub.eval(state).flatMap { case i =>
+          next(i).eval(state)
+        }
+    }
+  }
+
+  final def run(state: Call.State[C])(implicit mo: Monad[F]): F[(Call.Graph[C], A)] = {
+    ???
+  }
 }
 
 case class Return[C, F[_], A](a: A) extends Monitored[C, F, A]

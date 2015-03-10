@@ -34,7 +34,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     def f2(i: Int) = Monitored.apply0{(_: Call.State[Unit]) => s"foo $i"}
     def f3(i: Int) = Monitored.apply0{(_: Call.State[Unit]) => i + 1}
 
-    // Monitored.eval(f1, Call.State(Vector.empty, ())) should ===(1)
+    f1.eval(Call.State(Vector.empty, ())) should ===(1)
 
     println(f1)
 
@@ -46,6 +46,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     println(res)
     println(Monitored(res))
+
+    res.eval(Call.State(Vector.empty, ())) should ===("foo 1")
 
     // val (graph, result) = Monitored.run(res, Call.State(Vector.empty, ()))
     // result should ===("foo 1")
