@@ -3,10 +3,9 @@ package com.mfglab.monitoring
 import scala.language.higherKinds
 
 import scala.concurrent.Future
-import scalaz.{ Hoist, Monad, OptionT, MonadTrans, ListT, EitherT, Applicative, Functor, ∨ }
-import com.mfglab.Free
+import scalaz.{ Hoist, Monad, OptionT, ListT, EitherT, Applicative, Functor, \/, \/-, -\/ }
 import scala.language.higherKinds
-import scalaz.Unapply
+
 import scalaz.IndexedStateT
 import scalaz.syntax.monad._
 
@@ -30,12 +29,12 @@ object HasHoist {
     def lift[F[_], A](f: F[List[A]]): ListT[F, A] = ListT.apply(f)
   }
 
-  private[this] class EitherHasHoist[A] extends HasHoist[({ type λ[α] = A ∨ α })#λ] {
+  private[this] class EitherHasHoist[A] extends HasHoist[({ type λ[α] = A \/ α })#λ] {
     type T[F[_], B] = EitherT[F, A, B]
-    def lift[F[_], B](f: F[A ∨ B]): EitherT[F, A, B] = EitherT.apply(f)
+    def lift[F[_], B](f: F[A \/ B]): EitherT[F, A, B] = EitherT.apply(f)
   }
 
-  implicit def eitherHasHoist[A]: HasHoist.Aux[({ type λ[α] = A ∨ α })#λ, ({ type λ[F[_], B] = EitherT[F, A, B] })#λ] = new EitherHasHoist[A]
+  implicit def eitherHasHoist[A]: HasHoist.Aux[({ type λ[α] = A \/ α })#λ, ({ type λ[F[_], B] = EitherT[F, A, B] })#λ] = new EitherHasHoist[A]
 }
 
 trait CoHasHoist[T[_]] {
@@ -66,37 +65,40 @@ object CoHasHoist {
 
   implicit def eitherCoHasHoist[F0[_], A] = new CoHasHoist[({ type λ[α] = EitherT[F0, A, α] })#λ] {
     type F[T] = F0[T]
-    type G[T] = A ∨ T
-    def unlift[B](o: EitherT[F, A, B]): F[A ∨ B] = o.run
+    type G[T] = A \/ T
+    def unlift[B](o: EitherT[F, A, B]): F[A \/ B] = o.run
   }
 }
 
-case class Step[C, F[_], MC](st: IndexedStateT[F, Monitored.Call.State[C], C, MC]) {
+
+sealed trait Monitored[C, F[_], A] {
   self =>
 
-  import Monitored.Call
-
-  def map[B](fu: MC => B)(implicit ff: Functor[F]): Step[C, F, B] =
-    Step[C, F, B](self.st.map(fu))
-
-  def run(state: Call.State[C]): F[(C, MC)] = st.run(state)
-}
-
-object Step {
-  implicit def stepInstances[C, F[_]: Functor: Applicative] =
-    new Functor[({ type λ[α] = Step[C, F, α] })#λ] with Applicative[({ type λ[α] = Step[C, F, α] })#λ] {
-      override def map[A, B](fa: Step[C, F, A])(f: A => B) = fa map f
-      override def point[A](a: => A): Step[C,F,A] =
-        Step(IndexedStateT(call => (call.value, a).point[F]))
-      override def ap[A, B](fa: => Step[C,F,A])(f: => Step[C, F, A => B]): Step[C, F, B] = ???
+  final def resume: Monitored[C, F, A] \/ A =
+    this match {
+      case Return(a) => \/-(a)
+      case s@Step(_) => -\/(s)
+      case s@Sub(_, _) => -\/(s)
     }
+
+  final def flatMap[B](f: A => Monitored[C, F, B]): Monitored[C, F, B] =
+    Sub[C, F, A, B](self, f)
+
+  final def map[B](f: A => B): Monitored[C, F, B] =
+    flatMap(a => Return(f(a)))
 }
+
+case class Return[C, F[_], A](a: A) extends Monitored[C, F, A]
+case class Step[C, F[_], A](st: IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]]) extends Monitored[C, F, A] {
+  import Monitored.Call
+  def run(state: Call.State[C]): F[(C, Monitored[C, F, A])] = st.run(state)
+}
+
+case class Sub[C, F[_], I, A](sub: Monitored[C, F, I], next: I => Monitored[C, F, A]) extends Monitored[C, F, A]
 
 object Monitored {
   import scalaz.Id._
   import scalaz.Unapply
-
-  type Monitored[C, F[_], A] = Free[({ type λ[α] = Step[C, F, α] })#λ, A]
 
   case class Call(id: Call.Id) {
     def toJson = ???
@@ -121,60 +123,20 @@ object Monitored {
     }
   }
 
-  trait *->*[F[_]] {}
-  trait *->*->*[F[_, _]] {}
-
-  implicit def fKindEv[F0[_]] = new *->*[F0] {}
-  implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
-
-  import scalaz.{ \/-, -\/ }
-  def eval[C, F[_]: Monad, A](m: Monitored.Monitored[C, F, A], state: Call.State[C])(implicit fu: Functor[({ type λ[α] = Step[C, F, α] })#λ]): F[A] =
-    m.resume(fu) match {
-      case \/-(a) =>
-        a.point[F]
-      case -\/(step) =>
-        step.run(state).flatMap { case (c, mc) =>
-          eval(mc, Call.State(state.path :+ Call(Call.Id.gen), c))
-        }
-    }
-
-  def run[C, F[_]: Monad, A](m: Monitored.Monitored[C, F, A], state: Call.State[C])(implicit fu: Functor[({ type λ[α] = Step[C, F, α] })#λ]): F[(Call.Graph[C], A)] = {
-    def go(m: Monitored.Monitored[C, F, A], state: Call.State[C], graph: Call.Graph[C]): F[(Call.Graph[C], A)] = {
-      m.resume(fu) match {
-        case \/-(a) =>
-          (graph, a).point[F]
-        case -\/(step) =>
-          step.run(state).flatMap {
-            case (c, mc: Free.Gosub[({ type λ[α] = Step[C, F, α] })#λ, _]) =>
-              val id = Call.Id.gen
-              val gn: Call.Graph[C] = graph.copy(children = graph.children :+ Call.Graph(id, c, Vector.empty))
-              go(mc, Call.State(state.path :+ Call(id), c), gn)
-            case (c, mc) =>
-              val id = Call.Id.gen
-              go(mc, Call.State(state.path :+ Call(id), c), graph).map { case (g, a) =>
-                Call.Graph(id, c, Vector(g)) -> a
-              }
-          }
-      }
-    }
-
-    go(Monitored.apply(m), state, Call.Graph(Call.Id.gen, state.value, Vector.empty))
-  }
-
   def apply0[C, A](λ: Call.State[C] => A): Monitored[C, Id, A] =
     apply[C, Id, A](λ)
 
-  def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[A])(implicit fu: Functor[({ type λ[α] = Step[C, F, α] })#λ]): Monitored.Monitored[C, F, A] =
-    Free.liftF[({ type λ[α] = Step[C, F, α] })#λ, A] {
-      Step[C, F, A] {
-        IndexedStateT { (st: Call.State[C]) =>
-          for (a <- λ(st))
-          yield st.value -> a
-        }
+  def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[A]): Monitored[C, F, A] =
+    Step[C, F, A] {
+      IndexedStateT { (st: Call.State[C]) =>
+        for (a <- λ(st))
+        yield st.value -> Return(a)
       }
     }
 
-  def apply[C, F[_], A](m: Monitored.Monitored[C, F, A])(implicit ap: Applicative[({ type λ[α] = Step[C, F, α] })#λ]): Monitored.Monitored[C, F, A] =
-    Free.suspend[({ type λ[α] = Step[C, F, α] })#λ, A](m)
+  def apply[C, F[_]: Applicative, A](m: Monitored[C, F, A]): Monitored[C, F, A] =
+    Step(IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]]{ st =>
+      (st.value -> m).point[F]
+    })
 
 }
