@@ -117,9 +117,11 @@ sealed trait Monitored[C, F[_], A] {
           }
         case Sub(sub, next) =>
           val id = Call.Id.gen
-          val child = Call.Graph(id, state.value, Vector.empty)
-          go(sub, state, child).flatMap { case (g, a) =>
-            go(next(a), state, graph.copy(children = graph.children :+ g))
+          val g0 = Call.Graph(id, state.value, Vector.empty)
+          go(sub, state, g0).flatMap { case (gi, i) =>
+            go(next(i), state, gi).map { case (g, a) =>
+              graph.copy(children = graph.children ++ g.children) -> a
+            }
           }
       }
     }
