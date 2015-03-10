@@ -110,16 +110,16 @@ sealed trait Monitored[C, F[_], A] {
           step.run(state).flatMap {
             case (c, mc) =>
               val id = Call.Id.gen
-              val g = Call.Graph(id, c, Vector.empty)
-              go(mc, Call.State(state.path :+ Call(id), c), g).map { case (g, a) =>
-                graph.copy(children = graph.children :+ g) -> a
+              val g0 = Call.Graph(id, c, Vector.empty)
+              go(mc, Call.State(state.path :+ Call(id), c), g0).map { case (g, a) =>
+                graph.addChild(g) -> a
               }
           }
         case Sub(sub, next) =>
           val g0 = Call.Graph(Call.Id("dummy"), state.value, Vector.empty)
           go(sub, state, g0).flatMap { case (gi, i) =>
             go(next(i), state, gi).map { case (g, a) =>
-              graph.copy(children = graph.children ++ g.children) -> a
+              graph.addChildren(g.children) -> a
             }
           }
       }
@@ -157,7 +157,12 @@ object Monitored {
     }
     type Path = Vector[Call]
 
-    case class Graph[C](id: Call.Id, value: C, children: Vector[Graph[C]])
+    case class Graph[C](id: Call.Id, value: C, children: Vector[Graph[C]]) {
+      def addChildren(cs: Vector[Graph[C]]) =
+        this.copy(children = children ++ cs)
+      def addChild(c: Graph[C]) =
+        this.copy(children = children :+ c)
+    }
     case class State[C](path: Path, value: C)
 
     object Id {
