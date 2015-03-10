@@ -30,7 +30,12 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   val nocontext = Call(Call.Id.gen)
 
   def p[C](g: Call.Graph[C], before: String = ""): Unit = {
-    println(before  + g.id)
+    val id = g match {
+      case Call.Root(span, _) => s"span: $span"
+      case Call.GraphNode(id, _, _) => s"id: $id"
+    }
+
+    println(before  + id)
     for (c <- g.children)
     p(c, before + "  ")
   }

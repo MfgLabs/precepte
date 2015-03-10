@@ -110,13 +110,14 @@ sealed trait Monitored[C, F[_], A] {
           step.run(state).flatMap {
             case (c, mc) =>
               val id = Call.Id.gen
-              val g0 = Call.Graph(id, c, Vector.empty)
+              val g0 = Call.GraphNode(id, c, Vector.empty)
               go(mc, Call.State(state.path :+ Call(id), c), g0).map { case (g, a) =>
                 graph.addChild(g) -> a
               }
           }
         case Sub(sub, next) =>
-          val g0 = Call.Graph(Call.Id("dummy"), state.value, Vector.empty)
+          // XXX: kinda hackish. We're only interested in this node children
+          val g0 = Call.GraphNode(Call.Id("dummy"), state.value, Vector.empty)
           go(sub, state, g0).flatMap { case (gi, i) =>
             go(next(i), state, gi).map { case (g, a) =>
               graph.addChildren(g.children) -> a
@@ -124,8 +125,8 @@ sealed trait Monitored[C, F[_], A] {
           }
       }
     }
-    val root = Call.Id.gen
-    go(this, state, Call.Graph(root, state.value, Vector.empty))
+    val root = Call.Span.gen
+    go(this, state, Call.Root(root, Vector.empty))
   }
 
 }
@@ -147,6 +148,7 @@ object Monitored {
   }
 
   object Call {
+   case class Span(value: String) extends AnyVal
     case class Id(value: String) extends AnyVal
     case class Tags(values: (String, String)*) {
       override def toString = s"Tags(${values.toList})"
@@ -157,16 +159,30 @@ object Monitored {
     }
     type Path = Vector[Call]
 
-    case class Graph[C](id: Call.Id, value: C, children: Vector[Graph[C]]) {
+    sealed trait Graph[C] {
+      val children: Vector[Graph[C]]
+      def addChildren(cs: Vector[Graph[C]]): Graph[C]
+      def addChild(c: Graph[C]): Graph[C] =
+        addChildren(Vector(c))
+    }
+
+    case class GraphNode[C](id: Call.Id, value: C, children: Vector[Graph[C]]) extends Graph[C] {
       def addChildren(cs: Vector[Graph[C]]) =
         this.copy(children = children ++ cs)
-      def addChild(c: Graph[C]) =
-        this.copy(children = children :+ c)
     }
+
+    case class Root[C](span: Call.Span, children: Vector[Graph[C]]) extends Graph[C] {
+      def addChildren(cs: Vector[Graph[C]]) =
+        this.copy(children = children ++ cs)
+    }
+
     case class State[C](path: Path, value: C)
 
     object Id {
       def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)
+    }
+    object Span {
+      def gen = Span(java.util.UUID.randomUUID.toString)
     }
   }
 
