@@ -101,8 +101,8 @@ sealed trait Monitored[C, F[_], A] {
     }
 
 
-  final def run(state: Call.State[C])(implicit mo: Monad[F]): F[(Call.Graph[C], A)] = {
-    def go[B](m: Monitored[C, F, B], state: Call.State[C], graph: Call.Graph[C]): F[(Call.Graph[C], B)] = {
+  final def run(state: Call.State[C])(implicit mo: Monad[F]): F[(Call.Root[C], A)] = {
+    def go[G <: Call.Graph[C, G] ,B](m: Monitored[C, F, B], state: Call.State[C], graph: G): F[(G, B)] = {
       m match {
         case Return(a) =>
           (graph, a).point[F]
@@ -159,20 +159,20 @@ object Monitored {
     }
     type Path = Vector[Call]
 
-    sealed trait Graph[C] {
-      val children: Vector[Graph[C]]
-      def addChildren(cs: Vector[Graph[C]]): Graph[C]
-      def addChild(c: Graph[C]): Graph[C] =
+    sealed trait Graph[C, G <: Graph[C, G]] {
+      val children: Vector[GraphNode[C]]
+      def addChildren(cs: Vector[GraphNode[C]]): G
+      def addChild(c: GraphNode[C]): G =
         addChildren(Vector(c))
     }
 
-    case class GraphNode[C](id: Call.Id, value: C, children: Vector[Graph[C]]) extends Graph[C] {
-      def addChildren(cs: Vector[Graph[C]]) =
+    case class GraphNode[C](id: Call.Id, value: C, children: Vector[GraphNode[C]]) extends Graph[C, GraphNode[C]] {
+      def addChildren(cs: Vector[GraphNode[C]]): GraphNode[C] =
         this.copy(children = children ++ cs)
     }
 
-    case class Root[C](span: Call.Span, children: Vector[Graph[C]]) extends Graph[C] {
-      def addChildren(cs: Vector[Graph[C]]) =
+    case class Root[C](span: Call.Span, children: Vector[GraphNode[C]]) extends Graph[C, Root[C]] {
+      def addChildren(cs: Vector[GraphNode[C]]): Root[C] =
         this.copy(children = children ++ cs)
     }
 

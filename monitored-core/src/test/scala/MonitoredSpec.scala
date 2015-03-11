@@ -29,15 +29,19 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
   val nocontext = Call(Call.Id.gen)
 
-  def p[C](g: Call.Graph[C], before: String = ""): Unit = {
+  def p[C, G <: Call.Graph[C, G]](g: G, before: String = ""): Unit = {
     val id = g match {
       case Call.Root(span, _) => s"span: $span"
       case Call.GraphNode(id, _, _) => s"id: $id"
     }
 
     println(before  + id)
-    for (c <- g.children)
-    p(c, before + "  ")
+    for (c <- g.children) {
+      c match {
+        case node@Call.GraphNode(_, _, _) =>
+          p[C, Call.GraphNode[C]](node, before + "  ")
+      }
+    }
   }
 
   "Monitored" should "trivial" in {
@@ -49,12 +53,12 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     result0 should ===(1)
 
     println("-- graph0 --")
-    p(graph0)
+    p[Unit, Call.Root[Unit]](graph0)
     println("----")
 
     val (graphm, _) = Monitored(Monitored(f1)).run(Call.State(Vector.empty, ()))
     println("-- graphm --")
-    p(graphm)
+    p[Unit, Call.Root[Unit]](graphm)
     println("----")
 
     val res =
@@ -67,12 +71,12 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     result should ===("foo 1")
 
     println("-- graph --")
-    p(graph)
+    p[Unit, Call.Root[Unit]](graph)
     println("----")
 
     val (graph1, result1) = Monitored(res).run(Call.State(Vector.empty, ()))
     println("-- graph1 --")
-    p(graph1)
+    p[Unit, Call.Root[Unit]](graph1)
     println("----")
 
     // inside(graph) { case Call.Graph(id, c, children) =>
@@ -89,7 +93,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     val (graph2, result2) = res2.run(Call.State(Vector.empty, ()))
     println("-- graph2 --")
-    p(graph2)
+    p[Unit, Call.Root[Unit]](graph2)
     println("----")
   }
 
