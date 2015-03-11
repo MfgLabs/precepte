@@ -203,58 +203,60 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res3.run.eval(nostate).futureValue should ===(error)
+    val (graph, rr) = res3.run.run(nostate).futureValue
+    rr should ===(error)
+    p[Unit, Call.Root[Unit]](graph)
   }
 
-  // case class Board(pin: Option[Int])
-  // object BoardComp {
-  //   def get() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-  //     val logger = c.value
-  //     logger.debug("BoardComp.get")
-  //     Board(Option(1)).point[Future]
-  //   }
-  // }
+  case class Board(pin: Option[Int])
+  object BoardComp {
+    def get() = Monitored(Call.Tags.empty) { (c: Call.State[Log]) =>
+      val logger = c.value
+      logger.debug("BoardComp.get")
+      Board(Option(1)).point[Future]
+    }
+  }
 
-  // case class Community(name: String)
-  // case class Card(name: String)
+  case class Community(name: String)
+  case class Card(name: String)
 
-  // object CardComp {
-  //   def getPin(id: Int) = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-  //     val logger = c.value
-  //     logger.debug("CardComp.getPin")
-  //     Option(1 -> Card("card 1")).point[Future]
-  //   }
+  object CardComp {
+    def getPin(id: Int) = Monitored(Call.Tags.empty) { (c: Call.State[Log]) =>
+      val logger = c.value
+      logger.debug("CardComp.getPin")
+      Option(1 -> Card("card 1")).point[Future]
+    }
 
-  //   def countAll() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-  //     val logger = c.value
-  //     logger.debug("CardComp.countAll")
-  //     Set("Edito", "Video").point[Future]
-  //   }
+    def countAll() = Monitored(Call.Tags.empty) { (c: Call.State[Log]) =>
+      val logger = c.value
+      logger.debug("CardComp.countAll")
+      Set("Edito", "Video").point[Future]
+    }
 
-  //   def rank() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-  //     val logger = c.value
-  //     logger.debug("CardComp.rank")
-  //     List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
-  //   }
+    def rank() = Monitored(Call.Tags.empty) { (c: Call.State[Log]) =>
+      val logger = c.value
+      logger.debug("CardComp.rank")
+      List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
+    }
 
-  //   def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-  //     val logger = c.value
-  //     logger.debug("CardComp.cardsInfos")
-  //     List(
-  //       Card("foo") -> List(Community("community 1"), Community("community 2")),
-  //       Card("bar") -> List(Community("community 2"))).point[Future]
-  //   }
-  // }
+    def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Monitored(Call.Tags.empty) { (c: Call.State[Log]) =>
+      val logger = c.value
+      logger.debug("CardComp.cardsInfos")
+      List(
+        Card("foo") -> List(Community("community 1"), Community("community 2")),
+        Card("bar") -> List(Community("community 2"))).point[Future]
+    }
+  }
 
-  // import java.net.URL
-  // case class Highlight(title: String, cover: URL)
-  // object HighlightComp {
-  //   def get() = Monitored(Call.Tags.empty) { (c: Call[Log]) =>
-  //     val logger = c.value
-  //     logger.debug("HighlightComp.get")
-  //     Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
-  //   }
-  // }
+  import java.net.URL
+  case class Highlight(title: String, cover: URL)
+  object HighlightComp {
+    def get() = Monitored(Call.Tags.empty) { (c: Call.State[Log]) =>
+      val logger = c.value
+      logger.debug("HighlightComp.get")
+      Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
+    }
+  }
 
   // it should "have context" in {
   //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
