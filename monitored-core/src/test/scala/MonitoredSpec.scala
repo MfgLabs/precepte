@@ -27,21 +27,19 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  val nocontext = Call(Call.Id.gen)
-
   def p[C, G <: Call.Graph[C, G]](g: G, before: String = ""): Unit = {
     val txt = g match {
       case Call.Root(span, _) =>
         s"Root[$span]"
-      case Call.GraphNode(id, _, _) =>
-        s"GraphNode[$id]"
+      case Call.GraphNode(id, _, tags, _) =>
+        s"GraphNode[$id]: $tags"
     }
 
     println(before + txt)
 
     for (c <- g.children) {
       c match {
-        case node@Call.GraphNode(_, _, _) =>
+        case node@Call.GraphNode(_, _, _, _) =>
           p[C, Call.GraphNode[C]](node, before + "  ")
       }
     }
@@ -51,10 +49,11 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
   "Monitored" should "trivial" in {
     import Call.Tags
+    import Tags.Callee
 
-    def f1 = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => 1}
-    def f2(i: Int) = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => s"foo $i"}
-    def f3(i: Int) = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => i + 1}
+    def f1 = Monitored(Tags(Callee("f1"))).apply0{(_: Call.State[Unit]) => 1}
+    def f2(i: Int) = Monitored(Tags(Callee("f2"))).apply0{(_: Call.State[Unit]) => s"foo $i"}
+    def f3(i: Int) = Monitored(Tags(Callee("f3"))).apply0{(_: Call.State[Unit]) => i + 1}
 
     val (graph0, result0) = f1.run(nostate)
     result0 should ===(1)
@@ -81,7 +80,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     p[Unit, Call.Root[Unit]](graph)
     println("----")
 
-    val (graph1, result1) = Monitored(Tags.empty)(res).run(nostate)
+    val (graph1, result1) = Monitored(Tags(Callee("anon")))(res).run(nostate)
     println("-- graph1 --")
     p[Unit, Call.Root[Unit]](graph1)
     println("----")
@@ -94,7 +93,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     val res2 =
       for {
-        i <- Monitored(Tags.empty)(f1)
+        i <- Monitored(Tags(Callee("anon2")))(f1)
         r <- f2(i)
       } yield r
 

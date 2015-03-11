@@ -75,13 +75,6 @@ sealed trait Monitored[C, F[_], A] {
   self =>
   import Monitored.Call
 
-  final def resume: Monitored[C, F, A] \/ A =
-    this match {
-      case Return(a) => \/-(a)
-      case s@Step(_) => -\/(s)
-      case s@Sub(_, _) => -\/(s)
-    }
-
   final def flatMap[B](f: A => Monitored[C, F, B]): Monitored[C, F, B] =
     Sub[C, F, A, B](self, f)
 
@@ -91,8 +84,8 @@ sealed trait Monitored[C, F[_], A] {
   final def eval(state: Call.State[C])(implicit mo: Monad[F]): F[A] =
     this match {
       case Return(a) => a.point[F]
-      case Step(st) => st.run(state).flatMap { case(c, m) =>
-        m.eval(Call.State(state.path :+ Call(Call.Id.gen), c))
+      case Step(st, tags) => st.run(state).flatMap { case(c, m) =>
+        m.eval(Call.State(state.path :+ Call(Call.Id.gen, tags), c))
       }
       case Sub(sub, next) =>
         sub.eval(state).flatMap { case i =>
@@ -106,18 +99,18 @@ sealed trait Monitored[C, F[_], A] {
       m match {
         case Return(a) =>
           (graph, a).point[F]
-        case Step(step) =>
+        case Step(step, tags) =>
           step.run(state).flatMap {
             case (c, mc) =>
               val id = Call.Id.gen
-              val g0 = Call.GraphNode(id, c, Vector.empty)
-              go(mc, Call.State(state.path :+ Call(id), c), g0).map { case (g, a) =>
+              val g0 = Call.GraphNode(id, c, tags, Vector.empty)
+              go(mc, Call.State(state.path :+ Call(id, tags), c), g0).map { case (g, a) =>
                 graph.addChild(g) -> a
               }
           }
         case Sub(sub, next) =>
           // XXX: kinda hackish. We're only interested in this node children
-          val g0 = Call.GraphNode(Call.Id("dummy"), state.value, Vector.empty)
+          val g0 = Call.GraphNode(Call.Id("dummy"), state.value, Call.Tags.empty, Vector.empty)
           go(sub, state, g0).flatMap { case (gi, i) =>
             go(next(i), state, gi).map { case (g, a) =>
               graph.addChildren(g.children) -> a
@@ -125,16 +118,16 @@ sealed trait Monitored[C, F[_], A] {
           }
       }
     }
-    val root = Call.Span.gen
-    go(this, state, Call.Root(root, Vector.empty))
+    go(this, state, Call.Root(Call.Span.gen, Vector.empty))
   }
 
 }
 
 case class Return[C, F[_], A](a: A) extends Monitored[C, F, A]
-case class Step[C, F[_], A](st: IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]]) extends Monitored[C, F, A] {
+case class Step[C, F[_], A](st: IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]], tags: Monitored.Call.Tags) extends Monitored[C, F, A] {
   import Monitored.Call
-  def run(state: Call.State[C]): F[(C, Monitored[C, F, A])] = st.run(state)
+  def run(state: Call.State[C]): F[(C, Monitored[C, F, A])] =
+    st.run(state)
 }
 
 case class Sub[C, F[_], I, A](sub: Monitored[C, F, I], next: I => Monitored[C, F, A]) extends Monitored[C, F, A]
@@ -143,7 +136,7 @@ object Monitored {
   import scalaz.Id._
   import scalaz.Unapply
 
-  case class Call(id: Call.Id) {
+  case class Call(id: Call.Id, tags: Call.Tags) {
     def toJson = ???
   }
 
@@ -166,7 +159,7 @@ object Monitored {
         addChildren(Vector(c))
     }
 
-    case class GraphNode[C](id: Call.Id, value: C, children: Vector[GraphNode[C]]) extends Graph[C, GraphNode[C]] {
+    case class GraphNode[C](id: Call.Id, value: C, tags: Tags, children: Vector[GraphNode[C]]) extends Graph[C, GraphNode[C]] {
       def addChildren(cs: Vector[GraphNode[C]]): GraphNode[C] =
         this.copy(children = children ++ cs)
     }
@@ -193,17 +186,16 @@ object Monitored {
       apply[C, Id, A](λ)
 
     def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[A]): Monitored[C, F, A] =
-      Step[C, F, A] {
+      Step[C, F, A](
         IndexedStateT { (st: Call.State[C]) =>
           for (a <- λ(st))
           yield st.value -> Return(a)
-        }
-      }
+        }, tags)
 
     def apply[C, F[_]: Applicative, A](m: Monitored[C, F, A]): Monitored[C, F, A] =
       Step(IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]]{ st =>
         (st.value -> m).point[F]
-      })
+      }, tags)
   }
 
   def apply(_tags: Call.Tags) =
