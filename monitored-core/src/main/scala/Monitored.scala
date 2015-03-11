@@ -208,15 +208,22 @@ object Monitored {
   implicit def fKindEv[F0[_]] = new *->*[F0] {}
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 
-  def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G], fu: Functor[F], fg: Functor[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] = {
-    type T[G0] = hh.T[F, G0]
-    ???
+  def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G]): hh.T[({ type λ[α] = Monitored[C, F, α] })#λ, A] = {
+    type T[G0] = Monitored[C, F, G0]
+    hh.lift[T, A](m)
   }
 
-
-  def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ], fu: Functor[F], fg: Functor[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
+  def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): hh.T[({ type λ[α] = Monitored[C, F, α] })#λ, B] = {
     type λ[α] = G[A, α]
-    trans[C, F, λ, B](m)(new *->*[λ] {}, hh, fu, fg)
+    trans[C, F, λ, B](m)(new *->*[λ] {}, hh)
   }
+
+  implicit def monitoredInstances[C, F[_]: Monad] =
+    new Monad[({ type λ[α] = Monitored[C, F, α] })#λ] {
+      def point[A](a: => A): Monitored[C, F, A] = Monitored(Call.Tags.empty)[C, F, A]((_: Call.State[C]) => implicitly[Monad[F]].point(a))
+      def bind[A, B](m: Monitored[C, F, A])(f: A => Monitored[C, F, B]): Monitored[C, F, B] =
+        m.flatMap(f)
+    }
+
 
 }
