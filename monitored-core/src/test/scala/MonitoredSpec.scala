@@ -128,84 +128,83 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     res.run.eval(nostate).futureValue should ===(Some(("foo",1)))
 
-    // val res2 = for {
-    //   e1 <- trans(f1)
-    //   e2 <- trans(f3)
-    // } yield (e1, e2)
+    val res2 = for {
+      e1 <- trans(f1)
+      e2 <- trans(f3)
+    } yield (e1, e2)
 
-    // res2.eval(nostate).run.futureValue should ===(None)
+    res2.run.eval(nostate).futureValue should ===(None)
 
-    // val res3 = for {
-    //   e1 <- trans(f3)
-    //   e2 <- trans(f2)
-    // } yield (e1, e2)
+    val res3 = for {
+      e1 <- trans(f3)
+      e2 <- trans(f2)
+    } yield (e1, e2)
 
-    // res3.eval(nostate).run.futureValue should ===(None)
+    res3.run.eval(nostate).futureValue should ===(None)
   }
 
-  // it should "listT" in {
-  //   val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List("foo", "bar").point[Future])
-  //   val f2 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List(1, 2).point[Future])
-  //   val f3 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List[Int]().point[Future])
+  it should "listT" in {
+    val f1 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => List("foo", "bar").point[Future])
+    val f2 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => List(1, 2).point[Future])
+    val f3 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => List[Int]().point[Future])
 
-  //   val res = for {
-  //     e1 <- trans(f1)
-  //     e2 <- trans(f2)
-  //   } yield (e1, e2)
+    val res = for {
+      e1 <- trans(f1)
+      e2 <- trans(f2)
+    } yield (e1, e2)
 
-  //   res.eval(nocontext).run.futureValue should ===(List(("foo",1), ("foo",2), ("bar",1), ("bar",2)))
+    res.run.eval(nostate).futureValue should ===(List(("foo",1), ("foo",2), ("bar",1), ("bar",2)))
 
-  //   val res2 = for {
-  //     e1 <- trans(f1)
-  //     e2 <- trans(f3)
-  //   } yield (e1, e2)
+    val res2 = for {
+      e1 <- trans(f1)
+      e2 <- trans(f3)
+    } yield (e1, e2)
 
-  //   res2.eval(nocontext).run.futureValue should ===(List())
+    res2.run.eval(nostate).futureValue should ===(List())
 
-  //   val res3 = for {
-  //     e1 <- trans(f3)
-  //     e2 <- trans(f2)
-  //   } yield (e1, e2)
+    val res3 = for {
+      e1 <- trans(f3)
+      e2 <- trans(f2)
+    } yield (e1, e2)
 
-  //   res3.eval(nocontext).run.futureValue should ===(List())
-  // }
+    res3.run.eval(nostate).futureValue should ===(List())
+  }
 
-  // it should "EitherT" in {
-  //   import scalaz.{ \/ , \/-, -\/}
-  //   import EitherT.eitherTFunctor
+  it should "EitherT" in {
+    import scalaz.{ \/ , \/-, -\/}
+    import EitherT.eitherTFunctor
 
-  //   val f1: Monitored[Unit, Future, String \/ String] =
-  //     Monitored(Call.Tags.empty)(_ => \/-("foo").point[Future])
-  //   val f2: Monitored[Unit, Future, String \/ Int] =
-  //     Monitored(Call.Tags.empty)(_ => \/-(1).point[Future])
-  //   val f3: Monitored[Unit, Future, String \/ String] =
-  //     Monitored(Call.Tags.empty)(_ => -\/("Error").point[Future])
+    val f1: Monitored[Unit, Future, String \/ String] =
+      Monitored(Call.Tags.empty)(_ => \/-("foo").point[Future])
+    val f2: Monitored[Unit, Future, String \/ Int] =
+      Monitored(Call.Tags.empty)(_ => \/-(1).point[Future])
+    val f3: Monitored[Unit, Future, String \/ String] =
+      Monitored(Call.Tags.empty)(_ => -\/("Error").point[Future])
 
-  //   type Foo[A] = EitherT[Future, String, A]
-  //   implicitly[scalaz.Functor[Foo]]
+    type Foo[A] = EitherT[Future, String, A]
 
-  //   val res = for {
-  //     e1 <- trans(f1)
-  //     e2 <- trans(f2)
-  //   } yield (e1, e2)
+    val res = for {
+      e1 <- trans(f1)
+      e2 <- trans(f2)
+    } yield (e1, e2)
 
-  //   res.eval(nocontext).run.futureValue should ===(\/-("foo" -> 1))
+    res.run.eval(nostate).futureValue should ===(\/-("foo" -> 1))
 
-  //   val error = -\/("Error")
-  //   val res2 = for {
-  //     e1 <- trans(f1)
-  //     e2 <- trans(f3)
-  //   } yield (e1, e2)
+    val error = -\/("Error")
+    val res2 = for {
+      e1 <- trans(f1)
+      e2 <- trans(f3)
+    } yield (e1, e2)
 
-  //   res2.eval(nocontext).run.futureValue should ===(error)
+    res2.run.eval(nostate).futureValue should ===(error)
 
-  //   val res3 = for {
-  //     e1 <- trans(f3)
-  //     e2 <- trans(f2)
-  //   } yield (e1, e2)
+    val res3 = for {
+      e1 <- trans(f3)
+      e2 <- trans(f2)
+    } yield (e1, e2)
 
-  //   res3.eval(nocontext).run.futureValue should ===(error)
-  // }
+    res3.run.eval(nostate).futureValue should ===(error)
+  }
 
   // case class Board(pin: Option[Int])
   // object BoardComp {
