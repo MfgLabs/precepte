@@ -46,14 +46,14 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   val nostate = Call.State(Vector.empty, ())
+  import Call.Tags
+  import Tags.Callee
 
   "Monitored" should "trivial" in {
-    import Call.Tags
-    import Tags.Callee
 
-    def f1 = Monitored(Tags(Callee("f1"))).apply0{(_: Call.State[Unit]) => 1}
-    def f2(i: Int) = Monitored(Tags(Callee("f2"))).apply0{(_: Call.State[Unit]) => s"foo $i"}
-    def f3(i: Int) = Monitored(Tags(Callee("f3"))).apply0{(_: Call.State[Unit]) => i + 1}
+    def f1 = Monitored(Tags(Callee("trivial.f1"))).apply0{(_: Call.State[Unit]) => 1}
+    def f2(i: Int) = Monitored(Tags(Callee("trivial.f2"))).apply0{(_: Call.State[Unit]) => s"foo $i"}
+    def f3(i: Int) = Monitored(Tags(Callee("trivial.f3"))).apply0{(_: Call.State[Unit]) => i + 1}
 
     val (graph0, result0) = f1.run(nostate)
     result0 should ===(1)
@@ -80,7 +80,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     p[Unit, Call.Root[Unit]](graph)
     println("----")
 
-    val (graph1, result1) = Monitored(Tags(Callee("anon")))(res).run(nostate)
+    val (graph1, result1) = Monitored(Tags(Callee("trivial.anon")))(res).run(nostate)
     println("-- graph1 --")
     p[Unit, Call.Root[Unit]](graph1)
     println("----")
@@ -93,7 +93,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     val res2 =
       for {
-        i <- Monitored(Tags(Callee("anon2")))(f1)
+        i <- Monitored(Tags(Callee("trivial.anon2")))(f1)
         r <- f2(i)
       } yield r
 
@@ -104,8 +104,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "simple" in {
-    def f1 = Monitored(Call.Tags.empty){(_: Call.State[Unit]) => 1.point[Future]}
-    def f2(i: Int) = Monitored(Call.Tags.empty){(_: Call.State[Unit]) => s"foo $i".point[Future]}
+    def f1 = Monitored(Tags(Callee("simple.f1"))){(_: Call.State[Unit]) => 1.point[Future]}
+    def f2(i: Int) = Monitored(Tags(Callee("simple.f2"))){(_: Call.State[Unit]) => s"foo $i".point[Future]}
 
     val res = for {
       i <- f1
@@ -115,32 +115,32 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     res.eval(nostate).futureValue should ===("foo 1")
   }
 
-  // it should "optT" in {
-  //   val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => Option("foo").point[Future])
-  //   val f2 = Monitored(Call.Tags.empty)((_: Call[Unit]) => Option(1).point[Future])
-  //   val f3 = Monitored(Call.Tags.empty)((_: Call[Unit]) => (None: Option[Int]).point[Future])
+  it should "optT" in {
+    val f1 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => Option("foo").point[Future])
+    val f2 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => Option(1).point[Future])
+    val f3 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => (None: Option[Int]).point[Future])
 
-  //   val res = for {
-  //     e1 <- trans(f1)
-  //     e2 <- trans(f2)
-  //   } yield (e1, e2)
+    val res = for {
+      e1 <- trans(f1)
+      e2 <- trans(f2)
+    } yield (e1, e2)
 
-  //   res.eval(nocontext).run.futureValue should ===(Some(("foo",1)))
+    res.eval(nostate).run.futureValue should ===(Some(("foo",1)))
 
-  //   val res2 = for {
-  //     e1 <- trans(f1)
-  //     e2 <- trans(f3)
-  //   } yield (e1, e2)
+    val res2 = for {
+      e1 <- trans(f1)
+      e2 <- trans(f3)
+    } yield (e1, e2)
 
-  //   res2.eval(nocontext).run.futureValue should ===(None)
+    res2.eval(nostate).run.futureValue should ===(None)
 
-  //   val res3 = for {
-  //     e1 <- trans(f3)
-  //     e2 <- trans(f2)
-  //   } yield (e1, e2)
+    val res3 = for {
+      e1 <- trans(f3)
+      e2 <- trans(f2)
+    } yield (e1, e2)
 
-  //   res3.eval(nocontext).run.futureValue should ===(None)
-  // }
+    res3.eval(nostate).run.futureValue should ===(None)
+  }
 
   // it should "listT" in {
   //   val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => List("foo", "bar").point[Future])

@@ -76,7 +76,7 @@ sealed trait Monitored[C, F[_], A] {
   import Monitored.Call
 
   final def flatMap[B](f: A => Monitored[C, F, B]): Monitored[C, F, B] =
-    Sub[C, F, A, B](self, f)
+    Flatmap[C, F, A, B](self, f)
 
   final def map[B](f: A => B): Monitored[C, F, B] =
     flatMap(a => Return(f(a)))
@@ -87,12 +87,11 @@ sealed trait Monitored[C, F[_], A] {
       case Step(st, tags) => st.run(state).flatMap { case(c, m) =>
         m.eval(Call.State(state.path :+ Call(Call.Id.gen, tags), c))
       }
-      case Sub(sub, next) =>
+      case Flatmap(sub, next) =>
         sub.eval(state).flatMap { case i =>
           next(i).eval(state)
         }
     }
-
 
   final def run(state: Call.State[C])(implicit mo: Monad[F]): F[(Call.Root[C], A)] = {
     def go[G <: Call.Graph[C, G] ,B](m: Monitored[C, F, B], state: Call.State[C], graph: G): F[(G, B)] = {
@@ -108,7 +107,7 @@ sealed trait Monitored[C, F[_], A] {
                 graph.addChild(g) -> a
               }
           }
-        case Sub(sub, next) =>
+        case Flatmap(sub, next) =>
           // XXX: kinda hackish. We're only interested in this node children
           val g0 = Call.GraphNode(Call.Id("dummy"), state.value, Call.Tags.empty, Vector.empty)
           go(sub, state, g0).flatMap { case (gi, i) =>
@@ -123,14 +122,14 @@ sealed trait Monitored[C, F[_], A] {
 
 }
 
-case class Return[C, F[_], A](a: A) extends Monitored[C, F, A]
-case class Step[C, F[_], A](st: IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]], tags: Monitored.Call.Tags) extends Monitored[C, F, A] {
+private case class Return[C, F[_], A](a: A) extends Monitored[C, F, A]
+private case class Step[C, F[_], A](st: IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]], tags: Monitored.Call.Tags) extends Monitored[C, F, A] {
   import Monitored.Call
   def run(state: Call.State[C]): F[(C, Monitored[C, F, A])] =
     st.run(state)
 }
 
-case class Sub[C, F[_], I, A](sub: Monitored[C, F, I], next: I => Monitored[C, F, A]) extends Monitored[C, F, A]
+private case class Flatmap[C, F[_], I, A](sub: Monitored[C, F, I], next: I => Monitored[C, F, A]) extends Monitored[C, F, A]
 
 object Monitored {
   import scalaz.Id._
@@ -202,5 +201,22 @@ object Monitored {
     new MonitoredBuilder {
       val tags = _tags
     }
+
+  trait *->*[F[_]] {}
+  trait *->*->*[F[_, _]] {}
+
+  implicit def fKindEv[F0[_]] = new *->*[F0] {}
+  implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
+
+  def trans[C, F[_], G[_]: *->*, A](m: Monitored[C, F, G[A]])(implicit hh: HasHoist[G], fu: Functor[F], fg: Functor[G]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, A] = {
+    type T[G0] = hh.T[F, G0]
+    ???
+  }
+
+
+  def trans[C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ], fu: Functor[F], fg: Functor[({ type λ[α] = G[A, α] })#λ]): Monitored[C, ({ type λ[α] = hh.T[F, α] })#λ, B] = {
+    type λ[α] = G[A, α]
+    trans[C, F, λ, B](m)(new *->*[λ] {}, hh, fu, fg)
+  }
 
 }
