@@ -186,20 +186,29 @@ object Monitored {
     }
   }
 
-  def apply0[C, A](λ: Call.State[C] => A): Monitored[C, Id, A] =
-    apply[C, Id, A](λ)
+  trait MonitoredBuilder {
+    val tags: Call.Tags
 
-  def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[A]): Monitored[C, F, A] =
-    Step[C, F, A] {
-      IndexedStateT { (st: Call.State[C]) =>
-        for (a <- λ(st))
-        yield st.value -> Return(a)
+    def apply0[C, A](λ: Call.State[C] => A): Monitored[C, Id, A] =
+      apply[C, Id, A](λ)
+
+    def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[A]): Monitored[C, F, A] =
+      Step[C, F, A] {
+        IndexedStateT { (st: Call.State[C]) =>
+          for (a <- λ(st))
+          yield st.value -> Return(a)
+        }
       }
-    }
 
-  def apply[C, F[_]: Applicative, A](m: Monitored[C, F, A]): Monitored[C, F, A] =
-    Step(IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]]{ st =>
-      (st.value -> m).point[F]
-    })
+    def apply[C, F[_]: Applicative, A](m: Monitored[C, F, A]): Monitored[C, F, A] =
+      Step(IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]]{ st =>
+        (st.value -> m).point[F]
+      })
+  }
+
+  def apply(_tags: Call.Tags) =
+    new MonitoredBuilder {
+      val tags = _tags
+    }
 
 }

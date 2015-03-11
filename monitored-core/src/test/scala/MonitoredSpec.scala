@@ -45,9 +45,11 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   "Monitored" should "trivial" in {
-    def f1 = Monitored.apply0{(_: Call.State[Unit]) => 1}
-    def f2(i: Int) = Monitored.apply0{(_: Call.State[Unit]) => s"foo $i"}
-    def f3(i: Int) = Monitored.apply0{(_: Call.State[Unit]) => i + 1}
+    import Call.Tags
+
+    def f1 = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => 1}
+    def f2(i: Int) = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => s"foo $i"}
+    def f3(i: Int) = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => i + 1}
 
     val (graph0, result0) = f1.run(Call.State(Vector.empty, ()))
     result0 should ===(1)
@@ -56,7 +58,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     p[Unit, Call.Root[Unit]](graph0)
     println("----")
 
-    val (graphm, _) = Monitored(Monitored(f1)).run(Call.State(Vector.empty, ()))
+    val (graphm, _) = Monitored(Tags.empty)(Monitored(Tags.empty)(f1)).run(Call.State(Vector.empty, ()))
     println("-- graphm --")
     p[Unit, Call.Root[Unit]](graphm)
     println("----")
@@ -74,7 +76,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     p[Unit, Call.Root[Unit]](graph)
     println("----")
 
-    val (graph1, result1) = Monitored(res).run(Call.State(Vector.empty, ()))
+    val (graph1, result1) = Monitored(Tags.empty)(res).run(Call.State(Vector.empty, ()))
     println("-- graph1 --")
     p[Unit, Call.Root[Unit]](graph1)
     println("----")
@@ -87,7 +89,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
     val res2 =
       for {
-        i <- Monitored(f1)
+        i <- Monitored(Tags.empty)(f1)
         r <- f2(i)
       } yield r
 
