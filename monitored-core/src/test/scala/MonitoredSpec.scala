@@ -30,12 +30,15 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   val nocontext = Call(Call.Id.gen)
 
   def p[C, G <: Call.Graph[C, G]](g: G, before: String = ""): Unit = {
-    val id = g match {
-      case Call.Root(span, _) => s"span: $span"
-      case Call.GraphNode(id, _, _) => s"id: $id"
+    val txt = g match {
+      case Call.Root(span, _) =>
+        s"Root[$span]"
+      case Call.GraphNode(id, _, _) =>
+        s"GraphNode[$id]"
     }
 
-    println(before  + id)
+    println(before + txt)
+
     for (c <- g.children) {
       c match {
         case node@Call.GraphNode(_, _, _) =>
@@ -44,6 +47,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     }
   }
 
+  val nostate = Call.State(Vector.empty, ())
+
   "Monitored" should "trivial" in {
     import Call.Tags
 
@@ -51,14 +56,14 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     def f2(i: Int) = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => s"foo $i"}
     def f3(i: Int) = Monitored(Tags.empty).apply0{(_: Call.State[Unit]) => i + 1}
 
-    val (graph0, result0) = f1.run(Call.State(Vector.empty, ()))
+    val (graph0, result0) = f1.run(nostate)
     result0 should ===(1)
 
     println("-- graph0 --")
     p[Unit, Call.Root[Unit]](graph0)
     println("----")
 
-    val (graphm, _) = Monitored(Tags.empty)(Monitored(Tags.empty)(f1)).run(Call.State(Vector.empty, ()))
+    val (graphm, _) = Monitored(Tags.empty)(Monitored(Tags.empty)(f1)).run(nostate)
     println("-- graphm --")
     p[Unit, Call.Root[Unit]](graphm)
     println("----")
@@ -69,14 +74,14 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
         r <- f2(i)
       } yield r
 
-    val (graph, result) = res.run(Call.State(Vector.empty, ()))
+    val (graph, result) = res.run(nostate)
     result should ===("foo 1")
 
     println("-- graph --")
     p[Unit, Call.Root[Unit]](graph)
     println("----")
 
-    val (graph1, result1) = Monitored(Tags.empty)(res).run(Call.State(Vector.empty, ()))
+    val (graph1, result1) = Monitored(Tags.empty)(res).run(nostate)
     println("-- graph1 --")
     p[Unit, Call.Root[Unit]](graph1)
     println("----")
@@ -93,23 +98,23 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
         r <- f2(i)
       } yield r
 
-    val (graph2, result2) = res2.run(Call.State(Vector.empty, ()))
+    val (graph2, result2) = res2.run(nostate)
     println("-- graph2 --")
     p[Unit, Call.Root[Unit]](graph2)
     println("----")
   }
 
-  // it should "simple" in {
-  //   def f1 = Monitored(Call.Tags.empty){(_: Call[Unit]) => 1.point[Future]}
-  //   def f2(i: Int) = Monitored(Call.Tags.empty){(_: Call[Unit]) => s"foo $i".point[Future]}
+  it should "simple" in {
+    def f1 = Monitored(Call.Tags.empty){(_: Call.State[Unit]) => 1.point[Future]}
+    def f2(i: Int) = Monitored(Call.Tags.empty){(_: Call.State[Unit]) => s"foo $i".point[Future]}
 
-  //   val res = for {
-  //     i <- f1
-  //     r <- f2(i)
-  //   } yield r
+    val res = for {
+      i <- f1
+      r <- f2(i)
+    } yield r
 
-  //   res.eval(nocontext).futureValue should ===("foo 1")
-  // }
+    res.eval(nostate).futureValue should ===("foo 1")
+  }
 
   // it should "optT" in {
   //   val f1 = Monitored(Call.Tags.empty)((_: Call[Unit]) => Option("foo").point[Future])
