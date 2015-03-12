@@ -81,6 +81,9 @@ sealed trait Monitored[C, F[_], A] {
   final def map[B](f: A => B): Monitored[C, F, B] =
     flatMap(a => Return(f(a)))
 
+  def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Monitored[C, F, AP[A]] =
+    this.map(a => ap.point(a))
+
   final def eval(state: Call.State[C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[A] = {
     this match {
       case Return(a) => a.point[F]
