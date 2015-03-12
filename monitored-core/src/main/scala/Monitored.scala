@@ -85,7 +85,7 @@ sealed trait Monitored[C, F[_], A] {
     this match {
       case Return(a) => a.point[F]
       case Step(st, tags) => st.run(state).flatMap { case(c, m) =>
-        m.eval(Call.State(state.path :+ Call(ids.head, tags), c), ids.tail)
+        m.eval(Call.State(state.span, state.path :+ Call(ids.head, tags), c), ids.tail)
       }
       case Flatmap(sub, next) =>
         sub.eval(state).flatMap { case i =>
@@ -94,7 +94,7 @@ sealed trait Monitored[C, F[_], A] {
     }
   }
 
-  final def run(state: Call.State[C], span: Call.Span = Call.Span.gen, ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[(Call.Root[C], A)] = {
+  final def run(state: Call.State[C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[(Call.Root[C], A)] = {
     def go[G <: Call.Graph[C, G] ,B](m: Monitored[C, F, B], state: Call.State[C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
       m match {
         case Return(a) =>
@@ -104,7 +104,7 @@ sealed trait Monitored[C, F[_], A] {
             case (c, mc) =>
               val id = ids.head
               val g0 = Call.GraphNode(id, c, tags, Vector.empty)
-              go(mc, Call.State(state.path :+ Call(id, tags), c), g0, ids.tail).map { case (is, (g, a)) =>
+              go(mc, Call.State(state.span, state.path :+ Call(id, tags), c), g0, ids.tail).map { case (is, (g, a)) =>
                 (is, (graph.addChild(g),  a))
               }
           }
@@ -118,7 +118,7 @@ sealed trait Monitored[C, F[_], A] {
           }
       }
     }
-    go(this, state, Call.Root[C](span, Vector.empty), ids).map(_._2)
+    go(this, state, Call.Root[C](state.span, Vector.empty), ids).map(_._2)
   }
 
 }
@@ -169,7 +169,7 @@ object Monitored {
         this.copy(children = children ++ cs)
     }
 
-    case class State[C](path: Path, value: C)
+    case class State[C](span: Call.Span, path: Path, value: C)
 
     object Id {
       def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)

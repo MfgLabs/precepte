@@ -45,7 +45,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     }
   }
 
-  val nostate = Call.State(Vector.empty, ())
+  def nostate = Call.State(Call.Span.gen, Vector.empty, ())
   import Call.Tags
   import Tags.Callee
 
