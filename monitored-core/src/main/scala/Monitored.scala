@@ -84,9 +84,11 @@ sealed trait Monitored[C, F[_], A] {
   final def eval(state: Call.State[C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[A] = {
     this match {
       case Return(a) => a.point[F]
-      case Step(st, tags) => st.run(state).flatMap { case(c, m) =>
-        m.eval(Call.State(state.span, state.path :+ Call(ids.head, tags), c), ids.tail)
-      }
+      case Step(st, tags) =>
+        val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
+        st.run(state0).flatMap { case(c, m) =>
+          m.eval(state0.copy(value = c), ids.tail)
+        }
       case Flatmap(sub, next) =>
         sub.eval(state).flatMap { case i =>
           next(i).eval(state)
@@ -100,11 +102,12 @@ sealed trait Monitored[C, F[_], A] {
         case Return(a) =>
           (ids, (graph, a)).point[F]
         case Step(step, tags) =>
-          step.run(state).flatMap {
+          val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
+          step.run(state0).flatMap {
             case (c, mc) =>
               val id = ids.head
               val g0 = Call.GraphNode(id, c, tags, Vector.empty)
-              go(mc, Call.State(state.span, state.path :+ Call(id, tags), c), g0, ids.tail).map { case (is, (g, a)) =>
+              go(mc, state0.copy(value = c), g0, ids.tail).map { case (is, (g, a)) =>
                 (is, (graph.addChild(g),  a))
               }
           }

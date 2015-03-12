@@ -258,25 +258,22 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     }
   }
 
-  // it should "have context" in {
-  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+  it should "have context" in {
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
 
-  //   case class ContextTester(state: Call.State) {
-  //     def push(): Unit = {
-  //       ctxs += state
-  //       ()
-  //     }
-  //   }
+    def push(state: Call.State[Unit]): Unit = {
+      ctxs += state
+      ()
+    }
 
-  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push()
-  //     1.point[Future]
-  //   }
+    def f1 = Monitored(Tags(Callee("f1"))){ (c: Call.State[Unit]) =>
+      push(c)
+      1.point[Future]
+    }
 
-  //   f1.eval(s => ContextTester(s)).futureValue should ===(1)
-  //   ctxs.length should ===(1)
-  // }
+    f1.eval(nostate).futureValue should ===(1)
+    ctxs.length should ===(1)
+  }
 
   // it should "preserve context on map" in {
   //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
