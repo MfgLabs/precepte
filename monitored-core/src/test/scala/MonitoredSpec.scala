@@ -295,78 +295,74 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     ctxs.toList should ===(toStates(graph).toList)
   }
 
-  // it should "preserve context on map" in {
-  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+  it should "preserve context on map" in {
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
 
-  //   case class ContextTester(state: Call.State) {
-  //     def push(): Unit = {
-  //       ctxs += state
-  //       ()
-  //     }
-  //   }
+    def push(state: Call.State[Unit]): Unit = {
+      ctxs += state
+      ()
+    }
 
-  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push()
-  //     1.point[Future]
-  //   }.map(identity).map(identity).map(identity).map(identity)
+    def f1 = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+      push(c)
+      1.point[Future]
+    }.map(identity).map(identity).map(identity).map(identity)
 
-  //   f1.eval(s => ContextTester(s)).futureValue should ===(1)
+    val (graph, res) = f1.run(nostate).futureValue
+    res should ===(1)
 
-  //   ctxs.length should ===(1)
-  //   ctxs.head.path.length should ===(1)
-  // }
+    ctxs.length should ===(1)
+    ctxs.head.path.length should ===(1)
 
-  // it should "preserve context on flatMap" in {
-  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+    ctxs.toList should ===(toStates(graph).toList)
+  }
 
-  //   case class ContextTester(state: Call.State) {
-  //     def push(name: String): Unit = {
-  //       ctxs += state
-  //       ()
-  //     }
-  //   }
+  it should "preserve context on flatMap" in {
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
 
-  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push("f1")
-  //     1.point[Future]
-  //   }
+    def push(state: Call.State[Unit]): Unit = {
+      ctxs += state
+      ()
+    }
 
-  //   def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push("f2")
-  //     s"foo $i".point[Future]
-  //   }
+    def f1 = Monitored(Tags(Callee("f1"))){ (c: Call.State[Unit]) =>
+      push(c)
+      1.point[Future]
+    }
 
-  //   def f3(s: String) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push("f3")
-  //     s"f3 $s".point[Future]
-  //   }
+    def f2(i: Int) = Monitored(Tags(Callee("f2"))){ (c: Call.State[Unit]) =>
+      push(c)
+      s"foo $i".point[Future]
+    }
 
-  //   val f = Monitored(Call.Tags.empty)(f1
-  //     .flatMap(i => f2(i))
-  //     .flatMap(s => f3(s)))
+    def f3(s: String) = Monitored(Tags(Callee("f3"))){ (c: Call.State[Unit]) =>
+      push(c)
+      s"f3 $s".point[Future]
+    }
 
-  //   f.eval(s => ContextTester(s)).futureValue should ===("f3 foo 1")
+    val f = Monitored(Tags(Callee("anon0")))(f1
+      .flatMap(i => f2(i))
+      .flatMap(s => f3(s)))
 
-  //   ctxs.length should ===(3)
+    val (graph, res) = f.run(nostate).futureValue
+    res should ===("f3 foo 1")
 
-  // }
+    ctxs.length should ===(3)
+    ctxs.toList should ===(toStates(graph).toList.drop(1))
+  }
 
-  // it should "stack contexts" in {
+  it should "stack contexts" in {
+    def f1 = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+      1.point[Future]
+    }
 
-  //   def f1 = Monitored(Call.Tags.empty){ (c: Call[Unit]) =>
-  //     1.point[Future]
-  //   }
+    val stacked = Monitored(Call.Tags.empty)(f1)
+    val (graph, r) = stacked.run(nostate).futureValue
+    r should ===(1)
 
-  //   val stacked = Monitored(Call.Tags.empty)(f1)
-  //   val (s, r) = stacked.run(nocontext).futureValue
-  //   r should ===(1)
-
-  //   s.children should ===(1)
-  // }
+    graph.children should have length 1
+    graph.children.head.children should have length 1
+  }
 
   // it should "provide context to C" in {
   //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
