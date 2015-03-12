@@ -102,12 +102,6 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     p[Unit, Call.Root[Unit]](graph1)
     println("----")
 
-    // inside(graph) { case Call.Graph(id, c, children) =>
-    //   c should ===(())
-    //   children should have length 1
-    //   children.head.children should have length 3
-    // }
-
     val res2 =
       for {
         i <- Monitored(Tags(Callee("trivial.anon2")))(f1)
@@ -364,117 +358,109 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     graph.children.head.children should have length 1
   }
 
-  // it should "provide context to C" in {
-  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+  it should "provide context to C" in {
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
 
-  //   case class ContextTester(state: Call.State) {
-  //     def push(): Unit = {
-  //       ctxs += state
-  //       ()
-  //     }
-  //   }
+    def push(state: Call.State[Unit]): Unit = {
+      ctxs += state
+      ()
+    }
 
-  //   def f1 = Monitored(Call.Tags.empty) { (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push()
-  //     1.point[Future]
-  //   }
+    def f1 = Monitored(Call.Tags.empty) { (c: Call.State[Unit]) =>
+      push(c)
+      1.point[Future]
+    }
 
-  //   def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push()
-  //     s"foo $i".point[Future]
-  //   }
+    def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+      push(c)
+      s"foo $i".point[Future]
+    }
 
-  //   f1.eval(s => ContextTester(s)).futureValue should ===(1)
-  //   ctxs.length should ===(1)
-  //   ctxs.head.path.length should ===(1)
+    val (graph, res) = f1.run(nostate).futureValue
+    res should ===(1)
+    ctxs.length should ===(1)
+    ctxs.head.path.length should ===(1)
 
 
-  //   ctxs.clear()
+    ctxs.clear()
 
-  //   val res2 = f1.map(identity)
-  //   res2.eval(s => ContextTester(s))
+    val res2 = f1.map(identity)
+    res2.eval(nostate)
 
-  //   ctxs should have length(1)
-  //   forAll(ctxs.map(_.path.length == 1)){_  should ===(true) }
+    ctxs should have length(1)
+    forAll(ctxs.map(_.path.length == 1)){_  should ===(true) }
 
 
-  //   ctxs.clear()
+    ctxs.clear()
 
-  //   val res = for {
-  //     i <- f1
-  //     r <- f2(i)
-  //   } yield r
+    val r = for {
+      i <- f1
+      r <- f2(i)
+    } yield r
 
-  //   res.eval(s => ContextTester(s)).futureValue should ===("foo 1")
+    r.eval(nostate).futureValue should ===("foo 1")
 
-  //   ctxs should have length(2)
-  //   ctxs.map(_.span).toSet.size should ===(1) // span is unique
-  //   forAll(ctxs.map(_.path.length == 1)){ _ should ===(true) }
+    ctxs should have length(2)
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 1)){ _ should ===(true) }
 
-  //   ctxs.clear()
+    ctxs.clear()
 
-  //   val res3 = Monitored(Call.Tags.empty)(f1)
-  //   res3.eval(s => ContextTester(s)).futureValue should ===(1)
+    val res3 = Monitored(Call.Tags.empty)(f1)
+    res3.eval(nostate).futureValue should ===(1)
 
-  //   ctxs should have length(1)
-  //   ctxs.map(_.span).toSet.size should ===(1) // span is unique
-  //   forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
+    ctxs should have length(1)
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
 
-  //   ctxs.clear()
+    ctxs.clear()
 
-  //   val res4 = Monitored(Call.Tags.empty) {
-  //     for {
-  //       i <- f1
-  //       r <- f2(i)
-  //     } yield r
-  //   }
+    val res4 = Monitored(Call.Tags.empty) {
+      for {
+        i <- f1
+        r <- f2(i)
+      } yield r
+    }
 
-  //   res4.eval(s => ContextTester(s)).futureValue should ===("foo 1")
+    res4.eval(nostate).futureValue should ===("foo 1")
 
-  //   ctxs should have length(2)
-  //   ctxs.map(_.span).toSet.size should ===(1) // span is unique
-  //   forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
-  // }
+    ctxs should have length(2)
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
+  }
 
-  // it should "not stack context on trans" in {
-  //   val ctxs = scala.collection.mutable.ArrayBuffer[Call.State]()
+  it should "not stack context on trans" in {
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
 
-  //   case class ContextTester(state: Call.State) {
-  //     def push(): Unit = {
-  //       ctxs += state
-  //       ()
-  //     }
-  //   }
+    def push(state: Call.State[Unit]): Unit = {
+      ctxs += state
+      ()
+    }
 
-  //   def f1 = Monitored(Call.Tags.empty) { (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push()
-  //     Option(1).point[Future]
-  //   }
+    def f1 = Monitored(Call.Tags.empty) { (c: Call.State[Unit]) =>
+      push(c)
+      Option(1).point[Future]
+    }
 
-  //   def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call[ContextTester]) =>
-  //     val tester = c.value
-  //     tester.push()
-  //     Option(s"foo $i").point[Future]
-  //   }
+    def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+      push(c)
+      Option(s"foo $i").point[Future]
+    }
 
-  //   type X[T] = scalaz.OptionT[Future, T]
-  //   val res4 = Monitored(Call.Tags.empty)[ContextTester, X, String] { //TODO: why do I need to force the type
-  //     for {
-  //       i <- trans(f1)
-  //       r <- trans(f2(i))
-  //     } yield r
-  //   }
+    val res4 = Monitored(Call.Tags.empty) {
+      (for {
+        i <- trans(f1)
+        r <- trans(f2(i))
+      } yield r).run
+    }
 
-  //   res4.eval(s => ContextTester(s)).run.futureValue should ===(Some("foo 1"))
+    res4.eval(nostate).futureValue should ===(Some("foo 1"))
 
-  //   ctxs should have length(2)
-  //   ctxs.map(_.span).toSet.size should ===(1) // span is unique
-  //   forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
+    ctxs should have length(2)
+    ctxs.map(_.span).toSet.size should ===(1) // span is unique
+    forAll(ctxs.map(_.path.length == 2)){ _ should ===(true) }
 
-  // }
+  }
 
   // it should "real world wb.fr home" in {
 
