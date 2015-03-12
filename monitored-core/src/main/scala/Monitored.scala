@@ -81,43 +81,44 @@ sealed trait Monitored[C, F[_], A] {
   final def map[B](f: A => B): Monitored[C, F, B] =
     flatMap(a => Return(f(a)))
 
-  final def eval(state: Call.State[C])(implicit mo: Monad[F]): F[A] =
+  final def eval(state: Call.State[C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[A] = {
     this match {
       case Return(a) => a.point[F]
       case Step(st, tags) => st.run(state).flatMap { case(c, m) =>
-        m.eval(Call.State(state.path :+ Call(Call.Id.gen, tags), c))
+        m.eval(Call.State(state.path :+ Call(ids.head, tags), c), ids.tail)
       }
       case Flatmap(sub, next) =>
         sub.eval(state).flatMap { case i =>
           next(i).eval(state)
         }
     }
+  }
 
-  final def run(state: Call.State[C])(implicit mo: Monad[F]): F[(Call.Root[C], A)] = {
-    def go[G <: Call.Graph[C, G] ,B](m: Monitored[C, F, B], state: Call.State[C], graph: G): F[(G, B)] = {
+  final def run(state: Call.State[C], span: Call.Span = Call.Span.gen, ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[(Call.Root[C], A)] = {
+    def go[G <: Call.Graph[C, G] ,B](m: Monitored[C, F, B], state: Call.State[C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
       m match {
         case Return(a) =>
-          (graph, a).point[F]
+          (ids, (graph, a)).point[F]
         case Step(step, tags) =>
           step.run(state).flatMap {
             case (c, mc) =>
-              val id = Call.Id.gen
+              val id = ids.head
               val g0 = Call.GraphNode(id, c, tags, Vector.empty)
-              go(mc, Call.State(state.path :+ Call(id, tags), c), g0).map { case (g, a) =>
-                graph.addChild(g) -> a
+              go(mc, Call.State(state.path :+ Call(id, tags), c), g0, ids.tail).map { case (is, (g, a)) =>
+                (is, (graph.addChild(g),  a))
               }
           }
         case Flatmap(sub, next) =>
           // XXX: kinda hackish. We're only interested in this node children
           val g0 = Call.GraphNode(Call.Id("dummy"), state.value, Call.Tags.empty, Vector.empty)
-          go(sub, state, g0).flatMap { case (gi, i) =>
-            go(next(i), state, gi).map { case (g, a) =>
-              graph.addChildren(g.children) -> a
+          go(sub, state, g0, ids).flatMap { case (is0, (gi, i)) =>
+            go(next(i), state, gi, is0).map { case (is1, (g, a)) =>
+              (is1, (graph.addChildren(g.children), a))
             }
           }
       }
     }
-    go(this, state, Call.Root(Call.Span.gen, Vector.empty))
+    go(this, state, Call.Root[C](span, Vector.empty), ids).map(_._2)
   }
 
 }
