@@ -45,13 +45,30 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     }
   }
 
+  def toStates[C](g: Call.Root[C]): Seq[Call.State[C]] = {
+    def go(g: Call.GraphNode[C], span: Call.Span, path: Call.Path, states: Seq[Call.State[C]]): Seq[Call.State[C]] = {
+      val Call.GraphNode(id, value, tags, cs) = g
+      val p = path :+ Call(id, tags)
+      val st = Call.State[C](span, p, value)
+      val cst = cs.map{ c =>
+        go(c, span, p, Seq.empty)
+      }.flatten
+      (states :+ st) ++ cst
+    }
+
+    g.children.map { c =>
+      go(c, g.span, Vector.empty, Seq.empty)
+    }.flatten
+  }
+
+
   def nostate = Call.State(Call.Span.gen, Vector.empty, ())
   import Call.Tags
   import Tags.Callee
 
   "Monitored" should "trivial" in {
 
-    def f1 = Monitored(Tags(Callee("trivial.f1"))).apply0{(_: Call.State[Unit]) => 1}
+    def f1 = Monitored(Tags(Callee("trivial.f1"))).apply0{ (_: Call.State[Unit]) => 1 }
     def f2(i: Int) = Monitored(Tags(Callee("trivial.f2"))).apply0{(_: Call.State[Unit]) => s"foo $i"}
     def f3(i: Int) = Monitored(Tags(Callee("trivial.f3"))).apply0{(_: Call.State[Unit]) => i + 1}
 
@@ -97,7 +114,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
         r <- f2(i)
       } yield r
 
-    val (graph2, result2) = res2.run(nostate)
+    val (graph2, result2) = res2.run(nostate, (1 to 30).map(i => Call.Id(i.toString)).toStream)
     println("-- graph2 --")
     p[Unit, Call.Root[Unit]](graph2)
     println("----")
@@ -258,7 +275,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     }
   }
 
-  it should "have context" in {
+  it should "pass context" in {
     val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
 
     def push(state: Call.State[Unit]): Unit = {
@@ -271,8 +288,11 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
       1.point[Future]
     }
 
-    f1.eval(nostate).futureValue should ===(1)
+    val (graph, res) = f1.run(nostate).futureValue
+    res should ===(1)
     ctxs.length should ===(1)
+
+    ctxs.toList should ===(toStates(graph).toList)
   }
 
   // it should "preserve context on map" in {
