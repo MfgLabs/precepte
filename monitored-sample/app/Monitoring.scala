@@ -12,17 +12,18 @@ object Monitoring {
 
 	import com.mfglab.monitoring.Monitored
 	import Monitored._
+	import Monitored.Call._
 
-	case class Logger(state: Context.State) {
+	case class Logger(span: Span, path: Path) {
 		private def format(l: String, s: String) =
 			Json.prettyPrint(Json.obj(
 				"level" -> l,
 				"message" -> s,
-				"span" -> state.span.value,
-				"path" -> state.path.map { s =>
+				"span" -> span.value,
+				"path" -> path.map { s =>
 					Json.obj(
-						"id" -> s._1.value,
-						"tags" -> s._2.values.map { t =>
+						"id" -> s.id.value,
+						"tags" -> s.tags.values.map { t =>
 								Json.obj(t._1 -> t._2)
 							})
 				}))
@@ -33,30 +34,30 @@ object Monitoring {
 	  def error(message: => String): Unit = PLog.error(format("error", message))
 	}
 
-	case class Timer(state: Context.State) {
-		lazy val path = s"""${state.span} -> / ${state.path.map { case (id, tags) => tags.values.mkString("[", ", ", "]") + "(id.value)" }.mkString(" / ") }"""
+	case class Timer(span: Span, path: Path) {
+		lazy val p = s"""${span} -> / ${path.map { c => c.tags.values.mkString("[", ", ", "]") + "(" + c.id.value + ")" }.mkString(" / ") }"""
 		def timed[A](f: Future[A]) = {
 			val t0 = System.nanoTime()
 			f.map { x =>
 				val t1 = System.nanoTime()
-				PLog.debug(s"TIMED: $path: ${(t1 -t0) / 1000000}ms")
+				// PLog.debug(s"TIMED: $p: ${(t1 -t0) / 1000000}ms")
 				x
 			}
 		}
 	}
 
-	case class MonitoringContext(state: Context.State) {
-		val logger = Logger(state)
-		val timer = Timer(state)
+	case class MonitoringContext(span: Span, path: Path) {
+		val logger = Logger(span, path)
+		val timer = Timer(span, path)
 	}
 
-	def Timed[A](t: Context.Tags)(f: Context[MonitoringContext] => Future[A]) =
-		Monitored(t){ (c: Context[MonitoringContext]) =>
+	def Timed[A](t: Tags)(f: State[MonitoringContext] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[MonitoringContext, Future, A] =
+		Monitored(t){ (c: State[MonitoringContext]) =>
 			c.value.timer.timed(f(c))
 		}
 
 	object TimedAction {
-		def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[MonitoringContext, Future, Result]): Action[A] =
+		def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[MonitoringContext, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
 			Action.async(bodyParser) { request =>
 				import play.api.Routes.{ ROUTE_ACTION_METHOD, ROUTE_CONTROLLER }
 				val ts = request.tags
@@ -66,15 +67,17 @@ object Monitoring {
 				  a <- ts.get(ROUTE_ACTION_METHOD)
 				} yield s"$c.$a").getOrElse(request.toString)
 
-				Monitored(Context.Tags(Context.Tags.Callee(name))){
-					(c: Context[MonitoringContext]) =>
-						block(request).mapK(c.value.timer.timed _).eval{ st =>
-							c.copy(state = Context.State(c.state.span, c.state.path ++ st.path)).value
-						}
-				}.eval(MonitoringContext.apply _)
+				val tags = Tags(Tags.Callee(name))
+				val initialState = State(Span.gen, Vector.empty, (s: Span, p: Path) => MonitoringContext(s, p))
+
+				Monitored(tags) { (st: State[(Span, Path) => MonitoringContext]) =>
+					println(st.path.toString)
+					val state = st.copy(value = st.value(st.span, st.path))
+					block(request).eval(state)
+				}.eval(initialState)
 			}
 
-		def apply(block: Request[AnyContent] => Monitored[MonitoringContext, Future, Result]): Action[AnyContent] =
+		def apply(block: Request[AnyContent] => Monitored[MonitoringContext, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
 			apply(BodyParsers.parse.anyContent)(block)
 	}
 

@@ -37,40 +37,6 @@ object HasHoist {
   implicit def eitherHasHoist[A]: HasHoist.Aux[({ type λ[α] = A \/ α })#λ, ({ type λ[F[_], B] = EitherT[F, A, B] })#λ] = new EitherHasHoist[A]
 }
 
-trait CoHasHoist[T[_]] {
-  type F[_]
-  type G[_]
-  def unlift[A](f: T[A]): F[G[A]]
-}
-
-object CoHasHoist {
-  type Aux[T[_], F0[_], G0[_]] = CoHasHoist[T] {
-    type F[X] = F0[X]
-    type G[X] = G0[X]
-  }
-
-  def apply[T0[_]](implicit ch: CoHasHoist[T0]): Aux[T0, ch.F, ch.G] = ch
-
-  implicit def optionCoHasHoist[F0[_]] = new CoHasHoist[({ type λ[α] = OptionT[F0, α] })#λ] {
-    type F[T] = F0[T]
-    type G[T] = Option[T]
-    def unlift[A](o: OptionT[F, A]): F[Option[A]] = o.run
-  }
-
-  implicit def listCoHasHoist[F0[_]] = new CoHasHoist[({ type λ[α] = ListT[F0, α] })#λ] {
-    type F[T] = F0[T]
-    type G[T] = List[T]
-    def unlift[A](o: ListT[F, A]): F[List[A]] = o.run
-  }
-
-  implicit def eitherCoHasHoist[F0[_], A] = new CoHasHoist[({ type λ[α] = EitherT[F0, A, α] })#λ] {
-    type F[T] = F0[T]
-    type G[T] = A \/ T
-    def unlift[B](o: EitherT[F, A, B]): F[A \/ B] = o.run
-  }
-}
-
-
 sealed trait Monitored[C, F[_], A] {
   self =>
   import Monitored.Call

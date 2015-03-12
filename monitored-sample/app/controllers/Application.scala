@@ -15,6 +15,7 @@ import models._
 import commons.Monitoring.TimedAction
 import com.mfglab.monitoring.Monitored
 import Monitored._
+import Monitored.Call._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scalaz.std.scalaFuture._
@@ -49,7 +50,7 @@ object Application extends Controller {
    * Handle default path requests, redirect to computers list
    */
   def index = TimedAction{ _ =>
-    Monitored(Context.Tags.empty){ _ =>
+    Monitored(Tags.empty){ _ =>
       Future.successful(Home)
     }
   }
@@ -78,7 +79,7 @@ object Application extends Controller {
       options <- trans(Company.options.lift[Option])
     } yield {
       Ok(html.editForm(id, computerForm.fill(computer), options))
-    }).mapK(_.getOrElse(NotFound))
+    }).run.map(_.getOrElse(NotFound))
   }
 
   /**
