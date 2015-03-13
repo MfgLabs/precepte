@@ -13,7 +13,7 @@ import views._
 import models._
 
 import commons.Monitoring.TimedAction
-import com.mfglab.monitoring.Monitored
+import com.mfglabs.monitoring.Monitored
 import Monitored._
 import Monitored.Call._
 

@@ -10,7 +10,7 @@ object Monitoring {
 
 	import play.api.libs.json._
 
-	import com.mfglab.monitoring.Monitored
+	import com.mfglabs.monitoring.Monitored
 	import Monitored._
 	import Monitored.Call._
 
