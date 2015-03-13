@@ -40,7 +40,7 @@ object Monitoring {
 			val t0 = System.nanoTime()
 			f.map { x =>
 				val t1 = System.nanoTime()
-				// PLog.debug(s"TIMED: $p: ${(t1 -t0) / 1000000}ms")
+				PLog.debug(s"TIMED: $p: ${(t1 -t0) / 1000}µs")
 				x
 			}
 		}
