@@ -60,6 +60,11 @@ object Monitoring {
 			Timer(c.span, c.path).timed(f(c))
 		}
 
+	def TimedM[A](t: Tags)(f: Monitored[Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[Unit, Future, A] =
+		Monitored(t){ (c: State[Unit]) =>
+			Timer(c.span, c.path).timed(f.eval(c))
+		}
+
 	object TimedAction {
 		def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
 			Action.async(bodyParser) { request =>
@@ -74,7 +79,7 @@ object Monitoring {
 				val tags = Tags(Tags.Callee(name))
 				val initialState = State(Span.gen, Vector.empty, ())
 
-				Monitored(tags) {
+				TimedM(tags) {
 					block(request)
 				}.eval(initialState)
 			}
