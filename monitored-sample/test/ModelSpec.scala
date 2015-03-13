@@ -6,53 +6,58 @@ import play.api.test._
 import play.api.test.Helpers._
 
 @RunWith(classOf[JUnitRunner])
-class ModelSpec extends Specification {
-  
+class ModelSpec extends PlaySpecification {
+
   import models._
 
   // -- Date helpers
-  
+
   def dateIs(date: java.util.Date, str: String) = new java.text.SimpleDateFormat("yyyy-MM-dd").format(date) == str
-  
+
   // --
-  
+
+  import com.mfglabs.monitoring.Monitored.Call
+  import scala.concurrent.ExecutionContext.Implicits.global
+  import scalaz.std.scalaFuture._
+  def nostate = Call.State(Call.Span.gen, Vector.empty, ())
+
   "Computer model" should {
-    
+
     "be retrieved by id" in {
       running(FakeApplication(additionalConfiguration = inMemoryDatabase())) {
-        
-        val Some(macintosh) = Computer.findById(21)
-      
+
+        val Some(macintosh) = await(Computer.findById(21).eval(nostate))
+
         macintosh.name must equalTo("Macintosh")
-        macintosh.introduced must beSome.which(dateIs(_, "1984-01-24"))  
-        
+        macintosh.introduced must beSome.which(dateIs(_, "1984-01-24"))
+
       }
     }
-    
+
     "be listed along its companies" in {
       running(FakeApplication(additionalConfiguration = inMemoryDatabase())) {
-        
-        val computers = Computer.list()
+
+        val computers =  await(Computer.list().eval(nostate))
 
         computers.total must equalTo(574)
         computers.items must have length(10)
 
       }
     }
-    
+
     "be updated if needed" in {
       running(FakeApplication(additionalConfiguration = inMemoryDatabase())) {
-        
-        Computer.update(21, Computer(name="The Macintosh", introduced=None, discontinued=None, companyId=Some(1)))
-        
-        val Some(macintosh) = Computer.findById(21)
-        
+
+        await(Computer.update(21, Computer(name="The Macintosh", introduced=None, discontinued=None, companyId=Some(1))).eval(nostate))
+
+        val Some(macintosh) = await(Computer.findById(21).eval(nostate))
+
         macintosh.name must equalTo("The Macintosh")
         macintosh.introduced must beNone
-        
+
       }
     }
-    
+
   }
-  
+
 }

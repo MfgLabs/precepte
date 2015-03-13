@@ -20,7 +20,7 @@ lazy val core =
 				"-Yrangepos",
 				"-Xlint",
 				"-deprecation",
-				// "-Xfatal-warnings",
+				"-Xfatal-warnings",
 				"-feature",
 				"-encoding", "UTF-8",
 				"-unchecked",
@@ -37,10 +37,21 @@ lazy val sample =
 		.settings(commonSettings:_*)
 		.settings(
 			name := "monitored-sample",
-			libraryDependencies ++= Seq(jdbc, anorm))
+			libraryDependencies ++= Seq(
+				jdbc,
+				anorm,
+				"org.specs2" %% "specs2" % "2.4.9"))
 		.dependsOn(core)
 
 lazy val root = project.in(file("."))
 	.settings(commonSettings:_*)
 	.settings(name := "monitored-root")
+	.settings(
+		publishTo := {
+	  val s3Repo = "s3://mfg-mvn-repo"
+	  if (isSnapshot.value)
+	    Some("snapshots" at s3Repo + "/snapshots")
+	  else
+	    Some("releases" at s3Repo + "/releases")
+	})
 	.aggregate(core, sample)

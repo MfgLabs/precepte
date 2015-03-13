@@ -3,7 +3,6 @@ package com.mfglabs.monitoring
 import org.scalatest._
 import Matchers._
 import Inspectors._
-import Inside._
 
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -26,7 +25,6 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   import scala.concurrent.Future
   import scalaz.std.scalaFuture._
   import scalaz.std.option._
-  import scalaz.std.list._
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
