@@ -1,4 +1,4 @@
-package com.mfglab.monitoring
+package com.mfglabs.monitoring
 
 import scala.language.higherKinds
 
