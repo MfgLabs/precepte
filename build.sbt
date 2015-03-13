@@ -12,6 +12,14 @@ lazy val core =
 	project.in(file("monitored-core"))
 		.settings(commonSettings:_*)
 		.settings(
+			publishTo := {
+		  val s3Repo = "s3://mfg-mvn-repo"
+		  if (isSnapshot.value)
+		    Some("snapshots" at s3Repo + "/snapshots")
+		  else
+		    Some("releases" at s3Repo + "/releases")
+		})
+		.settings(
 			name := "monitored-core",
 			libraryDependencies ++= Seq(
 			  "org.scalaz" %% "scalaz-core" % "7.1.0",
@@ -46,12 +54,4 @@ lazy val sample =
 lazy val root = project.in(file("."))
 	.settings(commonSettings:_*)
 	.settings(name := "monitored-root")
-	.settings(
-		publishTo := {
-	  val s3Repo = "s3://mfg-mvn-repo"
-	  if (isSnapshot.value)
-	    Some("snapshots" at s3Repo + "/snapshots")
-	  else
-	    Some("releases" at s3Repo + "/releases")
-	})
 	.aggregate(core, sample)
