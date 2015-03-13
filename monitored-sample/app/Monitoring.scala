@@ -51,13 +51,17 @@ object Monitoring {
 		val timer = Timer(span, path)
 	}
 
-	def Timed[A](t: Tags)(f: State[MonitoringContext] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[MonitoringContext, Future, A] =
-		Monitored(t){ (c: State[MonitoringContext]) =>
-			c.value.timer.timed(f(c))
+	object MonitoringContext {
+		def apply[C](st: State[C]): MonitoringContext = MonitoringContext(st.span, st.path)
+	}
+
+	def Timed[A](t: Tags)(f: State[Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[Unit, Future, A] =
+		Monitored(t){ (c: State[Unit]) =>
+			Timer(c.span, c.path).timed(f(c))
 		}
 
 	object TimedAction {
-		def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[MonitoringContext, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
+		def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
 			Action.async(bodyParser) { request =>
 				import play.api.Routes.{ ROUTE_ACTION_METHOD, ROUTE_CONTROLLER }
 				val ts = request.tags
@@ -68,16 +72,14 @@ object Monitoring {
 				} yield s"$c.$a").getOrElse(request.toString)
 
 				val tags = Tags(Tags.Callee(name))
-				val initialState = State(Span.gen, Vector.empty, (s: Span, p: Path) => MonitoringContext(s, p))
+				val initialState = State(Span.gen, Vector.empty, ())
 
-				Monitored(tags) { (st: State[(Span, Path) => MonitoringContext]) =>
-					println(st.path.toString)
-					val state = st.copy(value = st.value(st.span, st.path))
-					block(request).eval(state)
+				Monitored(tags) {
+					block(request)
 				}.eval(initialState)
 			}
 
-		def apply(block: Request[AnyContent] => Monitored[MonitoringContext, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
+		def apply(block: Request[AnyContent] => Monitored[Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
 			apply(BodyParsers.parse.anyContent)(block)
 	}
 

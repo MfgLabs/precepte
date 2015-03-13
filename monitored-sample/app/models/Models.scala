@@ -61,8 +61,10 @@ object Computer {
    * Retrieve a computer from the id.
    */
   def findById(id: Long) =
-    Timed(Tags(Callee("Computer.findById"))) { (c: State[MonitoringContext]) =>
-      c.value.logger.debug(s"Finding computer with id $id")
+    Timed(Tags(Callee("Computer.findById"))) { (st: State[Unit]) =>
+      val ctx = MonitoringContext(st)
+      import ctx._
+      logger.debug(s"Finding computer with id $id")
       Future.successful {
         DB.withConnection { implicit connection =>
           SQL("select * from computer where id = {id}").on('id -> id).as(Computer.simple.singleOpt)
@@ -79,8 +81,10 @@ object Computer {
    * @param filter Filter applied on the name column
    */
   def list(page: Int = 0, pageSize: Int = 10, orderBy: Int = 1, filter: String = "%") =
-    Timed(Tags(Callee("Computer.list"))) { (c: State[MonitoringContext]) =>
-      c.value.logger.debug(s"Listing all computers")
+    Timed(Tags(Callee("Computer.list"))) { (st: State[Unit]) =>
+      val ctx = MonitoringContext(st)
+      import ctx._
+      logger.debug(s"Listing all computers")
       Future.successful {
         val offest = pageSize * page
 
@@ -123,8 +127,10 @@ object Computer {
    * @param id The computer id
    * @param computer The computer values.
    */
-  def update(id: Long, computer: Computer) = Timed(Tags(Callee("Computer.update"))) { (c: State[MonitoringContext]) =>
-    c.value.logger.info(s"updating computer with id $id: $computer")
+  def update(id: Long, computer: Computer) = Timed(Tags(Callee("Computer.update"))) { (st: State[Unit]) =>
+    val ctx = MonitoringContext(st)
+    import ctx._
+    logger.info(s"updating computer with id $id: $computer")
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL(
@@ -149,8 +155,10 @@ object Computer {
    *
    * @param computer The computer values.
    */
-  def insert(computer: Computer) = Timed(Tags(Callee("Computer.insert"))) { (c: State[MonitoringContext]) =>
-    c.value.logger.info(s"inserting computer: $computer")
+  def insert(computer: Computer) = Timed(Tags(Callee("Computer.insert"))) { (st: State[Unit]) =>
+    val ctx = MonitoringContext(st)
+    import ctx._
+    logger.info(s"inserting computer: $computer")
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL(
@@ -175,8 +183,10 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long) = Timed(Tags(Callee("Computer.delete"))) { (c: State[MonitoringContext]) =>
-    c.value.logger.info(s"deleting computer: $id")
+  def delete(id: Long) = Timed(Tags(Callee("Computer.delete"))) { (st: State[Unit]) =>
+    val ctx = MonitoringContext(st)
+    import ctx._
+    logger.info(s"deleting computer: $id")
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL("delete from computer where id = {id}").on('id -> id).executeUpdate()
@@ -201,8 +211,10 @@ object Company {
   /**
    * Construct the Map[String,String] needed to fill a select options set.
    */
-  def options = Timed(Tags(Callee("Company.options"))) { (c: State[MonitoringContext]) =>
-    c.value.logger.debug("Listing options")
+  def options = Timed(Tags(Callee("Company.options"))) { (st: State[Unit]) =>
+    val ctx = MonitoringContext(st)
+    import ctx._
+    logger.debug("Listing options")
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL("select * from company order by name").as(Company.simple *).map(c => c.id.toString -> c.name)
