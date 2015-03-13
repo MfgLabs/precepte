@@ -19,10 +19,10 @@ val f1 = Monitored(Tags(Callee("f1"))){ (_: Call.State[Unit]) =>
 }
 ```
 
-The two function f1 and f2 are "Monitored" function. Those function when executed will receive a call state. This call state contains:
+The function `f1` is a "Monitored" function. Those function when executed will receive a call state. This call state contains:
 
-- A span. It's a global request identifier
-- A path. A path is a succession of call ids from the parent functions.
+- A `span`. It's a global request identifier
+- A `path`. A path is a succession of call ids from the parent functions.
 
 To be called, a Monitored block needs to be passed an initial `State`.
 
@@ -31,11 +31,9 @@ val initialState = Monitored.Call.State(Call.Span.gen, Vector.empty, ())
 f1.eval(initialState)
 ```
 
-
 So far, nothing of interest. Now let's add a little twist:
 
 ```scala
-
 def printState[C](st: Call.State[C]) =
 	println(s"""${st.span.value}/${st.path.map(_.id.value).mkString("/")}""")
 
@@ -50,7 +48,7 @@ def f2(s: String) = Monitored(Tags(Callee("f1"))){ (st: Call.State[Unit]) =>
 }
 ```
 
-Note that f1 ans f2 are both returning with `Future`. Suppose that I want to call f1 and then f2.
+Note that `f1` and `f2` are both returning a `Future`. Suppose that I want to call `f1` and then `f2`.
 
 ```scala
 val mon: Monitored[Unit, Future, String] =
@@ -71,7 +69,7 @@ d973de8a-55fd-432b-bfe8-7a5d91457f8f/DkdoYf9
 d973de8a-55fd-432b-bfe8-7a5d91457f8f/z43zso6
 ```
 
-Note that it printed two calls. both have the same span since they are from the same request.
+Note that it printed two calls. Both have the same `span` since they are from the same request.
 
 ## Stacking monitored
 
