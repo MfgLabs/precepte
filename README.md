@@ -35,7 +35,7 @@ So far, nothing of interest. Now let's add a little twist:
 
 ```scala
 def printState[C](st: Call.State[C]) =
-	println(s"""${st.span.value}/${st.path.map(_.id.value).mkString("/")}""")
+	println(s"""${st.span.value}/${st.path.map(s => s.id.value + "(" + s.tags + ")".mkString("/")}""")
 
 val f1 = Monitored(Tags(Callee("f1"))){ (st: Call.State[Unit]) =>
 	printState(st)
