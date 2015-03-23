@@ -131,6 +131,16 @@ object Monitored {
           yield st.value -> Return(a)
         }, tags)
 
+    def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[(C, A)]): Monitored[C, F, A] =
+      Step[C, F, A](
+        IndexedStateT { (st: Call.State[C]) =>
+          for (ca <- λ(st))
+          yield {
+            val (c, a) = ca
+            c -> Return(a)
+          }
+        }, tags)
+
     def apply[C, F[_]: Applicative, A](m: Monitored[C, F, A]): Monitored[C, F, A] =
       Step(IndexedStateT[F, Monitored.Call.State[C], C, Monitored[C, F, A]]{ st =>
         (st.value -> m).point[F]
