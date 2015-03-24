@@ -50,6 +50,14 @@ lazy val sample =
 				anorm,
 				ws,
 				"org.specs2" %% "specs2" % "2.4.9"))
+		.dependsOn(core, influx)
+
+lazy val influx =
+	project.in(file("monitored-influx"))
+		.settings(commonSettings:_*)
+		.settings(
+			name := "monitored-influx",
+			libraryDependencies ++= Seq(ws))
 		.dependsOn(core)
 
 lazy val root = project.in(file("."))
