@@ -31,6 +31,12 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
   lazy val next = Option(page + 1).filter(_ => (offset + items.size) < total)
 }
 
+object Models {
+  import commons.Monitoring
+  def Timed[A](callee: Tags.Callee)(f: State[Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[Unit, Future, A] =
+    Monitoring.Timed(Tags.Category.Database)(callee)(f)(fu)
+}
+
 object Computer {
 
   // -- Parsers
@@ -61,7 +67,7 @@ object Computer {
    * Retrieve a computer from the id.
    */
   def findById(id: Long) =
-    Timed(Tags(Callee("Computer.findById"))) { (st: State[Unit]) =>
+    Models.Timed(Callee("Computer.findById")) { (st: State[Unit]) =>
       val ctx = MonitoringContext(st)
       import ctx._
       logger.debug(s"Finding computer with id $id")
@@ -81,7 +87,7 @@ object Computer {
    * @param filter Filter applied on the name column
    */
   def list(page: Int = 0, pageSize: Int = 10, orderBy: Int = 1, filter: String = "%") =
-    Timed(Tags(Callee("Computer.list"))) { (st: State[Unit]) =>
+    Models.Timed(Callee("Computer.list")) { (st: State[Unit]) =>
       val ctx = MonitoringContext(st)
       import ctx._
       logger.debug(s"Listing all computers")
@@ -127,7 +133,7 @@ object Computer {
    * @param id The computer id
    * @param computer The computer values.
    */
-  def update(id: Long, computer: Computer) = Timed(Tags(Callee("Computer.update"))) { (st: State[Unit]) =>
+  def update(id: Long, computer: Computer) = Models.Timed(Callee("Computer.update")) { (st: State[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"updating computer with id $id: $computer")
@@ -155,7 +161,7 @@ object Computer {
    *
    * @param computer The computer values.
    */
-  def insert(computer: Computer) = Timed(Tags(Callee("Computer.insert"))) { (st: State[Unit]) =>
+  def insert(computer: Computer) = Models.Timed(Callee("Computer.insert")) { (st: State[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"inserting computer: $computer")
@@ -183,7 +189,7 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long) = Timed(Tags(Callee("Computer.delete"))) { (st: State[Unit]) =>
+  def delete(id: Long) = Models.Timed(Callee("Computer.delete")) { (st: State[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"deleting computer: $id")
@@ -211,7 +217,7 @@ object Company {
   /**
    * Construct the Map[String,String] needed to fill a select options set.
    */
-  def options = Timed(Tags(Callee("Company.options"))) { (st: State[Unit]) =>
+  def options = Models.Timed(Callee("Company.options")) { (st: State[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.debug("Listing options")

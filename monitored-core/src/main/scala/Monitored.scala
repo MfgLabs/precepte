@@ -82,13 +82,33 @@ object Monitored {
   object Call {
    case class Span(value: String) extends AnyVal
     case class Id(value: String) extends AnyVal
-    case class Tags(values: (String, String)*) {
+    case class Tags(values: Tags.Tag*) {
       override def toString = s"Tags(${values.toList})"
+
+      def ++(ts: Tags) = Tags((values ++ ts.values):_*)
     }
     object Tags {
       val empty = Tags()
-      def Callee(n: String) = ("callee", n)
+      abstract class Tag(val name: String, val value: String)
+      case class Callee(override val value: String) extends Tag("callee", value)
+
+      abstract class Category(value: String) extends Tag("category", value)
+      object Category {
+        def unapply(c: Category) = Some(c.value)
+        object Api extends Category("api")
+        object Database extends Category("database")
+      }
+
+      abstract class Environment(value: String) extends Tag("environment", value)
+      object Environment {
+        object Dev extends Environment("dev")
+        object Staging extends Environment("staging")
+        object Production extends Environment("production")
+      }
+
+      case class Host(override val value: String) extends Tag("host", value)
     }
+
     type Path = Vector[Call]
 
     sealed trait Graph[C, G <: Graph[C, G]] {
@@ -131,7 +151,7 @@ object Monitored {
           yield st.value -> Return(a)
         }, tags)
 
-    def apply[C, F[_]: Functor, A](λ: Call.State[C] => F[(C, A)]): Monitored[C, F, A] =
+    def applyS[C, F[_]: Functor, A](λ: Call.State[C] => F[(C, A)]): Monitored[C, F, A] =
       Step[C, F, A](
         IndexedStateT { (st: Call.State[C]) =>
           for (ca <- λ(st))

@@ -48,6 +48,7 @@ lazy val sample =
 			libraryDependencies ++= Seq(
 				jdbc,
 				anorm,
+				ws,
 				"org.specs2" %% "specs2" % "2.4.9"))
 		.dependsOn(core)
 
