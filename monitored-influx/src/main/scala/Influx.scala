@@ -56,7 +56,7 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
     }
   }
 
-  private lazy val client = system.actorOf(Props(new InfluxClient))
+  private val client = system.actorOf(Props(new InfluxClient))
 
   system.scheduler.schedule(10 seconds, 10 seconds, client, Publish)
 
