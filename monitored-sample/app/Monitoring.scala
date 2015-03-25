@@ -1,6 +1,6 @@
 package commons
 
-import com.mfglabs.monitoring.{ Monitored, Influx }
+import com.mfglabs.monitoring.{ Monitored, Influx, Logback }
 import Monitored._
 import Monitored.Call._
 
@@ -15,34 +15,18 @@ object Monitoring {
 
 	import play.api.libs.json._
 
+	val env = Tags.Environment.Dev
+	val host = Tags.Host(java.net.InetAddress.getLocalHost().getHostName())
 	lazy val influx = Influx(
 		new java.net.URL("http://localhost:8086/db/monitored-sample/series?u=root&p=root"),
-		Tags.Environment.Dev,
-		Tags.Host(java.net.InetAddress.getLocalHost().getHostName()),
+		env,
+		host,
 		play.api.libs.concurrent.Akka.system)
 
-	case class Logger(span: Span, path: Path) {
-		private def format(l: String, s: String) =
-			Json.prettyPrint(Json.obj(
-				"level" -> l,
-				"message" -> s,
-				"span" -> span.value,
-				"path" -> path.map { s =>
-					Json.obj(
-						"id" -> s.id.value,
-						"tags" -> s.tags.values.map { t =>
-								Json.obj(t.name -> t.value)
-							})
-				}))
-
-		def debug(message: => String): Unit = PLog.debug(format("debug", message))
-	  def info(message: => String): Unit = PLog.info(format("info", message))
-	  def warn(message: => String): Unit = PLog.warn(format("warn", message))
-	  def error(message: => String): Unit = PLog.error(format("error", message))
-	}
+	lazy val logback = Logback(env, host)
 
 	case class MonitoringContext(span: Span, path: Path) {
-		val logger = Logger(span, path)
+		val logger = logback.Logger(span, path)
 		val timer = influx.Timer(span, path)
 	}
 

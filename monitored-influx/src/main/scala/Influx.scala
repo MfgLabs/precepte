@@ -4,10 +4,9 @@ import java.net.URL
 import scala.language.higherKinds
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
+import scala.language.postfixOps
 
 import akka.actor.{ Actor, Props, ActorSystem }
-
-import Monitored._
 import Monitored.Call._
 
 case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, system: ActorSystem)(implicit ex: ExecutionContext) {
@@ -16,9 +15,9 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
 
   case object Publish
+  case class Metric(time: Long, span: Span, path: Path, duration: Duration)
 
   class InfluxClient extends Actor {
-    type Metric = (Long, Span, Path, Duration)
     val metrics = scala.collection.mutable.ArrayBuffer[Metric]()
 
     // fast and ugly json serialization
@@ -26,7 +25,7 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
       val sep = "/"
 
       val points =
-        metrics.map { case (time, span, path, duration) =>
+        metrics.map { case Metric(time, span, path, duration) =>
           val p = path.map { c =>
             c.id.value
           }.mkString(sep, sep, "")
@@ -48,6 +47,7 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
     def receive = {
       case m: Metric =>
         metrics += m
+        ()
       case Publish =>
         if(metrics.nonEmpty) {
           WS.url(influxdbURL.toString).post(json)
@@ -65,7 +65,7 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
       val t0 = System.nanoTime()
       f.map { x =>
         val t1 = System.nanoTime()
-        client ! (t0 / 1000000, span, path, (t1 -t0) nanoseconds)
+        client ! Metric(t0 / 1000000, span, path, (t1 -t0) nanoseconds)
         x
       }
     }
