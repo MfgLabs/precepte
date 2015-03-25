@@ -71,4 +71,16 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
     }
   }
 
+  import scala.concurrent.Future
+
+  def Timed[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: State[Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[Unit, Future, A] =
+    Monitored(Tags(category, callee) ++ others){ (c: State[Unit]) =>
+      Timer(c.span, c.path).timed(f(c))
+    }
+
+  def TimedM[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: Monitored[Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[Unit, Future, A] =
+    Monitored(Tags(category, callee) ++ others){ (c: State[Unit]) =>
+      Timer(c.span, c.path).timed(f.eval(c))
+    }
+
 }

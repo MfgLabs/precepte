@@ -34,7 +34,7 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
 object Models {
   import commons.Monitoring
   def Timed[A](callee: Tags.Callee)(f: State[Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[Unit, Future, A] =
-    Monitoring.Timed(Tags.Category.Database)(callee)(f)(fu)
+    Monitoring.influx.Timed(Tags.Category.Database)(callee)(f)(fu)
 }
 
 object Computer {

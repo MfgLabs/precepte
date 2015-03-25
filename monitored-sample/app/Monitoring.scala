@@ -34,16 +34,6 @@ object Monitoring {
 		def apply[C](st: State[C]): MonitoringContext = MonitoringContext(st.span, st.path)
 	}
 
-	def Timed[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: State[Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[Unit, Future, A] =
-		Monitored(Tags(category, callee) ++ others){ (c: State[Unit]) =>
-			influx.Timer(c.span, c.path).timed(f(c))
-		}
-
-	def TimedM[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: Monitored[Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[Unit, Future, A] =
-		Monitored(Tags(category, callee) ++ others){ (c: State[Unit]) =>
-			influx.Timer(c.span, c.path).timed(f.eval(c))
-		}
-
 	object TimedAction {
 		def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
 			Action.async(bodyParser) { request =>
@@ -56,7 +46,7 @@ object Monitoring {
 				} yield s"$c.$a").getOrElse(request.toString)
 
 				val initialState = State(Span.gen, Vector.empty, ())
-				TimedM(Tags.Category.Api)(Tags.Callee(name)) {
+				influx.TimedM(Tags.Category.Api)(Tags.Callee(name)) {
 					block(request)
 				}.eval(initialState)
 			}
