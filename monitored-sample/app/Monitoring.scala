@@ -23,7 +23,7 @@ object Monitoring {
 		host,
 		play.api.libs.concurrent.Akka.system)
 
-	lazy val logback = Logback(env, host)
+	lazy val logback = Logback(env)
 
 	case class MonitoringContext(span: Span, path: Path) {
 		val logger = logback.Logger(span, path)

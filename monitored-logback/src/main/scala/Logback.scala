@@ -3,7 +3,7 @@ package com.mfglabs.monitoring
 import scala.language.higherKinds
 import Monitored.Call._
 
-case class Logback[T](env: Tags.Environment, hostname: Tags.Host) {
+case class Logback[T](env: Tags.Environment) {
 
   import net.logstash.logback.marker.Markers._
   import org.slf4j.LoggerFactory
@@ -20,12 +20,14 @@ case class Logback[T](env: Tags.Environment, hostname: Tags.Host) {
           c.tags.values.collect { case Tags.Callee(n) => n }
         }.mkString(sep, sep, "")
 
+      val tags = Map("parameters" -> path.last.tags.values.map(t => t.name -> t.value).toMap).asJava
+
       (Map(params:_*) ++ Map(
         env.name -> env.value,
-        hostname.name -> hostname.value,
         "span" -> span.value,
         "path" -> path.map(_.id.value).mkString(sep, sep, ""),
-        "callees" -> callees)).asJava
+        "callees" -> callees,
+        "tags" -> tags)).asJava
     }
 
     def debug(message: => String, params: (String, String)*): Unit =
