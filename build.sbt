@@ -52,7 +52,7 @@ lazy val sample =
 				anorm,
 				ws,
 				"org.specs2" %% "specs2" % "2.4.9"))
-		.dependsOn(core, influx, logback)
+		.dependsOn(core, influx, logback, play)
 
 lazy val influx =
 	project.in(file("monitored-influx"))
@@ -73,6 +73,16 @@ lazy val logback =
 				"ch.qos.logback" % "logback-classic" % "1.1.2",
 				"net.logstash.logback" % "logstash-logback-encoder" % "4.2"))
 		.dependsOn(core)
+
+lazy val play =
+	project.in(file("monitored-play"))
+		.settings(commonSettings:_*)
+		.settings(strictScalac)
+		.settings(
+			libraryDependencies += "com.typesafe.play" %% "play" % "2.3.7"
+			,
+			name := "monitored-play")
+		.dependsOn(core, influx)
 
 lazy val root = project.in(file("."))
 	.settings(commonSettings:_*)

@@ -4,6 +4,7 @@ import java.net.URL
 import scala.language.higherKinds
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.language.postfixOps
 
 import akka.actor.{ Actor, Props, ActorSystem }
@@ -14,10 +15,10 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
   private val builder = new com.ning.http.client.AsyncHttpClientConfig.Builder()
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
 
-  case object Publish
-  case class Metric(time: Long, span: Span, path: Path, duration: Duration)
+  private case object Publish
+  private case class Metric(time: Long, span: Span, path: Path, duration: Duration)
 
-  class InfluxClient extends Actor {
+  private class InfluxClient extends Actor {
     val metrics = scala.collection.mutable.ArrayBuffer[Metric]()
 
     // fast and ugly json serialization
@@ -70,8 +71,6 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
       }
     }
   }
-
-  import scala.concurrent.Future
 
   def Timed[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: State[Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[Unit, Future, A] =
     Monitored(Tags(category, callee) ++ others){ (c: State[Unit]) =>
