@@ -70,7 +70,7 @@ object Computer {
     Models.Timed(Callee("Computer.findById")) { (st: State[Unit]) =>
       val ctx = MonitoringContext(st)
       import ctx._
-      logger.debug(s"Finding computer with id $id")
+      logger.debug(s"Finding computer with id", "id" -> id.toString)
       Future.successful {
         DB.withConnection { implicit connection =>
           SQL("select * from computer where id = {id}").on('id -> id).as(Computer.simple.singleOpt)
@@ -136,7 +136,7 @@ object Computer {
   def update(id: Long, computer: Computer) = Models.Timed(Callee("Computer.update")) { (st: State[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
-    logger.info(s"updating computer with id $id: $computer")
+    logger.info(s"updating computer with id", "id" -> id.toString, "computer" -> computer.toString)
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL(
@@ -164,7 +164,7 @@ object Computer {
   def insert(computer: Computer) = Models.Timed(Callee("Computer.insert")) { (st: State[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
-    logger.info(s"inserting computer: $computer")
+    logger.info(s"inserting computer", "computer" -> computer.toString)
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL(
@@ -192,7 +192,7 @@ object Computer {
   def delete(id: Long) = Models.Timed(Callee("Computer.delete")) { (st: State[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
-    logger.info(s"deleting computer: $id")
+    logger.info(s"deleting computer", ("id" -> id.toString))
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL("delete from computer where id = {id}").on('id -> id).executeUpdate()
