@@ -10,7 +10,7 @@ import scala.language.postfixOps
 import akka.actor.{ Actor, Props, ActorSystem }
 import Call._
 
-case class Influx(influxdbURL: URL, env: Env, system: ActorSystem)(implicit ex: ExecutionContext) {
+case class Influx(influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit ex: ExecutionContext) {
 
   private val builder = new com.ning.http.client.AsyncHttpClientConfig.Builder()
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
@@ -72,13 +72,13 @@ case class Influx(influxdbURL: URL, env: Env, system: ActorSystem)(implicit ex: 
     }
   }
 
-  def Timed[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: State[Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[Unit, Future, A] =
-    Monitored(Tags(category, callee) ++ others){ (c: State[Unit]) =>
+  def Timed[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: State[BaseEnv, Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[BaseEnv, Unit, Future, A] =
+    Monitored(Tags(category, callee) ++ others){ (c: State[BaseEnv, Unit]) =>
       Timer(c.span, c.path).timed(f(c))
     }
 
-  def TimedM[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: Monitored[Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[Unit, Future, A] =
-    Monitored(Tags(category, callee) ++ others){ (c: State[Unit]) =>
+  def TimedM[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: Monitored[BaseEnv, Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[BaseEnv, Unit, Future, A] =
+    Monitored(Tags(category, callee) ++ others){ (c: State[BaseEnv, Unit]) =>
       Timer(c.span, c.path).timed(f.eval(c))
     }
 

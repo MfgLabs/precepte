@@ -28,10 +28,10 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  val env = Call.Env(Call.Tags.Host("localhost"), Call.Tags.Environment.Dev)
+  val env = Call.BaseEnv(Call.Tags.Host("localhost"), Call.Tags.Environment.Dev)
 
-  def Logged[F[_]: scalaz.Functor, A](tags: Call.Tags)(f: Log => F[A]): Monitored[(Call.Span, Call.Path) => Log, F, A] =
-    Monitored(tags) { (state: Call.State[(Call.Span, Call.Path) => Log]) =>
+  def Logged[F[_]: scalaz.Functor, A](tags: Call.Tags)(f: Log => F[A]): Monitored[Call.BaseEnv, (Call.Span, Call.Path) => Log, F, A] =
+    Monitored(tags) { (state: Call.State[Call.BaseEnv, (Call.Span, Call.Path) => Log]) =>
       f(state.value(state.span, state.path))
     }
 
@@ -97,11 +97,11 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     }
   }
 
-  def toStates[C](g: Call.Root[C]): Seq[Call.State[C]] = {
-    def go(g: Call.GraphNode[C], span: Call.Span, path: Call.Path, states: Seq[Call.State[C]]): Seq[Call.State[C]] = {
+  def toStates[C](g: Call.Root[C]): Seq[Call.State[Call.BaseEnv, C]] = {
+    def go(g: Call.GraphNode[C], span: Call.Span, path: Call.Path, states: Seq[Call.State[Call.BaseEnv, C]]): Seq[Call.State[Call.BaseEnv, C]] = {
       val Call.GraphNode(id, value, tags, cs) = g
       val p = path :+ Call(id, tags)
-      val st = Call.State[C](span, env, p, value)
+      val st = Call.State[Call.BaseEnv, C](span, env, p, value)
       val cst = cs.map{ c =>
         go(c, span, p, Seq.empty)
       }.flatten
@@ -120,9 +120,9 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
 
   "Monitored" should "trivial" in {
 
-    def f1 = Monitored(Tags(Callee("trivial.f1"))).apply0{ (_: Call.State[Unit]) => 1 }
-    def f2(i: Int) = Monitored(Tags(Callee("trivial.f2"))).apply0{(_: Call.State[Unit]) => s"foo $i"}
-    def f3(i: Int) = Monitored(Tags(Callee("trivial.f3"))).apply0{(_: Call.State[Unit]) => i + 1}
+    def f1 = Monitored(Tags(Callee("trivial.f1"))).apply0{ (_: Call.State[Call.BaseEnv, Unit]) => 1 }
+    def f2(i: Int) = Monitored(Tags(Callee("trivial.f2"))).apply0{(_: Call.State[Call.BaseEnv, Unit]) => s"foo $i"}
+    def f3(i: Int) = Monitored(Tags(Callee("trivial.f3"))).apply0{(_: Call.State[Call.BaseEnv, Unit]) => i + 1}
 
     val (graph0, result0) = f1.run(nostate)
     result0 should ===(1)
@@ -167,8 +167,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "simple" in {
-    def f1 = Monitored(Tags(Callee("simple.f1"))){(_: Call.State[Unit]) => 1.point[Future]}
-    def f2(i: Int) = Monitored(Tags(Callee("simple.f2"))){(_: Call.State[Unit]) => s"foo $i".point[Future]}
+    def f1 = Monitored(Tags(Callee("simple.f1"))){(_: Call.State[Call.BaseEnv, Unit]) => 1.point[Future]}
+    def f2(i: Int) = Monitored(Tags(Callee("simple.f2"))){(_: Call.State[Call.BaseEnv, Unit]) => s"foo $i".point[Future]}
 
     val res = for {
       i <- f1
@@ -179,9 +179,9 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "optT" in {
-    val f1 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => Option("foo").point[Future])
-    val f2 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => Option(1).point[Future])
-    val f3 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => (None: Option[Int]).point[Future])
+    val f1 = Monitored(Call.Tags.empty)((_: Call.State[Call.BaseEnv, Unit]) => Option("foo").point[Future])
+    val f2 = Monitored(Call.Tags.empty)((_: Call.State[Call.BaseEnv, Unit]) => Option(1).point[Future])
+    val f3 = Monitored(Call.Tags.empty)((_: Call.State[Call.BaseEnv, Unit]) => (None: Option[Int]).point[Future])
 
 
     val res = for {
@@ -207,9 +207,9 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "listT" in {
-    val f1 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => List("foo", "bar").point[Future])
-    val f2 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => List(1, 2).point[Future])
-    val f3 = Monitored(Call.Tags.empty)((_: Call.State[Unit]) => List[Int]().point[Future])
+    val f1 = Monitored(Call.Tags.empty)((_: Call.State[Call.BaseEnv, Unit]) => List("foo", "bar").point[Future])
+    val f2 = Monitored(Call.Tags.empty)((_: Call.State[Call.BaseEnv, Unit]) => List(1, 2).point[Future])
+    val f3 = Monitored(Call.Tags.empty)((_: Call.State[Call.BaseEnv, Unit]) => List[Int]().point[Future])
 
     val res = for {
       e1 <- trans(f1)
@@ -237,11 +237,11 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     import scalaz.{ \/ , \/-, -\/}
     import EitherT.eitherTFunctor
 
-    val f1: Monitored[Unit, Future, String \/ String] =
+    val f1: Monitored[Call.BaseEnv, Unit, Future, String \/ String] =
       Monitored(Call.Tags.empty)(_ => \/-("foo").point[Future])
-    val f2: Monitored[Unit, Future, String \/ Int] =
+    val f2: Monitored[Call.BaseEnv, Unit, Future, String \/ Int] =
       Monitored(Call.Tags.empty)(_ => \/-(1).point[Future])
-    val f3: Monitored[Unit, Future, String \/ String] =
+    val f3: Monitored[Call.BaseEnv, Unit, Future, String \/ String] =
       Monitored(Call.Tags.empty)(_ => -\/("Error").point[Future])
 
     type Foo[A] = EitherT[Future, String, A]
@@ -272,14 +272,14 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "pass context" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Unit]]()
 
-    def push(state: Call.State[Unit]): Unit = {
+    def push(state: Call.State[Call.BaseEnv, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Monitored(Tags(Callee("f1"))){ (c: Call.State[Unit]) =>
+    def f1 = Monitored(Tags(Callee("f1"))){ (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       1.point[Future]
     }
@@ -292,14 +292,14 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "preserve context on map" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Unit]]()
 
-    def push(state: Call.State[Unit]): Unit = {
+    def push(state: Call.State[Call.BaseEnv, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+    def f1 = Monitored(Call.Tags.empty){ (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       1.point[Future]
     }.map(identity).map(identity).map(identity).map(identity)
@@ -314,24 +314,24 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "preserve context on flatMap" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Unit]]()
 
-    def push(state: Call.State[Unit]): Unit = {
+    def push(state: Call.State[Call.BaseEnv, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Monitored(Tags(Callee("f1"))){ (c: Call.State[Unit]) =>
+    def f1 = Monitored(Tags(Callee("f1"))){ (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       1.point[Future]
     }
 
-    def f2(i: Int) = Monitored(Tags(Callee("f2"))){ (c: Call.State[Unit]) =>
+    def f2(i: Int) = Monitored(Tags(Callee("f2"))){ (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       s"foo $i".point[Future]
     }
 
-    def f3(s: String) = Monitored(Tags(Callee("f3"))){ (c: Call.State[Unit]) =>
+    def f3(s: String) = Monitored(Tags(Callee("f3"))){ (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       s"f3 $s".point[Future]
     }
@@ -348,7 +348,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "stack contexts" in {
-    def f1 = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+    def f1 = Monitored(Call.Tags.empty){ (c: Call.State[Call.BaseEnv, Unit]) =>
       1.point[Future]
     }
 
@@ -361,19 +361,19 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "provide context to C" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Unit]]()
 
-    def push(state: Call.State[Unit]): Unit = {
+    def push(state: Call.State[Call.BaseEnv, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Monitored(Call.Tags.empty) { (c: Call.State[Unit]) =>
+    def f1 = Monitored(Call.Tags.empty) { (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       1.point[Future]
     }
 
-    def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+    def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       s"foo $i".point[Future]
     }
@@ -432,19 +432,19 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "not stack context on trans" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Unit]]()
 
-    def push(state: Call.State[Unit]): Unit = {
+    def push(state: Call.State[Call.BaseEnv, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Monitored(Call.Tags.empty) { (c: Call.State[Unit]) =>
+    def f1 = Monitored(Call.Tags.empty) { (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       Option(1).point[Future]
     }
 
-    def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call.State[Unit]) =>
+    def f2(i: Int) = Monitored(Call.Tags.empty){ (c: Call.State[Call.BaseEnv, Unit]) =>
       push(c)
       Option(s"foo $i").point[Future]
     }
@@ -478,7 +478,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     val getPin =
       (for {
         b   <- trans(BoardComp.get().lift[Option])
-        id  <- trans(Monitored(Call.Tags.empty)((_: Call.State[(Call.Span, Call.Path) => Log]) => b.pin.point[Future]))
+        id  <- trans(Monitored(Call.Tags.empty)((_: Call.State[Call.BaseEnv, (Call.Span, Call.Path) => Log]) => b.pin.point[Future]))
         pin <- trans(CardComp.getPin(id))
       } yield pin).run
 

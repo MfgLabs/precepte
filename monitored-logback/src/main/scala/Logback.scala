@@ -3,7 +3,7 @@ package com.mfglabs.monitoring
 import scala.language.higherKinds
 import Call._
 
-case class Logback(env: Env) {
+case class Logback(env: BaseEnv) {
 
   import net.logstash.logback.marker.Markers._
   import org.slf4j.LoggerFactory

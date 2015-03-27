@@ -55,8 +55,9 @@ object Call {
       this.copy(children = children ++ cs)
   }
 
-  case class Env(host: Tags.Host, environment: Tags.Environment, others: Tags = Tags.empty)
-  case class State[C](span: Call.Span, env: Env, path: Path, value: C)
+  trait Env
+  case class BaseEnv(host: Tags.Host, environment: Tags.Environment) extends Env
+  case class State[E <: Env, C](span: Call.Span, env: E, path: Path, value: C)
 
   object Id {
     def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)
