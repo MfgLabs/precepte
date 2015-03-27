@@ -24,12 +24,12 @@ object Monitoring {
 	lazy val logback = Logback(env)
 	val TimedAction = com.mfglabs.monitoring.TimedAction(influx, env)
 
-	case class MonitoringContext(span: Span, path: Path) {
+	case class MonitoringContext(span: Span, path: Path[BaseTags]) {
 		val logger = logback.Logger(span, path)
 		val timer = influx.Timer(span, path)
 	}
 
 	object MonitoringContext {
-		def apply[C](st: State[BaseEnv, C]): MonitoringContext = MonitoringContext(st.span, st.path)
+		def apply[C](st: State[BaseEnv, BaseTags, C]): MonitoringContext = MonitoringContext(st.span, st.path)
 	}
 }

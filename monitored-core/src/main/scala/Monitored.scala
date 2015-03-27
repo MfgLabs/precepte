@@ -1,28 +1,28 @@
 package com.mfglabs.monitoring
 
 import scala.language.higherKinds
-import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT }
+import scalaz.{ Bind, Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT }
 import scalaz.syntax.monad._
-import Call.Env
+import Call.{ Env, Tags }
 
-sealed trait Monitored[E <: Env, C, F[_], A] {
+sealed trait Monitored[E <: Env, T <: Tags, C, F[_], A] {
   self =>
 
-  final def flatMap[B](f: A => Monitored[E, C, F, B]): Monitored[E, C, F, B] =
-    Flatmap[E, C, F, A, B](self, f)
+  final def flatMap[B](f: A => Monitored[E, T, C, F, B]): Monitored[E, T, C, F, B] =
+    Flatmap[E, T, C, F, A, B](self, f)
 
-  final def map[B](f: A => B): Monitored[E, C, F, B] =
+  final def map[B](f: A => B): Monitored[E, T, C, F, B] =
     flatMap(a => Return(f(a)))
 
-  def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Monitored[E, C, F, AP[A]] =
+  def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Monitored[E, T, C, F, AP[A]] =
     this.map(a => ap.point(a))
 
-  final def eval(state: Call.State[E, C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[A] = {
+  final def eval(state: Call.State[E, T, C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[A] = {
     this match {
       case Return(a) => a.point[F]
       case Step(st, tags) =>
         val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
-        st.run(state0).flatMap { case(c, m) =>
+        st.run(state0).flatMap { case (c, m) =>
           m.eval(state0.copy(value = c), ids.tail)
         }
       case Flatmap(sub, next) =>
@@ -32,8 +32,8 @@ sealed trait Monitored[E <: Env, C, F[_], A] {
     }
   }
 
-  final def run(state: Call.State[E, C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[(Call.Root[C], A)] = {
-    def go[G <: Call.Graph[C, G] ,B](m: Monitored[E, C, F, B], state: Call.State[E, C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
+  final def run(state: Call.State[E, T, C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[(Call.Root[T, C], A)] = {
+    def go[G <: Call.Graph[T, C, G] ,B](m: Monitored[E, T, C, F, B], state: Call.State[E, T, C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
       m match {
         case Return(a) =>
           (ids, (graph, a)).point[F]
@@ -49,7 +49,7 @@ sealed trait Monitored[E <: Env, C, F[_], A] {
           }
         case Flatmap(sub, next) =>
           // XXX: kinda hackish. We're only interested in this node children
-          val g0 = Call.GraphNode(Call.Id("dummy"), state.value, Call.Tags.empty, Vector.empty)
+          val g0 = Call.Root[T, C](Call.Span("dummy"), Vector.empty)
           go(sub, state, g0, ids).flatMap { case (is0, (gi, i)) =>
             go(next(i), state, gi, is0).map { case (is1, (g, a)) =>
               (is1, (graph.addChildren(g.children), a))
@@ -57,38 +57,38 @@ sealed trait Monitored[E <: Env, C, F[_], A] {
           }
       }
     }
-    go(this, state, Call.Root[C](state.span, Vector.empty), ids).map(_._2)
+    go(this, state, Call.Root[T, C](state.span, Vector.empty), ids).map(_._2)
   }
 
 }
 
-private case class Return[E <: Env, C, F[_], A](a: A) extends Monitored[E, C, F, A]
-private case class Step[E <: Env, C, F[_], A](st: IndexedStateT[F, Call.State[E, C], C, Monitored[E, C, F, A]], tags: Call.Tags) extends Monitored[E, C, F, A] {
-  def run(state: Call.State[E, C]): F[(C, Monitored[E, C, F, A])] =
+private case class Return[E <: Env, T <: Tags, C, F[_], A](a: A) extends Monitored[E, T, C, F, A]
+private case class Step[E <: Env, T <: Tags, C, F[_], A](st: IndexedStateT[F, Call.State[E, T, C], C, Monitored[E, T, C, F, A]], tags: T) extends Monitored[E, T, C, F, A] {
+  def run(state: Call.State[E, T, C]): F[(C, Monitored[E, T, C, F, A])] =
     st.run(state)
 }
 
-private case class Flatmap[E <: Env, C, F[_], I, A](sub: Monitored[E, C, F, I], next: I => Monitored[E, C, F, A]) extends Monitored[E, C, F, A]
+private case class Flatmap[E <: Env, T <: Tags, C, F[_], I, A](sub: Monitored[E, T, C, F, I], next: I => Monitored[E, T, C, F, A]) extends Monitored[E, T, C, F, A]
 
 object Monitored {
 
-  trait MonitoredBuilder {
-    val tags: Call.Tags
+  trait MonitoredBuilder[T <: Tags] {
+    val tags: T
     import scalaz.Id._
 
-    def apply0[E <: Env, C, A](λ: Call.State[E, C] => A): Monitored[E, C, Id, A] =
+    def apply0[E <: Env, C, A](λ: Call.State[E, T, C] => A): Monitored[E, T, C, Id, A] =
       apply[E, C, Id, A](λ)
 
-    def apply[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, C] => F[A]): Monitored[E, C, F, A] =
-      Step[E, C, F, A](
-        IndexedStateT { (st: Call.State[E, C]) =>
+    def apply[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, T, C] => F[A]): Monitored[E, T, C, F, A] =
+      Step[E, T, C, F, A](
+        IndexedStateT { (st: Call.State[E, T, C]) =>
           for (a <- λ(st))
           yield st.value -> Return(a)
         }, tags)
 
-    def applyS[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, C] => F[(C, A)]): Monitored[E, C, F, A] =
-      Step[E, C, F, A](
-        IndexedStateT { (st: Call.State[E, C]) =>
+    def applyS[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, T, C] => F[(C, A)]): Monitored[E, T, C, F, A] =
+      Step[E, T, C, F, A](
+        IndexedStateT { (st: Call.State[E, T, C]) =>
           for (ca <- λ(st))
           yield {
             val (c, a) = ca
@@ -96,14 +96,14 @@ object Monitored {
           }
         }, tags)
 
-    def apply[E <: Env, C, F[_]: Applicative, A](m: Monitored[E, C, F, A]): Monitored[E, C, F, A] =
-      Step(IndexedStateT[F, Call.State[E, C], C, Monitored[E, C, F, A]]{ st =>
+    def apply[E <: Env, C, F[_]: Applicative, A](m: Monitored[E, T, C, F, A]): Monitored[E, T, C, F, A] =
+      Step(IndexedStateT[F, Call.State[E, T, C], C, Monitored[E, T, C, F, A]]{ st =>
         (st.value -> m).point[F]
       }, tags)
   }
 
-  def apply(_tags: Call.Tags) =
-    new MonitoredBuilder {
+  def apply[T <: Tags](_tags: T) =
+    new MonitoredBuilder[T] {
       val tags = _tags
     }
 
@@ -113,20 +113,20 @@ object Monitored {
   implicit def fKindEv[F0[_]] = new *->*[F0] {}
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 
-  def trans[E <: Env, C, F[_], G[_]: *->*, A](m: Monitored[E, C, F, G[A]])(implicit hh: HasHoist[G]): hh.T[({ type λ[α] = Monitored[E, C, F, α] })#λ, A] = {
-    type T[G0] = Monitored[E, C, F, G0]
-    hh.lift[T, A](m)
+  def trans[E <: Env, T <: Tags, C, F[_], G[_]: *->*, A](m: Monitored[E, T, C, F, G[A]])(implicit hh: HasHoist[G]): hh.T[({ type λ[α] = Monitored[E, T, C, F, α] })#λ, A] = {
+    type λ[α] = Monitored[E, T, C, F, α]
+    hh.lift[λ, A](m)
   }
 
-  def trans[E <: Env, C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[E, C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): hh.T[({ type λ[α] = Monitored[E, C, F, α] })#λ, B] = {
+  def trans[E <: Env, T <: Tags, C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[E, T, C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): hh.T[({ type λ[α] = Monitored[E, T, C, F, α] })#λ, B] = {
     type λ[α] = G[A, α]
-    trans[E, C, F, λ, B](m)(new *->*[λ] {}, hh)
+    trans[E, T, C, F, λ, B](m)(new *->*[λ] {}, hh)
   }
 
-  implicit def monitoredInstances[E <: Env, C, F[_]: Monad] =
-    new Monad[({ type λ[α] = Monitored[E, C, F, α] })#λ] {
-      def point[A](a: => A): Monitored[E, C, F, A] = Monitored(Call.Tags.empty)[E, C, F, A]((_: Call.State[E, C]) => implicitly[Monad[F]].point(a))
-      def bind[A, B](m: Monitored[E, C, F, A])(f: A => Monitored[E, C, F, B]): Monitored[E, C, F, B] =
+  implicit def monitoredInstances[E <: Env, T <: Tags, C, F[_]: Bind] =
+    new Bind[({ type λ[α] = Monitored[E, T, C, F, α] })#λ] {
+      def map[A, B](m: Monitored[E, T, C, F, A])(f: A => B): Monitored[E,T,C,F,B] = m.map(f)
+      def bind[A, B](m: Monitored[E, T, C, F, A])(f: A => Monitored[E, T, C, F, B]): Monitored[E, T, C, F, B] =
         m.flatMap(f)
     }
 }

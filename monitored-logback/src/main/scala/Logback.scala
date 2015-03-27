@@ -12,23 +12,20 @@ case class Logback(env: BaseEnv) {
 
   val sep = "/"
 
-  case class Logger(span: Span, path: Path) {
+  case class Logger(span: Span, path: Path[BaseTags]) {
     def p(params: Seq[(String, String)]) = {
       import collection.JavaConverters._
       val callees =
-        path.flatMap { c =>
-          c.tags.values.collect { case Tags.Callee(n) => n }
+        path.map { c =>
+          c.tags.callee.value
         }.mkString(sep, sep, "")
-
-      val tags = path.last.tags.values.map(t => t.name -> t.value).toMap.asJava
 
       Map(
         env.environment.name -> env.environment.value,
         "span" -> span.value,
         "path" -> path.map(_.id.value).mkString(sep, sep, ""),
         "callees" -> callees,
-        "parameters" -> Map(params:_*).asJava,
-        "tags" -> tags).asJava
+        "parameters" -> Map(params:_*).asJava).asJava
     }
 
     def debug(message: => String, params: (String, String)*): Unit =

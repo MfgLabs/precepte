@@ -16,7 +16,7 @@ case class Influx(influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit 
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
 
   private case object Publish
-  private case class Metric(time: Long, span: Span, path: Path, duration: Duration)
+  private case class Metric(time: Long, span: Span, path: Path[BaseTags], duration: Duration)
 
   private class InfluxClient extends Actor {
     val metrics = scala.collection.mutable.ArrayBuffer[Metric]()
@@ -32,12 +32,10 @@ case class Influx(influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit 
           }.mkString(sep, sep, "")
 
           val callees =
-            path.flatMap { c =>
-              c.tags.values.collect { case Tags.Callee(n) => n }
-            }.mkString(sep, sep, "")
+            path.map(_.tags.callee).mkString(sep, sep, "")
 
           val category =
-            path.last.tags.values.collect { case Tags.Category(c) => c }.head
+            path.map(_.tags.category).mkString(sep, sep, "")
 
           s"""["${env.host.value}", "${env.environment.value}", "$category", "${span.value}", "$p", "$callees", $time, ${duration.toNanos}]"""
         }.mkString(",")
@@ -61,7 +59,7 @@ case class Influx(influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit 
 
   system.scheduler.schedule(10 seconds, 10 seconds, client, Publish)
 
-  case class Timer(span: Span, path: Path) {
+  case class Timer(span: Span, path: Path[BaseTags]) {
     def timed[A](f: scala.concurrent.Future[A]) = {
       val t0 = System.nanoTime()
       f.map { x =>
@@ -72,13 +70,13 @@ case class Influx(influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit 
     }
   }
 
-  def Timed[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: State[BaseEnv, Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[BaseEnv, Unit, Future, A] =
-    Monitored(Tags(category, callee) ++ others){ (c: State[BaseEnv, Unit]) =>
+  def Timed[A](category: Tags.Category)(callee: Tags.Callee)(f: State[BaseEnv, BaseTags, Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
+    Monitored(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, Unit]) =>
       Timer(c.span, c.path).timed(f(c))
     }
 
-  def TimedM[A](category: Tags.Category)(callee: Tags.Callee, others: Tags = Tags.empty)(f: Monitored[BaseEnv, Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[BaseEnv, Unit, Future, A] =
-    Monitored(Tags(category, callee) ++ others){ (c: State[BaseEnv, Unit]) =>
+  def TimedM[A](category: Tags.Category)(callee: Tags.Callee)(f: Monitored[BaseEnv, BaseTags, Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
+    Monitored(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, Unit]) =>
       Timer(c.span, c.path).timed(f.eval(c))
     }
 
