@@ -1,8 +1,8 @@
 package commons
 
-import com.mfglabs.monitoring.{ Monitored, Influx, Logback }
+import com.mfglabs.monitoring.{ Monitored, Influx, Logback, Call }
 import Monitored._
-import Monitored.Call._
+import Call._
 
 object Monitoring {
 	import scala.concurrent.Future

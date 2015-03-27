@@ -8,7 +8,7 @@ import scala.concurrent.Future
 import scala.language.postfixOps
 
 import akka.actor.{ Actor, Props, ActorSystem }
-import Monitored.Call._
+import Call._
 
 case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, system: ActorSystem)(implicit ex: ExecutionContext) {
 

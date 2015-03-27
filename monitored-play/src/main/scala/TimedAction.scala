@@ -2,7 +2,7 @@ package com.mfglabs.monitoring
 
 import play.api.mvc._
 import scala.concurrent.Future
-import Monitored.Call._
+import Call._
 
 case class TimedAction(influx: Influx) {
   def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =

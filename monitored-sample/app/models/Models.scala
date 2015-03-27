@@ -11,9 +11,8 @@ import anorm.SqlParser._
 import scala.language.postfixOps
 import scala.concurrent.Future
 
-import com.mfglabs.monitoring.Monitored
-import Monitored._
-import Monitored.Call._
+import com.mfglabs.monitoring.{ Monitored, Call }
+import Monitored._, Call._
 import Tags.Callee
 import commons.Monitoring._
 

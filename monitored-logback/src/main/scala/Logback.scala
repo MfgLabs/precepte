@@ -1,7 +1,7 @@
 package com.mfglabs.monitoring
 
 import scala.language.higherKinds
-import Monitored.Call._
+import Call._
 
 case class Logback(env: Tags.Environment) {
 
