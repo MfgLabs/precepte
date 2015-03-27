@@ -15,11 +15,12 @@ class ModelSpec extends PlaySpecification {
   def dateIs(date: java.util.Date, str: String) = new java.text.SimpleDateFormat("yyyy-MM-dd").format(date) == str
 
   // --
-
-  import com.mfglabs.monitoring.Monitored.Call
+  import com.mfglabs.monitoring.Call
   import scala.concurrent.ExecutionContext.Implicits.global
   import scalaz.std.scalaFuture._
-  def nostate = Call.State(Call.Span.gen, Vector.empty, ())
+
+  val env = Call.Env(Call.Tags.Host("localhost"), Call.Tags.Environment.Dev)
+  def nostate = Call.State(Call.Span.gen, env, Vector.empty, ())
 
   "Computer model" should {
 

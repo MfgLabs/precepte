@@ -5,13 +5,14 @@ case class Call(id: Call.Id, tags: Call.Tags) {
 }
 
 object Call {
- case class Span(value: String) extends AnyVal
+	case class Span(value: String) extends AnyVal
   case class Id(value: String) extends AnyVal
+
   case class Tags(values: Tags.Tag*) {
     override def toString = s"Tags(${values.toList})"
-
     def ++(ts: Tags) = Tags((values ++ ts.values):_*)
   }
+
   object Tags {
     val empty = Tags()
     abstract class Tag(val name: String, val value: String)
@@ -26,6 +27,7 @@ object Call {
 
     abstract class Environment(value: String) extends Tag("environment", value)
     object Environment {
+      object Test extends Environment("test")
       object Dev extends Environment("dev")
       object Staging extends Environment("staging")
       object Production extends Environment("production")
@@ -53,7 +55,8 @@ object Call {
       this.copy(children = children ++ cs)
   }
 
-  case class State[C](span: Call.Span, path: Path, value: C)
+  case class Env(host: Tags.Host, environment: Tags.Environment, others: Tags = Tags.empty)
+  case class State[C](span: Call.Span, env: Env, path: Path, value: C)
 
   object Id {
     def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)

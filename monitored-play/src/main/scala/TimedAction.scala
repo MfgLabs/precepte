@@ -4,7 +4,7 @@ import play.api.mvc._
 import scala.concurrent.Future
 import Call._
 
-case class TimedAction(influx: Influx) {
+case class TimedAction(influx: Influx, env: Env) {
   def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
     Action.async(bodyParser) { request =>
       import play.api.Routes.{ ROUTE_ACTION_METHOD, ROUTE_CONTROLLER }
@@ -15,7 +15,7 @@ case class TimedAction(influx: Influx) {
         a <- ts.get(ROUTE_ACTION_METHOD)
       } yield s"$c.$a").getOrElse(request.toString)
 
-      val initialState = State(Span.gen, Vector.empty, ())
+      val initialState = State(Span.gen, env, Vector.empty, ())
       influx.TimedM(Tags.Category.Api)(Tags.Callee(name)) {
         block(request)
       }.eval(initialState)

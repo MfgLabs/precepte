@@ -15,16 +15,14 @@ object Monitoring {
 
 	import play.api.libs.json._
 
-	val env = Tags.Environment.Dev
-	val host = Tags.Host(java.net.InetAddress.getLocalHost().getHostName())
+	val env = Env(Tags.Host(java.net.InetAddress.getLocalHost().getHostName()), Tags.Environment.Dev)
 	lazy val influx = Influx(
 		new java.net.URL("http://localhost:8086/db/monitored-sample/series?u=root&p=root"),
 		env,
-		host,
 		play.api.libs.concurrent.Akka.system)
 
 	lazy val logback = Logback(env)
-	val TimedAction = com.mfglabs.monitoring.TimedAction(influx)
+	val TimedAction = com.mfglabs.monitoring.TimedAction(influx, env)
 
 	case class MonitoringContext(span: Span, path: Path) {
 		val logger = logback.Logger(span, path)

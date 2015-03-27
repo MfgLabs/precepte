@@ -10,7 +10,7 @@ import scala.language.postfixOps
 import akka.actor.{ Actor, Props, ActorSystem }
 import Call._
 
-case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, system: ActorSystem)(implicit ex: ExecutionContext) {
+case class Influx(influxdbURL: URL, env: Env, system: ActorSystem)(implicit ex: ExecutionContext) {
 
   private val builder = new com.ning.http.client.AsyncHttpClientConfig.Builder()
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
@@ -39,7 +39,7 @@ case class Influx(influxdbURL: URL, env: Tags.Environment, hostname: Tags.Host, 
           val category =
             path.last.tags.values.collect { case Tags.Category(c) => c }.head
 
-          s"""["${hostname.value}", "${env.value}", "$category", "${span.value}", "$p", "$callees", $time, ${duration.toNanos}]"""
+          s"""["${env.host.value}", "${env.environment.value}", "$category", "${span.value}", "$p", "$callees", $time, ${duration.toNanos}]"""
         }.mkString(",")
 
       s"""[{"name": "response_times", "columns": ["host", "environment", "category", "span", "path", "callees", "time", "duration"], "points": [$points] }]"""

@@ -28,6 +28,8 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
+  val env = Call.Env(Call.Tags.Host("localhost"), Call.Tags.Environment.Dev)
+
   def Logged[F[_]: scalaz.Functor, A](tags: Call.Tags)(f: Log => F[A]): Monitored[(Call.Span, Call.Path) => Log, F, A] =
     Monitored(tags) { (state: Call.State[(Call.Span, Call.Path) => Log]) =>
       f(state.value(state.span, state.path))
@@ -99,7 +101,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     def go(g: Call.GraphNode[C], span: Call.Span, path: Call.Path, states: Seq[Call.State[C]]): Seq[Call.State[C]] = {
       val Call.GraphNode(id, value, tags, cs) = g
       val p = path :+ Call(id, tags)
-      val st = Call.State[C](span, p, value)
+      val st = Call.State[C](span, env, p, value)
       val cst = cs.map{ c =>
         go(c, span, p, Seq.empty)
       }.flatten
@@ -112,7 +114,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   }
 
 
-  def nostate = Call.State(Call.Span.gen, Vector.empty, ())
+  def nostate = Call.State(Call.Span.gen, env, Vector.empty, ())
   import Call.Tags
   import Tags.Callee
 
@@ -492,7 +494,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
     def logger(span: Call.Span, path: Call.Path): Log =
       Logger(span, path)
 
-    val initialState = Call.State(Call.Span.gen, Vector.empty, logger _)
+    val initialState = Call.State(Call.Span.gen, env, Vector.empty, logger _)
     res.eval(initialState).futureValue should ===(
       (Some((1, Card("card 1"))),
         List((1, Card("foo")), (1, Card("bar"))),
