@@ -124,9 +124,12 @@ object Monitored {
   }
 
   implicit def monitoredInstances[E <: Env, T <: Tags, C, F[_]: Bind] =
-    new Bind[({ type λ[α] = Monitored[E, T, C, F, α] })#λ] {
-      def map[A, B](m: Monitored[E, T, C, F, A])(f: A => B): Monitored[E,T,C,F,B] = m.map(f)
-      def bind[A, B](m: Monitored[E, T, C, F, A])(f: A => Monitored[E, T, C, F, B]): Monitored[E, T, C, F, B] =
+    new Monad[({ type λ[α] = Monitored[E, T, C, F, α] })#λ] {
+      override def point[A](a: => A): Monitored[E,T,C,F,A] =
+        Return(a)
+      override def map[A, B](m: Monitored[E, T, C, F, A])(f: A => B): Monitored[E,T,C,F,B] =
+        m.map(f)
+      override def bind[A, B](m: Monitored[E, T, C, F, A])(f: A => Monitored[E, T, C, F, B]): Monitored[E, T, C, F, B] =
         m.flatMap(f)
     }
 }

@@ -32,9 +32,9 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
 
 object Models {
   import commons.Monitoring
-  def Timed[A](callee: Tags.Callee)(f: State[BaseEnv, Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[BaseEnv, Unit, Future, A] =
+  type ST = State[BaseEnv, BaseTags, Unit]
+  def Timed[A](callee: Tags.Callee)(f: ST => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
     Monitoring.influx.Timed(Tags.Category.Database)(callee)(f)(fu)
-  type ST = State[BaseEnv, Unit]
 }
 
 import Models.ST
@@ -60,7 +60,7 @@ object Computer {
    * Parse a (Computer,Company) from a ResultSet
    */
   val withCompany = Computer.simple ~ (Company.simple ?) map {
-    case computer~company => (computer,company)
+    case computer ~ company => (computer,company)
   }
 
   // -- Queries

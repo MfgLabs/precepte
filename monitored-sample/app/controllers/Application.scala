@@ -48,7 +48,7 @@ object Application extends Controller {
   /**
    * Handle default path requests, redirect to computers list
    */
-  def index = TimedAction { _ =>
+  def index = TimedAction.action { _ =>
     Future.successful(Home)
   }
 

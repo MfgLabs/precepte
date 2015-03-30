@@ -20,7 +20,8 @@ class ModelSpec extends PlaySpecification {
   import scalaz.std.scalaFuture._
 
   val env = Call.BaseEnv(Call.Tags.Host("localhost"), Call.Tags.Environment.Dev)
-  def nostate = Call.State(Call.Span.gen, env, Vector.empty, ())
+  private def tags(n: String) = Call.BaseTags(Call.Tags.Callee(n), Call.Tags.Category.Database)
+  def nostate = Call.State[Call.BaseEnv, Call.BaseTags, Unit](Call.Span.gen, env, Vector.empty, ())
 
   "Computer model" should {
 
