@@ -20,8 +20,10 @@ object Macros {
   def paramMacro[T](c: Context)(t: c.Tree) = {
   	import c.universe._
   	val name = t.symbol
-  	if(t.symbol.asTerm.isVal || t.symbol.asTerm.isVar)
+  	if(t.symbol != null && t.symbol.isTerm && (t.symbol.asTerm.isVal || t.symbol.asTerm.isVar))
   		q"""(${name.name.encodedName.toString} -> $name.toString)"""
+  	else if(t.symbol == null)
+  		throw new scala.reflect.internal.FatalError(s"$t is not a val or a var")
   	else
   		throw new scala.reflect.internal.FatalError(s"$name is not a val or a var")
   }
