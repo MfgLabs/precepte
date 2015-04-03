@@ -48,10 +48,8 @@ object Application extends Controller {
   /**
    * Handle default path requests, redirect to computers list
    */
-  def index = TimedAction{ _ =>
-    Monitored(Tags.empty){ _ =>
-      Future.successful(Home)
-    }
+  def index = TimedAction.action { _ =>
+    Future.successful(Home)
   }
 
   /**

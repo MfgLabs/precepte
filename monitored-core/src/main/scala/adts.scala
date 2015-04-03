@@ -1,20 +1,16 @@
 package com.mfglabs.monitoring
 
-case class Call(id: Call.Id, tags: Call.Tags) {
-  def toJson = ???
-}
+case class Call[T <: Call.Tags](id: Call.Id, tags: T)
 
 object Call {
 	case class Span(value: String) extends AnyVal
   case class Id(value: String) extends AnyVal
 
-  case class Tags(values: Tags.Tag*) {
-    override def toString = s"Tags(${values.toList})"
-    def ++(ts: Tags) = Tags((values ++ ts.values):_*)
-  }
+  trait Tags
+  object NoTags extends Tags
+  case class BaseTags(callee: Tags.Callee, category: Tags.Category) extends Tags
 
   object Tags {
-    val empty = Tags()
     abstract class Tag(val name: String, val value: String)
     case class Callee(override val value: String) extends Tag("callee", value)
 
@@ -36,27 +32,28 @@ object Call {
     case class Host(override val value: String) extends Tag("host", value)
   }
 
-  type Path = Vector[Call]
+  type Path[T <: Tags] = Vector[Call[T]]
 
-  sealed trait Graph[C, G <: Graph[C, G]] {
-    val children: Vector[GraphNode[C]]
-    def addChildren(cs: Vector[GraphNode[C]]): G
-    def addChild(c: GraphNode[C]): G =
+  sealed trait Graph[T <: Tags, C, G <: Graph[T, C, G]] {
+    val children: Vector[GraphNode[T, C]]
+    def addChildren(cs: Vector[GraphNode[T, C]]): G
+    def addChild(c: GraphNode[T, C]): G =
       addChildren(Vector(c))
   }
 
-  case class GraphNode[C](id: Call.Id, value: C, tags: Tags, children: Vector[GraphNode[C]]) extends Graph[C, GraphNode[C]] {
-    def addChildren(cs: Vector[GraphNode[C]]): GraphNode[C] =
+  case class GraphNode[T <: Tags, C](id: Call.Id, value: C, tags: T, children: Vector[GraphNode[T, C]]) extends Graph[T, C, GraphNode[T, C]] {
+    def addChildren(cs: Vector[GraphNode[T, C]]): GraphNode[T, C] =
       this.copy(children = children ++ cs)
   }
 
-  case class Root[C](span: Call.Span, children: Vector[GraphNode[C]]) extends Graph[C, Root[C]] {
-    def addChildren(cs: Vector[GraphNode[C]]): Root[C] =
+  case class Root[T <: Tags, C](span: Call.Span, children: Vector[GraphNode[T, C]]) extends Graph[T, C, Root[T, C]] {
+    def addChildren(cs: Vector[GraphNode[T, C]]): Root[T, C] =
       this.copy(children = children ++ cs)
   }
 
-  case class Env(host: Tags.Host, environment: Tags.Environment, others: Tags = Tags.empty)
-  case class State[C](span: Call.Span, env: Env, path: Path, value: C)
+  trait Env
+  case class BaseEnv(host: Tags.Host, environment: Tags.Environment) extends Env
+  case class State[E <: Env, T <: Tags, C](span: Call.Span, env: E, path: Path[T], value: C)
 
   object Id {
     def gen = Id(scala.util.Random.alphanumeric.take(7).mkString)
