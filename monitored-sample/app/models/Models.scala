@@ -14,6 +14,7 @@ import scala.concurrent.Future
 import com.mfglabs.monitoring.{ Monitored, Call }
 import Monitored._, Call._
 import Tags.Callee
+import com.mfglabs.monitoring.macros.Macros.callee
 import commons.Monitoring._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -33,7 +34,8 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
 object Models {
   import commons.Monitoring
   type ST = State[BaseEnv, BaseTags, Unit]
-  def Timed[A](callee: Tags.Callee)(f: ST => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
+
+  def Timed[A](f: ST => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
     Monitoring.influx.Timed(Tags.Category.Database)(callee)(f)(fu)
 }
 
@@ -69,7 +71,7 @@ object Computer {
    * Retrieve a computer from the id.
    */
   def findById(id: Long) =
-    Models.Timed(Callee("Computer.findById")) { (st: ST) =>
+    Models.Timed { (st: ST) =>
       val ctx = MonitoringContext(st)
       import ctx._
       logger.debug(s"Finding computer with id", "id" -> id.toString)
@@ -89,7 +91,7 @@ object Computer {
    * @param filter Filter applied on the name column
    */
   def list(page: Int = 0, pageSize: Int = 10, orderBy: Int = 1, filter: String = "%") =
-    Models.Timed(Callee("Computer.list")) { (st: ST) =>
+    Models.Timed { (st: ST) =>
       val ctx = MonitoringContext(st)
       import ctx._
       logger.debug(s"Listing all computers")
@@ -135,7 +137,7 @@ object Computer {
    * @param id The computer id
    * @param computer The computer values.
    */
-  def update(id: Long, computer: Computer) = Models.Timed(Callee("Computer.update")) { (st: ST) =>
+  def update(id: Long, computer: Computer) = Models.Timed { (st: ST) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"updating computer with id", "id" -> id.toString, "computer" -> computer.toString)
@@ -163,7 +165,7 @@ object Computer {
    *
    * @param computer The computer values.
    */
-  def insert(computer: Computer) = Models.Timed(Callee("Computer.insert")) { (st: ST) =>
+  def insert(computer: Computer) = Models.Timed { (st: ST) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"inserting computer", "computer" -> computer.toString)
@@ -191,7 +193,7 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long) = Models.Timed(Callee("Computer.delete")) { (st: ST) =>
+  def delete(id: Long) = Models.Timed { (st: ST) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"deleting computer", ("id" -> id.toString))
@@ -219,7 +221,7 @@ object Company {
   /**
    * Construct the Map[String,String] needed to fill a select options set.
    */
-  def options = Models.Timed(Callee("Company.options")) { (st: ST) =>
+  def options = Models.Timed { (st: ST) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.debug("Listing options")

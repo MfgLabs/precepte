@@ -37,6 +37,7 @@ lazy val core =
 			  else
 			    Some("releases" at s3Repo + "/releases")
 			},
+			libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 			libraryDependencies ++= Seq(
 			  "org.scalaz" %% "scalaz-core" % "7.1.0",
 			  "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test"))
