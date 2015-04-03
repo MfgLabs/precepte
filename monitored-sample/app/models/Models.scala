@@ -14,7 +14,8 @@ import scala.concurrent.Future
 import com.mfglabs.monitoring.{ Monitored, Call }
 import Monitored._, Call._
 import Tags.Callee
-import com.mfglabs.monitoring.macros.Macros.callee
+import com.mfglabs.monitoring.macros.Macros
+import Macros.callee
 import commons.Monitoring._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -94,7 +95,7 @@ object Computer {
     Models.Timed { (st: ST) =>
       val ctx = MonitoringContext(st)
       import ctx._
-      logger.debug(s"Listing all computers")
+      logger.debug(s"Listing all computers", Macros.params(page, pageSize, orderBy, filter):_*)
       Future.successful {
         val offest = pageSize * page
 
@@ -193,7 +194,7 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long) = Models.Timed { (st: ST) =>
+  def delete(id: Long): Monitored[Call.BaseEnv, Call.BaseTags, Unit, Future, Int] = Models.Timed { (st: ST) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"deleting computer", ("id" -> id.toString))

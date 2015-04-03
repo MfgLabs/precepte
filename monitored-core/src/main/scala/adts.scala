@@ -13,7 +13,6 @@ object Call {
   object Tags {
     abstract class Tag(val name: String, val value: String)
     case class Callee(override val value: String) extends Tag("callee", value)
-
     abstract class Category(value: String) extends Tag("category", value)
     object Category {
       def unapply(c: Category) = Some(c.value)
