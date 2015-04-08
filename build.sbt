@@ -46,6 +46,11 @@ lazy val sample =
 	project.in(file("monitored-sample"))
 		.enablePlugins(PlayScala)
 		.settings(commonSettings:_*)
+		.settings(buildInfoSettings: _*)
+		.settings(
+			sourceGenerators in Compile <+= buildInfo,
+			buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+			buildInfoPackage := organization.value)
 		.settings(
 			name := "monitored-sample",
 			libraryDependencies ++= Seq(

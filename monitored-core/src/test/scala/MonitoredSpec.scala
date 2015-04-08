@@ -29,7 +29,7 @@ class MonitoredSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  val env = Call.BaseEnv(Call.Tags.Host("localhost"), Call.Tags.Environment.Test)
+  val env = Call.BaseEnv(Call.Tags.Host("localhost"), Call.Tags.Environment.Test, Call.Tags.Version("1.0"))
 
   def Logged[F[_]: scalaz.Functor, A](tags: Call.BaseTags)(f: Log => F[A]): Monitored[Call.BaseEnv, Call.BaseTags, (Call.Span, Call.Path[Call.BaseTags]) => Log, F, A] =
     Monitored(tags) { (state: Call.State[Call.BaseEnv, Call.BaseTags, (Call.Span, Call.Path[Call.BaseTags]) => Log]) =>

@@ -15,7 +15,7 @@ object Monitoring {
 
 	import play.api.libs.json._
 
-	val env = BaseEnv(Tags.Host(java.net.InetAddress.getLocalHost().getHostName()), Tags.Environment.Dev)
+	val env = BaseEnv(Tags.Host(java.net.InetAddress.getLocalHost().getHostName()), Tags.Environment.Dev, Tags.Version(com.mfglabs.BuildInfo.version))
 	lazy val influx = Influx(
 		new java.net.URL("http://localhost:8086/db/monitored-sample/series?u=root&p=root"),
 		env,

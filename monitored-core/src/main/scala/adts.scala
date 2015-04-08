@@ -29,6 +29,7 @@ object Call {
     }
 
     case class Host(override val value: String) extends Tag("host", value)
+    case class Version(override val value: String) extends Tag("version", value)
   }
 
   type Path[T <: Tags] = Vector[Call[T]]
@@ -51,7 +52,7 @@ object Call {
   }
 
   trait Env
-  case class BaseEnv(host: Tags.Host, environment: Tags.Environment) extends Env
+  case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
   case class State[E <: Env, T <: Tags, C](span: Call.Span, env: E, path: Path[T], value: C)
 
   object Id {
