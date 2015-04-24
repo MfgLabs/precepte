@@ -14,7 +14,7 @@ object Macros {
 
   def calleeMacro(c: Context) = {
   	import c.universe._
-  	q"""Callee(${c.internal.enclosingOwner.fullName})"""
+  	q"""com.mfglabs.monitoring.Call.Tags.Callee(${c.internal.enclosingOwner.fullName})"""
   }
 
   def paramMacro[T](c: Context)(t: c.Tree) = {
