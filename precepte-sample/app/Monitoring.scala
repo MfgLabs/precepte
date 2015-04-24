@@ -1,7 +1,7 @@
 package commons
 
-import com.mfglabs.monitoring.{ Monitored, Influx, Logback, Call }
-import Monitored._
+import com.mfglabs.monitoring.{ Precepte, Influx, Logback, Call }
+import Precepte._
 import Call._
 
 object Monitoring {
@@ -17,7 +17,7 @@ object Monitoring {
 
 	val env = BaseEnv(Tags.Host(java.net.InetAddress.getLocalHost().getHostName()), Tags.Environment.Dev, Tags.Version(com.mfglabs.BuildInfo.version))
 	lazy val influx = Influx(
-		new java.net.URL("http://localhost:8086/db/monitored-sample/series?u=root&p=root"),
+		new java.net.URL("http://localhost:8086/db/precepte-sample/series?u=root&p=root"),
 		env,
 		play.api.libs.concurrent.Akka.system)
 

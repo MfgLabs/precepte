@@ -70,13 +70,13 @@ case class Influx(influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit 
     }
   }
 
-  def Timed[A](category: Tags.Category)(callee: Tags.Callee)(f: State[BaseEnv, BaseTags, Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
-    Monitored(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, Unit]) =>
+  def Timed[A](category: Tags.Category)(callee: Tags.Callee)(f: State[BaseEnv, BaseTags, Unit] => Future[A])(implicit fu: scalaz.Functor[Future]): Precepte[BaseEnv, BaseTags, Unit, Future, A] =
+    Precepte(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, Unit]) =>
       Timer(c.span, c.path).timed(f(c))
     }
 
-  def TimedM[A](category: Tags.Category)(callee: Tags.Callee)(f: Monitored[BaseEnv, BaseTags, Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
-    Monitored(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, Unit]) =>
+  def TimedM[A](category: Tags.Category)(callee: Tags.Callee)(f: Precepte[BaseEnv, BaseTags, Unit, Future, A])(implicit mo: scalaz.Monad[Future]): Precepte[BaseEnv, BaseTags, Unit, Future, A] =
+    Precepte(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, Unit]) =>
       Timer(c.span, c.path).timed(f.eval(c))
     }
 

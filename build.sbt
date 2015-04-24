@@ -25,11 +25,11 @@ lazy val strictScalac =
 		"-Ywarn-unused-import")
 
 lazy val core =
-	project.in(file("monitored-core"))
+	project.in(file("precepte-core"))
 		.settings(commonSettings:_*)
 		.settings(strictScalac)
 		.settings(
-			name := "monitored-core",
+			name := "precepte-core",
 			publishTo := {
 			  val s3Repo = "s3://mfg-mvn-repo"
 			  if (isSnapshot.value)
@@ -43,7 +43,7 @@ lazy val core =
 			  "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test"))
 
 lazy val sample =
-	project.in(file("monitored-sample"))
+	project.in(file("precepte-sample"))
 		.enablePlugins(PlayScala)
 		.settings(commonSettings:_*)
 		.settings(buildInfoSettings: _*)
@@ -52,7 +52,7 @@ lazy val sample =
 			buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
 			buildInfoPackage := organization.value)
 		.settings(
-			name := "monitored-sample",
+			name := "precepte-sample",
 			libraryDependencies ++= Seq(
 				jdbc,
 				anorm,
@@ -61,36 +61,36 @@ lazy val sample =
 		.dependsOn(core, influx, logback, play)
 
 lazy val influx =
-	project.in(file("monitored-influx"))
+	project.in(file("precepte-influx"))
 		.settings(commonSettings:_*)
 		.settings(strictScalac)
 		.settings(
-			name := "monitored-influx",
+			name := "precepte-influx",
 			libraryDependencies ++= Seq(ws))
 		.dependsOn(core)
 
 lazy val logback =
-	project.in(file("monitored-logback"))
+	project.in(file("precepte-logback"))
 		.settings(commonSettings:_*)
 		.settings(strictScalac)
 		.settings(
-			name := "monitored-logback",
+			name := "precepte-logback",
 			libraryDependencies ++= Seq(
 				"ch.qos.logback" % "logback-classic" % "1.1.2",
 				"net.logstash.logback" % "logstash-logback-encoder" % "4.2"))
 		.dependsOn(core)
 
 lazy val play =
-	project.in(file("monitored-play"))
+	project.in(file("precepte-play"))
 		.settings(commonSettings:_*)
 		.settings(strictScalac)
 		.settings(
 			libraryDependencies += "com.typesafe.play" %% "play" % "2.3.7"
 			,
-			name := "monitored-play")
+			name := "precepte-play")
 		.dependsOn(core, influx)
 
 lazy val root = project.in(file("."))
 	.settings(commonSettings:_*)
-	.settings(name := "monitored-root")
+	.settings(name := "precepte-root")
 	.aggregate(core, sample)

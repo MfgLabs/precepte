@@ -5,7 +5,7 @@ import scala.concurrent.Future
 import Call._
 
 case class TimedAction(influx: Influx, env: BaseEnv) {
-  private def tagged[A](bodyParser: BodyParser[A])(f: (Tags.Category, Tags.Callee, Request[A]) => Monitored[BaseEnv, BaseTags, Unit, Future, Result])(implicit fu: scalaz.Monad[Future]) =
+  private def tagged[A](bodyParser: BodyParser[A])(f: (Tags.Category, Tags.Callee, Request[A]) => Precepte[BaseEnv, BaseTags, Unit, Future, Result])(implicit fu: scalaz.Monad[Future]) =
     Action.async(bodyParser) { request =>
       import play.api.Routes.{ ROUTE_ACTION_METHOD, ROUTE_CONTROLLER }
       val ts = request.tags
@@ -19,10 +19,10 @@ case class TimedAction(influx: Influx, env: BaseEnv) {
       f(Tags.Category.Api, Tags.Callee(name), request).eval(initialState)
     }
 
-  def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Monitored[BaseEnv, BaseTags, Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
+  def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Precepte[BaseEnv, BaseTags, Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
     tagged(bodyParser)((c, t, r) => influx.TimedM(c)(t)(block(r)))
 
-  def apply(block: Request[AnyContent] => Monitored[BaseEnv, BaseTags, Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
+  def apply(block: Request[AnyContent] => Precepte[BaseEnv, BaseTags, Unit, Future, Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
     apply(BodyParsers.parse.anyContent)(block)
 
   def action[A](bodyParser: BodyParser[A])(block: Request[A] => Future[Result])(implicit fu: scalaz.Monad[Future]): Action[A] =

@@ -11,8 +11,8 @@ import anorm.SqlParser._
 import scala.language.postfixOps
 import scala.concurrent.Future
 
-import com.mfglabs.monitoring.{ Monitored, Call }
-import Monitored._, Call._
+import com.mfglabs.monitoring.{ Precepte, Call }
+import Precepte._, Call._
 import Tags.Callee
 import com.mfglabs.monitoring.macros.Macros
 import Macros.callee
@@ -36,7 +36,7 @@ object Models {
   import commons.Monitoring
   type ST = State[BaseEnv, BaseTags, Unit]
 
-  def Timed[A](f: ST => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): Monitored[BaseEnv, BaseTags, Unit, Future, A] =
+  def Timed[A](f: ST => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): Precepte[BaseEnv, BaseTags, Unit, Future, A] =
     Monitoring.influx.Timed(Tags.Category.Database)(callee)(f)(fu)
 }
 
@@ -194,7 +194,7 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long): Monitored[Call.BaseEnv, Call.BaseTags, Unit, Future, Int] = Models.Timed { (st: ST) =>
+  def delete(id: Long): Precepte[Call.BaseEnv, Call.BaseTags, Unit, Future, Int] = Models.Timed { (st: ST) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"deleting computer", Macros.param(id))

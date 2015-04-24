@@ -5,16 +5,16 @@ import scalaz.{ Bind, Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT }
 import scalaz.syntax.monad._
 import Call.{ Env, Tags }
 
-sealed trait Monitored[E <: Env, T <: Tags, C, F[_], A] {
+sealed trait Precepte[E <: Env, T <: Tags, C, F[_], A] {
   self =>
 
-  final def flatMap[B](f: A => Monitored[E, T, C, F, B]): Monitored[E, T, C, F, B] =
+  final def flatMap[B](f: A => Precepte[E, T, C, F, B]): Precepte[E, T, C, F, B] =
     Flatmap[E, T, C, F, A, B](self, f)
 
-  final def map[B](f: A => B): Monitored[E, T, C, F, B] =
+  final def map[B](f: A => B): Precepte[E, T, C, F, B] =
     flatMap(a => Return(f(a)))
 
-  def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Monitored[E, T, C, F, AP[A]] =
+  def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[E, T, C, F, AP[A]] =
     this.map(a => ap.point(a))
 
   final def eval(state: Call.State[E, T, C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[A] = {
@@ -33,7 +33,7 @@ sealed trait Monitored[E <: Env, T <: Tags, C, F[_], A] {
   }
 
   final def run(state: Call.State[E, T, C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[(Call.Root[T, C], A)] = {
-    def go[G <: Call.Graph[T, C, G] ,B](m: Monitored[E, T, C, F, B], state: Call.State[E, T, C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
+    def go[G <: Call.Graph[T, C, G] ,B](m: Precepte[E, T, C, F, B], state: Call.State[E, T, C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
       m match {
         case Return(a) =>
           (ids, (graph, a)).point[F]
@@ -62,31 +62,31 @@ sealed trait Monitored[E <: Env, T <: Tags, C, F[_], A] {
 
 }
 
-private case class Return[E <: Env, T <: Tags, C, F[_], A](a: A) extends Monitored[E, T, C, F, A]
-private case class Step[E <: Env, T <: Tags, C, F[_], A](st: IndexedStateT[F, Call.State[E, T, C], C, Monitored[E, T, C, F, A]], tags: T) extends Monitored[E, T, C, F, A] {
-  def run(state: Call.State[E, T, C]): F[(C, Monitored[E, T, C, F, A])] =
+private case class Return[E <: Env, T <: Tags, C, F[_], A](a: A) extends Precepte[E, T, C, F, A]
+private case class Step[E <: Env, T <: Tags, C, F[_], A](st: IndexedStateT[F, Call.State[E, T, C], C, Precepte[E, T, C, F, A]], tags: T) extends Precepte[E, T, C, F, A] {
+  def run(state: Call.State[E, T, C]): F[(C, Precepte[E, T, C, F, A])] =
     st.run(state)
 }
 
-private case class Flatmap[E <: Env, T <: Tags, C, F[_], I, A](sub: Monitored[E, T, C, F, I], next: I => Monitored[E, T, C, F, A]) extends Monitored[E, T, C, F, A]
+private case class Flatmap[E <: Env, T <: Tags, C, F[_], I, A](sub: Precepte[E, T, C, F, I], next: I => Precepte[E, T, C, F, A]) extends Precepte[E, T, C, F, A]
 
-object Monitored {
+object Precepte {
 
-  trait MonitoredBuilder[T <: Tags] {
+  trait PrecepteBuilder[T <: Tags] {
     val tags: T
     import scalaz.Id._
 
-    def apply0[E <: Env, C, A](λ: Call.State[E, T, C] => A): Monitored[E, T, C, Id, A] =
+    def apply0[E <: Env, C, A](λ: Call.State[E, T, C] => A): Precepte[E, T, C, Id, A] =
       apply[E, C, Id, A](λ)
 
-    def apply[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, T, C] => F[A]): Monitored[E, T, C, F, A] =
+    def apply[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, T, C] => F[A]): Precepte[E, T, C, F, A] =
       Step[E, T, C, F, A](
         IndexedStateT { (st: Call.State[E, T, C]) =>
           for (a <- λ(st))
           yield st.value -> Return(a)
         }, tags)
 
-    def applyS[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, T, C] => F[(C, A)]): Monitored[E, T, C, F, A] =
+    def applyS[E <: Env, C, F[_]: Functor, A](λ: Call.State[E, T, C] => F[(C, A)]): Precepte[E, T, C, F, A] =
       Step[E, T, C, F, A](
         IndexedStateT { (st: Call.State[E, T, C]) =>
           for (ca <- λ(st))
@@ -96,14 +96,14 @@ object Monitored {
           }
         }, tags)
 
-    def apply[E <: Env, C, F[_]: Applicative, A](m: Monitored[E, T, C, F, A]): Monitored[E, T, C, F, A] =
-      Step(IndexedStateT[F, Call.State[E, T, C], C, Monitored[E, T, C, F, A]]{ st =>
+    def apply[E <: Env, C, F[_]: Applicative, A](m: Precepte[E, T, C, F, A]): Precepte[E, T, C, F, A] =
+      Step(IndexedStateT[F, Call.State[E, T, C], C, Precepte[E, T, C, F, A]]{ st =>
         (st.value -> m).point[F]
       }, tags)
   }
 
   def apply[T <: Tags](_tags: T) =
-    new MonitoredBuilder[T] {
+    new PrecepteBuilder[T] {
       val tags = _tags
     }
 
@@ -113,23 +113,23 @@ object Monitored {
   implicit def fKindEv[F0[_]] = new *->*[F0] {}
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 
-  def trans[E <: Env, T <: Tags, C, F[_], G[_]: *->*, A](m: Monitored[E, T, C, F, G[A]])(implicit hh: HasHoist[G]): hh.T[({ type λ[α] = Monitored[E, T, C, F, α] })#λ, A] = {
-    type λ[α] = Monitored[E, T, C, F, α]
+  def trans[E <: Env, T <: Tags, C, F[_], G[_]: *->*, A](m: Precepte[E, T, C, F, G[A]])(implicit hh: HasHoist[G]): hh.T[({ type λ[α] = Precepte[E, T, C, F, α] })#λ, A] = {
+    type λ[α] = Precepte[E, T, C, F, α]
     hh.lift[λ, A](m)
   }
 
-  def trans[E <: Env, T <: Tags, C, F[_], G[_, _]: *->*->*, A, B](m: Monitored[E, T, C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): hh.T[({ type λ[α] = Monitored[E, T, C, F, α] })#λ, B] = {
+  def trans[E <: Env, T <: Tags, C, F[_], G[_, _]: *->*->*, A, B](m: Precepte[E, T, C, F, G[A, B]])(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): hh.T[({ type λ[α] = Precepte[E, T, C, F, α] })#λ, B] = {
     type λ[α] = G[A, α]
     trans[E, T, C, F, λ, B](m)(new *->*[λ] {}, hh)
   }
 
-  implicit def monitoredInstances[E <: Env, T <: Tags, C, F[_]: Bind] =
-    new Monad[({ type λ[α] = Monitored[E, T, C, F, α] })#λ] {
-      override def point[A](a: => A): Monitored[E,T,C,F,A] =
+  implicit def PrecepteInstances[E <: Env, T <: Tags, C, F[_]: Bind] =
+    new Monad[({ type λ[α] = Precepte[E, T, C, F, α] })#λ] {
+      override def point[A](a: => A): Precepte[E,T,C,F,A] =
         Return(a)
-      override def map[A, B](m: Monitored[E, T, C, F, A])(f: A => B): Monitored[E,T,C,F,B] =
+      override def map[A, B](m: Precepte[E, T, C, F, A])(f: A => B): Precepte[E,T,C,F,B] =
         m.map(f)
-      override def bind[A, B](m: Monitored[E, T, C, F, A])(f: A => Monitored[E, T, C, F, B]): Monitored[E, T, C, F, B] =
+      override def bind[A, B](m: Precepte[E, T, C, F, A])(f: A => Precepte[E, T, C, F, B]): Precepte[E, T, C, F, B] =
         m.flatMap(f)
     }
 }

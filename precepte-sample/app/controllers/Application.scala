@@ -13,8 +13,8 @@ import views._
 import models._
 
 import commons.Monitoring.TimedAction
-import com.mfglabs.monitoring.{ Monitored, Call }
-import Monitored._, Call._
+import com.mfglabs.monitoring.{ Precepte, Call }
+import Precepte._, Call._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scalaz.std.scalaFuture._
