@@ -1,7 +1,7 @@
 package com.mfglabs.monitoring
 
 import scala.language.higherKinds
-import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, IndexedStateT, ~> }
+import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, IndexedStateT }
 import scalaz.syntax.monad._
 import Call.{ Env, Tags }
 
@@ -14,24 +14,19 @@ sealed trait Precepte[E <: Env, T <: Tags, C, F[_], A] {
   final def map[B](f: A => B): Precepte[E, T, C, F, B] =
     flatMap(a => Return(f(a)))
 
-  final def transform[G[_]](f: F ~> G)(implicit F: Functor[F], G: Functor[G]): Precepte[E, T, C, G, A] =
-    this match {
-      case Return(a) => Return(a)
-      case Step(st, tags) =>
-        Step(st.mapK(f).map(_ transform f), tags)
-      case fl@Flatmap(sub, next) =>
-        Flatmap(sub transform f, (i: fl._I) => next(i).transform(f))
-    }
+  // final def transform[G[_]](f: F ~> G)(implicit F: Functor[F], G: Functor[G]): Precepte[E, T, C, G, A] =
+  //   this match {
+  //     case Return(a) => Return(a)
+  //     case Step(st, tags) =>
+  //       Step(st.mapK(f).map(_ transform f), tags)
+  //     case MapK(sub, mapK) =>
+  //       ???
+  //     case fl@Flatmap(sub, next) =>
+  //       Flatmap(sub transform f, (i: fl._I) => next(i).transform(f))
+  //   }
 
-  final def mapK(f: F[(C, Precepte[E, T, C, F, A])] => F[(C, Precepte[E, T, C, F, A])])(implicit F: Functor[F]): Precepte[E, T, C, F, A] =
-    this match {
-      case Return(a) => Return(a)
-      case Step(st, tags) =>
-        val st2 = st.mapK(f(_).map{ case (c, p) => c -> p.mapK(f) })
-        Step(st2, tags)
-      case fl@Flatmap(sub, next) =>
-        Flatmap(sub, (i: fl._I) => next(i).mapK(f))
-    }
+  final def flatMapK[B](f: F[A] => F[Precepte[E, T, C, F, B]]): Precepte[E, T, C, F, B] =
+    FlatmapK(self, f)
 
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[E, T, C, F, AP[A]] =
     this.map(a => ap.point(a))
@@ -44,9 +39,13 @@ sealed trait Precepte[E <: Env, T <: Tags, C, F[_], A] {
         st.run(state0).flatMap { case (c, m) =>
           m.eval(state0.copy(value = c), ids.tail)
         }
+      case FlatmapK(sub, f) =>
+        f(sub.eval(state, ids)).flatMap { s =>
+          s.eval(state, ids.tail) // XXX: not sure
+        }
       case Flatmap(sub, next) =>
-        sub.eval(state).flatMap { case i =>
-          next(i).eval(state)
+        sub.eval(state, ids).flatMap { case i =>
+          next(i).eval(state, ids.tail)
         }
     }
   }
@@ -66,6 +65,8 @@ sealed trait Precepte[E <: Env, T <: Tags, C, F[_], A] {
                 (is, (graph.addChild(g),  a))
               }
           }
+        case FlatmapK(sub, f) =>
+          ???
         case Flatmap(sub, next) =>
           // XXX: kinda hackish. We're only interested in this node children
           val g0 = Call.Root[T, C](Call.Span("dummy"), Vector.empty)
@@ -90,6 +91,8 @@ case class Step[E <: Env, T <: Tags, C, F[_], A](st: IndexedStateT[F, Call.State
 case class Flatmap[E <: Env, T <: Tags, C, F[_], I, A](sub: Precepte[E, T, C, F, I], next: I => Precepte[E, T, C, F, A]) extends Precepte[E, T, C, F, A] {
   type _I = I
 }
+
+case class FlatmapK[E <: Env, T <: Tags, C, F[_], A, B](sub: Precepte[E, T, C, F, A], f: F[A] => F[Precepte[E, T, C, F, B]]) extends Precepte[E, T, C, F, B]
 
 trait LowPriorityInstances {
   implicit def precepteInstances[E <: Env, T <: Tags, C, F[_]: Bind] =

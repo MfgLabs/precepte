@@ -515,4 +515,52 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     println(l)
   }
 
+  it should "implement mapK" in {
+
+    type Pre[A] = Precepte[Call.BaseEnv, Call.BaseTags, Unit, Future, A]
+
+    def f1: Pre[Int] =
+      Precepte(tags("f1")) { (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+        1.point[Future]
+      }
+
+    def f2: Pre[Int] =
+      Precepte(tags("f2")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+        Future { throw new RuntimeException("ooopps f2") }
+      }
+
+    def f3(i: Int): Pre[String] =
+      Precepte(tags("f3")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+        "foo".point[Future]
+      }
+
+    def f4(i: Int): Pre[String] =
+      Precepte(tags("f4")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+        Future { throw new RuntimeException("ooopps f4") }
+      }
+
+    (for {
+      i <- f2
+      r <- f3(i)
+    } yield r)
+      .flatMapK(_.map(_.point[Pre]).recover { case _ => "recovered".point[Pre] })
+      .eval(nostate).futureValue should ===("recovered")
+
+    (for {
+      i <- f1
+      r <- f4(i)
+    } yield r)
+      .flatMapK(_.map(_.point[Pre]).recover { case _ => "recovered".point[Pre] })
+      .eval(nostate).futureValue should ===("recovered")
+
+  }
+
+  // it should "not break type inference" in {
+  //   import Call._
+  //   type Pre[A] = Precepte[BaseEnv, BaseTags, Unit, Future, A]
+  //   val f1 = Option(1).point[Pre]
+  //   val t = trans(f1)
+  //   t |@| t
+  // }
+
 }

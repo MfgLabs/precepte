@@ -16,7 +16,7 @@ object HasHoist {
 
   implicit object optionHasHoist extends HasHoist[Option] {
     type T[F[_], A] = OptionT[F, A]
-    def lift[F[_], A](f: F[Option[A]]): OptionT[F, A] = OptionT.apply(f)
+    def lift[F[_], A](f: F[Option[A]]): OptionT[F, A] = OptionT.optionT[F](f)
   }
 
   implicit object listHasHoist extends HasHoist[List] {
