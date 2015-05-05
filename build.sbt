@@ -13,7 +13,7 @@ lazy val strictScalac =
 		"-Yrangepos",
 		"-Xlint",
 		"-deprecation",
-		"-Xfatal-warnings",
+		// "-Xfatal-warnings",
 		"-feature",
 		"-encoding", "UTF-8",
 		"-unchecked",

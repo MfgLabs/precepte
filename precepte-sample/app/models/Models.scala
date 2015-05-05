@@ -36,7 +36,7 @@ object Models {
   import commons.Monitoring
   type ST = State[BaseEnv, BaseTags, Unit]
 
-  def Timed[A](f: ST => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): Precepte[BaseEnv, BaseTags, Unit, Future, A] =
+  def Timed[A](f: ST => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): Precepte.Aux[BaseEnv, BaseTags, Unit, Future, A] =
     Monitoring.influx.Timed(Tags.Category.Database)(callee)(f)(fu)
 }
 
@@ -194,7 +194,7 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long): Precepte[Call.BaseEnv, Call.BaseTags, Unit, Future, Int] = Models.Timed { (st: ST) =>
+  def delete(id: Long): Precepte.Aux[Call.BaseEnv, Call.BaseTags, Unit, Future, Int] = Models.Timed { (st: ST) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"deleting computer", Macros.param(id))
