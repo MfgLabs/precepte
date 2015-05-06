@@ -5,8 +5,16 @@ import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, Inde
 import scalaz.syntax.monad._
 import Call.{ Env, Tags }
 
-sealed trait Precepte[E <: Env, T <: Tags, C, F[_], A] {
+import Pre.{ Precepte, Unkind }
+
+sealed trait Pre[U <: Unkind] {
   self =>
+
+  type E = U#E
+  type T = U#T
+  type C = U#C
+  type F[X] = U#F[X]
+  type A = U#A
 
   final def flatMap[B](f: A => Precepte[E, T, C, F, B]): Precepte[E, T, C, F, B] =
     Flatmap[E, T, C, F, A, B](self, f)
@@ -82,13 +90,13 @@ sealed trait Precepte[E <: Env, T <: Tags, C, F[_], A] {
 
 }
 
-case class Return[E <: Env, T <: Tags, C, F[_], A](a: A) extends Precepte[E, T, C, F, A]
+case class Return[E <: Env, T <: Tags, C, F[_], A](a: A) extends Pre[Pre.Aux[E, T, C, F, A]]
 case class Step[E <: Env, T <: Tags, C, F[_], A](st: IndexedStateT[F, Call.State[E, T, C], C, Precepte[E, T, C, F, A]], tags: T) extends Precepte[E, T, C, F, A] {
   def run(state: Call.State[E, T, C]): F[(C, Precepte[E, T, C, F, A])] =
     st.run(state)
 }
 
-case class Flatmap[E <: Env, T <: Tags, C, F[_], I, A](sub: Precepte[E, T, C, F, I], next: I => Precepte[E, T, C, F, A]) extends Precepte[E, T, C, F, A] {
+case class Flatmap[E <: Env, T <: Tags, C, F[_], I, A](sub: Precepte[E, T, C, F, I], next: I => Precepte[E, T, C, F, A]) extends Pre[Pre.Aux[E, T, C, F, A]] {
   type _I = I
 }
 
@@ -106,7 +114,26 @@ trait LowPriorityInstances {
     }
 }
 
-object Precepte extends LowPriorityInstances {
+object Pre extends LowPriorityInstances {
+
+  trait Unkind {
+    type E <: Env
+    type T <: Tags
+    type C
+    type F[_]
+    type A
+  }
+
+  type Aux[E0, T0, C0, F0[_], A0] = Unkind {
+    type E = E0
+    type T = T0
+    type C = C0
+    type F[X] = F0[X]
+    type A = A0
+  }
+
+  type Precepte[E, T, C, F[_], A] = Pre[Aux[E, T, C, F, A]]
+
 
   trait PrecepteBuilder[T <: Tags] {
     val tags: T
