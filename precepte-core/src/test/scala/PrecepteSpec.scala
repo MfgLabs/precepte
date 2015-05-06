@@ -555,12 +555,32 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   }
 
-  // it should "not break type inference" in {
-  //   import Call._
-  //   type Pre[A] = Precepte[BaseEnv, BaseTags, Unit, Future, A]
-  //   val f1 = Option(1).point[Pre]
-  //   val t = trans(f1)
-  //   t |@| t
-  // }
+  /*
+  it should "not break type inference" in {
+    import scalaz.syntax.monadPlus._
+    import scalaz.OptionT._
+    import Call._
+
+    // This problem seems to be caused by the classic bug on dependent types on the Scala compiler.
+    // Since the conversion MonadPlusOpsUnapply uses Unapply, and withFilter does not have an explicit return type,
+    // the compiler infer something like res90.M[res90.A] for withFilter return type
+    // From there it's not capable to find instances of typeclasses for res90.M
+    //
+    // see the following REPL session:
+    // scala> type Pre[A] = Precepte[BaseEnv, BaseTags, Unit, Future, A]
+    // scala> scalaz.OptionT.optionTMonadPlus[Pre]
+    // res88: scalaz.MonadPlus[[α]scalaz.OptionT[Pre,α]] = scalaz.OptionTInstances0$$anon$2@6f6029a9
+    // scala> scalaz.Unapply.unapplyMFA[scalaz.MonadPlus, scalaz.OptionT, Pre, Int](res88)
+    // res90: scalaz.Unapply[scalaz.MonadPlus,scalaz.OptionT[Pre,Int]]{type M[X] = scalaz.OptionT[Pre,X]; type A = Int} = scalaz.Unapply_0$$anon$11@7020e2a1
+    // scala> scalaz.syntax.monadPlus.ToMonadPlusOpsUnapply(optionT(f1))(res90)
+    // res93: scalaz.syntax.MonadPlusOps[res90.M,res90.A] = scalaz.syntax.MonadPlusOps@628d6048
+    // scala> res93.withFilter _
+    // res94: (res90.A => Boolean) => res90.M[res90.A] = <function1>
+
+    type Pre[A] = Precepte[BaseEnv, BaseTags, Unit, Future, A]
+    val f1 = Option(1).point[Pre]
+    optionT(f1).withFilter(_ => true).withFilter(_ => true) should ===(f1)
+  }
+  */
 
 }
