@@ -12,12 +12,7 @@ import scala.language.higherKinds
 
 class PrecepteSpec extends FlatSpec with ScalaFutures {
 
-  import Precepte._
   import Call.Tags
-  trait Log {
-    def debug(s: String): Unit
-  }
-
 
   implicit val defaultPatience =
     PatienceConfig(timeout =  Span(300, Seconds), interval = Span(5, Millis))
@@ -25,62 +20,16 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import scalaz.std.scalaFuture._
-  import scalaz.std.option._
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
+  val taggingContext = new TaggingContext[Call.BaseEnv, Call.BaseTags, Unit, Future]
+  import taggingContext._
+  import Precepte._
+
   val env = Call.BaseEnv(Call.Tags.Host("localhost"), Call.Tags.Environment.Test, Call.Tags.Version("1.0"))
 
-  def Logged[F[_]: scalaz.Functor, A](tags: Call.BaseTags)(f: Log => F[A]): Precepte[Call.BaseEnv, Call.BaseTags, (Call.Span, Call.Path[Call.BaseTags]) => Log, F, A] =
-    Precepte(tags) { (state: Call.State[Call.BaseEnv, Call.BaseTags, (Call.Span, Call.Path[Call.BaseTags]) => Log]) =>
-      f(state.value(state.span, state.path))
-    }
-
   private def tags(n: String) = Call.BaseTags(Tags.Callee(n), Tags.Category.Database)
-
-  case class Board(pin: Option[Int])
-  object BoardComp {
-    def get() = Logged(tags("BoardComp.get")) { (logger: Log) =>
-      logger.debug("BoardComp.get")
-      Board(Option(1)).point[Future]
-    }
-  }
-
-  case class Community(name: String)
-  case class Card(name: String)
-
-  object CardComp {
-    def getPin(id: Int) = Logged(tags("BoardComp.getPin")) { (logger: Log) =>
-      logger.debug("CardComp.getPin")
-      Option(1 -> Card("card 1")).point[Future]
-    }
-
-    def countAll() = Logged(tags("CardComp.countAll")) { (logger: Log) =>
-      logger.debug("CardComp.countAll")
-      Set("Edito", "Video").point[Future]
-    }
-
-    def rank() = Logged(tags("CardComp.rank")) { (logger: Log) =>
-      logger.debug("CardComp.rank")
-      List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
-    }
-
-    def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Logged(tags("CardComp.cardsInfos")) { (logger: Log) =>
-      logger.debug("CardComp.cardsInfos")
-      List(
-        Card("foo") -> List(Community("community 1"), Community("community 2")),
-        Card("bar") -> List(Community("community 2"))).point[Future]
-    }
-  }
-
-  import java.net.URL
-  case class Highlight(title: String, cover: URL)
-  object HighlightComp {
-    def get() = Logged(tags("HighlightComp.get")) { (logger: Log) =>
-      logger.debug("HighlightComp.get")
-      Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
-    }
-  }
 
   def p[C, G <: Call.Graph[Call.BaseTags, C, G]](g: G, before: String = ""): Unit = {
     val txt = g match {
@@ -123,18 +72,18 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   "Precepte" should "trivial" in {
 
-    def f1 = Precepte(tags("trivial.f1")).apply0{ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => 1 }
-    def f2(i: Int) = Precepte(tags("trivial.f2")).apply0{(_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => s"foo $i"}
-    def f3(i: Int) = Precepte(tags("trivial.f3")).apply0{(_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => i + 1}
+    def f1 = Precepte(tags("trivial.f1")){ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => 1.point[Future] }
+    def f2(i: Int) = Precepte(tags("trivial.f2")){ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => s"foo $i".point[Future] }
+    def f3(i: Int) = Precepte(tags("trivial.f3")){ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => (i + 1).point[Future] }
 
-    val (graph0, result0) = f1.run(nostate)
+    val (graph0, result0) = f1.run(nostate).futureValue
     result0 should ===(1)
 
     println("-- graph0 --")
     p[Unit, Call.Root[Call.BaseTags, Unit]](graph0)
     println("----")
 
-    val (graphm, _) = Precepte(tags("graphm0"))(Precepte(tags("graphm"))(f1)).run(nostate)
+    val (graphm, _) = Precepte(tags("graphm0"))(Precepte(tags("graphm"))(f1)).run(nostate).futureValue
     println("-- graphm --")
     p[Unit, Call.Root[Call.BaseTags, Unit]](graphm)
     println("----")
@@ -145,14 +94,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         r <- f2(i)
       } yield r
 
-    val (graph, result) = res.run(nostate)
+    val (graph, result) = res.run(nostate).futureValue
     result should ===("foo 1")
 
     println("-- graph --")
     p[Unit, Call.Root[Call.BaseTags, Unit]](graph)
     println("----")
 
-    val (graph1, result1) = Precepte(tags("trivial.anon"))(res).run(nostate)
+    val (graph1, result1) = Precepte(tags("trivial.anon"))(res).run(nostate).futureValue
     println("-- graph1 --")
     p[Unit, Call.Root[Call.BaseTags, Unit]](graph1)
     println("----")
@@ -163,7 +112,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         r <- f2(i)
       } yield r
 
-    val (graph2, result2) = res2.run(nostate, (1 to 30).map(i => Call.Id(i.toString)).toStream)
+    val (graph2, result2) = res2.run(nostate, (1 to 30).map(i => Call.Id(i.toString)).toStream).futureValue
     println("-- graph2 --")
     p[Unit, Call.Root[Call.BaseTags, Unit]](graph2)
     println("----")
@@ -240,11 +189,11 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     import scalaz.{ \/ , \/-, -\/}
     import EitherT.eitherTFunctor
 
-    val f1: Precepte[Call.BaseEnv, Call.BaseTags, Unit, Future, String \/ String] =
+    val f1: Precepte[String \/ String] =
       Precepte(tags("f1"))(_ => \/-("foo").point[Future])
-    val f2: Precepte[Call.BaseEnv, Call.BaseTags, Unit, Future, String \/ Int] =
+    val f2: Precepte[String \/ Int] =
       Precepte(tags("f2"))(_ => \/-(1).point[Future])
-    val f3: Precepte[Call.BaseEnv, Call.BaseTags, Unit, Future, String \/ String] =
+    val f3: Precepte[String \/ String] =
       Precepte(tags("f3"))(_ => -\/("Error").point[Future])
 
     type Foo[A] = EitherT[Future, String, A]
@@ -469,6 +418,66 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   it should "real world wb.fr home" in {
 
+    type ST = (Call.Span, Call.Path[Call.BaseTags]) => Log
+
+    val taggingContext = new TaggingContext[Call.BaseEnv, Call.BaseTags, ST, Future]
+    import taggingContext._
+    import Precepte._
+    import scalaz.std.option._
+
+    trait Log {
+      def debug(s: String): Unit
+    }
+
+    def Logged[A](tags: Call.BaseTags)(f: Log => Future[A]): Precepte[A] =
+      Precepte(tags) { (state: Call.State[Call.BaseEnv, Call.BaseTags, ST]) =>
+        f(state.value(state.span, state.path))
+      }
+
+    case class Board(pin: Option[Int])
+    object BoardComp {
+      def get() = Logged(tags("BoardComp.get")) { (logger: Log) =>
+        logger.debug("BoardComp.get")
+        Board(Option(1)).point[Future]
+      }
+    }
+
+    case class Community(name: String)
+    case class Card(name: String)
+
+    object CardComp {
+      def getPin(id: Int) = Logged(tags("BoardComp.getPin")) { (logger: Log) =>
+        logger.debug("CardComp.getPin")
+        Option(1 -> Card("card 1")).point[Future]
+      }
+
+      def countAll() = Logged(tags("CardComp.countAll")) { (logger: Log) =>
+        logger.debug("CardComp.countAll")
+        Set("Edito", "Video").point[Future]
+      }
+
+      def rank() = Logged(tags("CardComp.rank")) { (logger: Log) =>
+        logger.debug("CardComp.rank")
+        List(1 -> Card("foo"), 1 -> Card("bar")).point[Future]
+      }
+
+      def cardsInfos(cs: List[(Int, Card)], pin: Option[Int]) = Logged(tags("CardComp.cardsInfos")) { (logger: Log) =>
+        logger.debug("CardComp.cardsInfos")
+        List(
+          Card("foo") -> List(Community("community 1"), Community("community 2")),
+          Card("bar") -> List(Community("community 2"))).point[Future]
+      }
+    }
+
+    import java.net.URL
+    case class Highlight(title: String, cover: URL)
+    object HighlightComp {
+      def get() = Logged(tags("HighlightComp.get")) { (logger: Log) =>
+        logger.debug("HighlightComp.get")
+        Highlight("demo", new URL("http://nd04.jxs.cz/641/090/34f0421346_74727174_o2.png")).point[Future]
+      }
+    }
+
     val logs = scala.collection.mutable.ArrayBuffer[String]()
 
     case class Logger(span: Call.Span, path: Call.Path[Call.BaseTags]) extends Log {
@@ -481,7 +490,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val getPin =
       (for {
         b   <- trans(BoardComp.get().lift[Option])
-        id  <- trans(Precepte(tags("point"))((_: Call.State[Call.BaseEnv, Call.BaseTags, (Call.Span, Call.Path[Call.BaseTags]) => Log]) => b.pin.point[Future]))
+        id  <- trans(Precepte(tags("point"))((_: Call.State[Call.BaseEnv, Call.BaseTags, ST]) => b.pin.point[Future]))
         pin <- trans(CardComp.getPin(id))
       } yield pin).run
 
@@ -497,7 +506,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     def logger(span: Call.Span, path: Call.Path[Call.BaseTags]): Log =
       Logger(span, path)
 
-    val initialState = Call.State[Call.BaseEnv, Call.BaseTags, (Call.Span, Call.Path[Call.BaseTags]) => Log](Call.Span.gen, env, Vector.empty, logger _)
+    val initialState = Call.State[Call.BaseEnv, Call.BaseTags, ST](Call.Span.gen, env, Vector.empty, logger _)
     res.eval(initialState).futureValue should ===(
       (Some((1, Card("card 1"))),
         List((1, Card("foo")), (1, Card("bar"))),
@@ -517,24 +526,22 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   it should "implement mapK" in {
 
-    type Pre[A] = Precepte[Call.BaseEnv, Call.BaseTags, Unit, Future, A]
-
-    def f1: Pre[Int] =
+    def f1: Precepte[Int] =
       Precepte(tags("f1")) { (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
         1.point[Future]
       }
 
-    def f2: Pre[Int] =
+    def f2: Precepte[Int] =
       Precepte(tags("f2")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
         Future { throw new RuntimeException("ooopps f2") }
       }
 
-    def f3(i: Int): Pre[String] =
+    def f3(i: Int): Precepte[String] =
       Precepte(tags("f3")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
         "foo".point[Future]
       }
 
-    def f4(i: Int): Pre[String] =
+    def f4(i: Int): Precepte[String] =
       Precepte(tags("f4")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
         Future { throw new RuntimeException("ooopps f4") }
       }
@@ -543,44 +550,23 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       i <- f2
       r <- f3(i)
     } yield r)
-      .flatMapK(_.map(_.point[Pre]).recover { case _ => "recovered".point[Pre] })
+      .flatMapK(_.map(_.point[Precepte]).recover { case _ => "recovered".point[Precepte] })
       .eval(nostate).futureValue should ===("recovered")
 
     (for {
       i <- f1
       r <- f4(i)
     } yield r)
-      .flatMapK(_.map(_.point[Pre]).recover { case _ => "recovered".point[Pre] })
+      .flatMapK(_.map(_.point[Precepte]).recover { case _ => "recovered".point[Precepte] })
       .eval(nostate).futureValue should ===("recovered")
 
   }
 
-  /*
   it should "not break type inference" in {
     import scalaz.syntax.monadPlus._
     import scalaz.OptionT._
-    import Call._
-
-    // This problem seems to be caused by the classic bug on dependent types on the Scala compiler.
-    // Since the conversion MonadPlusOpsUnapply uses Unapply, and withFilter does not have an explicit return type,
-    // the compiler infer something like res90.M[res90.A] for withFilter return type
-    // From there it's not capable to find instances of typeclasses for res90.M
-    //
-    // see the following REPL session:
-    // scala> type Pre[A] = Precepte[BaseEnv, BaseTags, Unit, Future, A]
-    // scala> scalaz.OptionT.optionTMonadPlus[Pre]
-    // res88: scalaz.MonadPlus[[α]scalaz.OptionT[Pre,α]] = scalaz.OptionTInstances0$$anon$2@6f6029a9
-    // scala> scalaz.Unapply.unapplyMFA[scalaz.MonadPlus, scalaz.OptionT, Pre, Int](res88)
-    // res90: scalaz.Unapply[scalaz.MonadPlus,scalaz.OptionT[Pre,Int]]{type M[X] = scalaz.OptionT[Pre,X]; type A = Int} = scalaz.Unapply_0$$anon$11@7020e2a1
-    // scala> scalaz.syntax.monadPlus.ToMonadPlusOpsUnapply(optionT(f1))(res90)
-    // res93: scalaz.syntax.MonadPlusOps[res90.M,res90.A] = scalaz.syntax.MonadPlusOps@628d6048
-    // scala> res93.withFilter _
-    // res94: (res90.A => Boolean) => res90.M[res90.A] = <function1>
-
-    type Pre[A] = Precepte[BaseEnv, BaseTags, Unit, Future, A]
-    val f1 = Option(1).point[Pre]
-    optionT(f1).withFilter(_ => true).withFilter(_ => true) should ===(f1)
+    val f1 = Option(1).point[Precepte]
+    optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
   }
-  */
 
 }
