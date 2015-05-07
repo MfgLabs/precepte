@@ -1,7 +1,6 @@
 package commons
 
-import com.mfglabs.monitoring.{ Precepte, Influx, Logback, Call }
-import Precepte._
+import com.mfglabs.monitoring.{ Influx, Logback, Call }
 import Call._
 
 object Monitoring {

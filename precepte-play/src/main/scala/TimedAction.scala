@@ -26,14 +26,17 @@ case class TimedAction[C](ctx: TaggingContext[BaseEnv, BaseTags, C, Future], inf
       f(Tags.Category.Api, Tags.Callee(name), request).eval(initialState)
     }
 
+  private def cast[A](p: Precepte[A]) = p.asInstanceOf[influx.ctx.Precepte[A]]
+  private def uncast[A](p: influx.ctx.Precepte[A]) = p.asInstanceOf[Precepte[A]]
+
   def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Precepte[Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
-    tagged(bodyParser)((c, t, r) => influx.TimedM(c)(t)(block(r)))
+    tagged(bodyParser)((c, t, r) => uncast(influx.TimedM(c)(t)(cast(block(r)))))
 
   def apply(block: Request[AnyContent] => Precepte[Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
     apply(BodyParsers.parse.anyContent)(block)
 
   def action[A](bodyParser: BodyParser[A])(block: Request[A] => Future[Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
-    tagged(bodyParser)((c, t, r) => influx.Timed(c)(t)(_ => block(r)))
+    tagged(bodyParser)((c, t, r) => uncast(influx.Timed(c)(t)(_ => block(r))))
 
   def action(block: Request[AnyContent] => Future[Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
     action(BodyParsers.parse.anyContent)(block)
