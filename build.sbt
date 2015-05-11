@@ -3,14 +3,14 @@ import play.PlayImport.PlayKeys._
 lazy val commonSettings =  Seq(
 	organization := "com.mfglabs",
 	version := "0.1.0-SNAPSHOT",
-	scalaVersion := "2.11.4",
+	scalaVersion := "2.11.6",
 	resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
 	logLevel in update := Level.Warn
 )
 
 lazy val strictScalac =
 	scalacOptions ++= Seq(
-		"-Yrangepos",
+		"-Yrangepos"/*,
 		"-Xlint",
 		"-deprecation",
 		"-Xfatal-warnings",
@@ -22,7 +22,7 @@ lazy val strictScalac =
 		"-Ywarn-numeric-widen",
 		"-Ywarn-value-discard",
 		"-Xfuture",
-		"-Ywarn-unused-import")
+		"-Ywarn-unused-import"*/)
 
 lazy val core =
 	project.in(file("precepte-core"))
@@ -40,7 +40,9 @@ lazy val core =
 			libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 			libraryDependencies ++= Seq(
 			  "org.scalaz" %% "scalaz-core" % "7.1.0",
-			  "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test"))
+			  "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test",
+  			"com.chuusai" %% "shapeless" % "2.2.0-RC6"
+  		))
 
 lazy val sample =
 	project.in(file("precepte-sample"))
@@ -94,3 +96,5 @@ lazy val root = project.in(file("."))
 	.settings(commonSettings:_*)
 	.settings(name := "precepte-root")
 	.aggregate(core, sample)
+
+

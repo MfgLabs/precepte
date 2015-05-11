@@ -159,3 +159,4 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
     }
   }
 }
+

@@ -10,6 +10,8 @@ import org.scalatest.time.{Millis, Seconds, Span}
 
 import scala.language.higherKinds
 
+
+
 class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   import Call.Tags
@@ -20,6 +22,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import scalaz.std.scalaFuture._
+  // import scalaz.std.option._
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
@@ -70,6 +73,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   import Call.Tags
   import Tags.Callee
 
+/*
   "Precepte" should "trivial" in {
 
     def f1 = Precepte(tags("trivial.f1")){ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => 1.point[Future] }
@@ -568,5 +572,239 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val f1 = Option(1).point[Precepte]
     optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
   }
+*/
 
+  it should "do" in {
+    import scalaz.{Monad, Bind, MonadPlus, Leibniz, Foldable, Bifoldable, OptionT, OptionTMonadPlus}
+
+    // import scalaz.syntax.monadPlus._
+    // import scalaz.std.option._
+    // import scalaz.OptionT._
+    // import scalaz.Id._
+    // import scalaz.std.list._
+
+    // import shapeless._
+
+
+    import scala.language.implicitConversions
+    // import scalaz.syntax.monadPlus._
+
+/*
+    trait Generic1[F[_], FR[_[_]]] {
+      type R[t]
+
+      implicit lazy val fr: FR[R] = mkFrr
+
+      lazy val ff: FR[F] = mkFrf
+
+      // def to[T](ft: F[T]): R[T]
+      // def lift[T](rt: R[T]): F[T]
+
+      def mkFrr: FR[R]
+
+      def mkFrf: FR[F]
+    }
+
+    object Generic1 {
+      type Aux[F[_], FR[_[_]], R0[_]] = Generic1[F, FR] { type R[t] = R0[t] }
+
+      def apply[F[_], FR[_[_]]](implicit gen: Generic1[F, FR]): Aux[F, FR, gen.R] = gen
+
+      // implicit def materialize[T[_], FR[_[_]]]: Generic1[T, FR] = macro Generic1Macros.materialize[T, FR]
+    }
+
+    implicit def optionTG1[R0[_]](implicit lmr0: Lazy[Monad[R0]]) = new Generic1[({type λ[A] = OptionT[R0, A]})#λ, Monad] {
+      type R[t] = R0[t]
+
+      def mkFrr = lazily[Monad[R0]]
+
+      // def to[T](ft: OptionT[R0, T]): R0[T] = ft.runn
+      // def lift[T](rt: R[T]): OptionT[R, T] = optionT(fr.map(rt)(Some(_)))
+
+      def mkFrf = lazily[Monad[({type λ[A] = OptionT[R0, A]})#λ]]
+    }
+
+    implicit def generic[F[_]](implicit gen: Generic1[F, Monad]): Monad[F] = gen.ff
+*/
+
+      // new Monad[F] {
+      //   override def point[A](a: => A): F[A] = gen.ff.point(a)
+
+      //   override def map[A, B](m: F[A])(f: A => B): F[B] = gen.ff.map(m)(f)
+
+      //   override def bind[A, B](m: F[A])(f: A => F[B]): F[B] = gen.ff.bind(m)(f)
+      // }
+
+    // final class MonadPlusOps[F[_],A0](val self: F[A0])(implicit val F: MonadPlus[F]) extends scalaz.syntax.Ops[F[A0]] {
+    //   ////
+    //   import Leibniz.===
+
+    //   def filter(f: A0 => Boolean) =
+    //     F.filter(self)(f)
+      
+    //   def withFilter(f: A0 => Boolean) =
+    //     filter(f)
+
+    //   final def uniteU[T](implicit T: Unapply[Foldable, A0]): F[T.A] =
+    //     F.uniteU(self)(new scalaz.Unapply[Foldable, A0]{
+    //       type M[x] = T.M[x]
+    //       type A = T.A
+    //       def TC = T.TC
+
+    //       def leibniz = scalaz.Leibniz.force[Nothing, Any, A0, T.M[A]]
+    //     })
+
+    //   def unite[T[_], B](implicit ev: A0 === T[B], T: Foldable[T]): F[B] = {
+    //     val ftb: F[T[B]] = ev.subst(self)
+    //     F.unite[T, B](ftb)
+    //   }
+
+    //   final def separate[G[_, _], B, C](implicit ev: A0 === G[B, C], G: Bifoldable[G]): (F[B], F[C]) =
+    //     F.separate(ev.subst(self))
+
+    //   ////
+    // }
+
+
+
+    // implicit def ToMonadPlusOpsUnapply[FA](v: FA)(implicit F0: com.mfglabs.monitoring.Unapply[MonadPlus, FA]) =
+    //   new MonadPlusOps[F0.M,F0.A](F0.subst(v))(F0.TC)
+
+    // implicit def ToMonadPlusOps[F[_],A](v: F[A])(implicit F0: MonadPlus[F]) =
+    //   new MonadPlusOps[F,A](v)
+
+    type P2[A] = P[Int, A]
+    // val a = Option(1).point[P2]
+    // val b: OptionT[({type λ[A] = P[Future, A]})#λ, Int] = optionT(a).withFilter(_ => true)
+    // b.withFilter(_ => true)
+
+    // type PP2[A] = PP.Aux[Future, A]
+    // val a = Option(1).point[P2]
+    // val b: OptionT[({type λ[A] = P[Int, A]})#λ, Int] =  optionT(a).withFilter(_ => true)
+    // b.withFilter(_ => true)
+    // implicitly[Monad[Future]]
+    // implicitly[MonadPlus[P2]]
+    // implicitly[Unapply[MonadPlus, OptionT[P2, Int]]]
+    // implicitly[Unapply[MonadPlus, OptionT[({type λ[A] = P[Int, A]})#λ, Int]]]
+    // implicitly[Monad[List]]
+    // Unapply.Aux2MT[Monad, OptionT[List, Int], OptionT, List, Int]
+    // implicitly[Monad[P2]]
+    // implicitly[Monad[({type λ[A] = P[Int, A]})#λ]]
+    // implicitly[MonadPlus[Id]]
+    // implicitly[Unapply[Monad, OptionT[scalaz.Id.Id, Int]]]
+
+    // implicitly[Monad[({type λ[A] = OptionT[Future, A]})#λ]]
+
+
+// implicit val a = {
+//   import shapeless.lazily
+
+//   final class fresh$macro$2 extends _root_.utils.$u2206$u2206[Option, scalaz.Monad] {
+//     type R[fresh$macro$1] = Option[fresh$macro$1];
+//     def mkFrr: scalaz.Monad[R] = lazily[scalaz.Monad[R]]
+//   };
+//   new fresh$macro$2()
+// }
+      
+    // ∆∆[Future, Monad]
+
+    // import utils.∆∆
+
+    // ∆∆[({type λ[A] = P[Int, A]})#λ, Monad]
+
+    // implicitly[Monad[({type λ[A] = P[Int, A]})#λ]]
+    // ∆∆[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ, Monad]
+    // val dd = ∆∆.materialize2[OptionT, Monad, ({type λ[A] = P[Int, A]})#λ]
+    // implicit val r = ∆∆∆(dd)
+    // ∆∆∆[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]
+    // implicitly[Monad[({type λ[A] = OptionT[Future, A]})#λ]]
+    // trait SaveUrAss {
+
+      // import utils.∆∆
+      // import scalaz.Monad
+      // implicit def ∆∆∆[F[_]](implicit gen: ∆∆[F, Monad]): Monad[F] = gen.fr.asInstanceOf[Monad[F]]
+      // implicit def ∆∆∆[T[_[_], _], F[_, _], I](
+      //   implicit gen: ∆∆[({type λ[A] = T[({type λ[A] = F[I, A]})#λ, A]})#λ, Monad]
+      // ): Monad[({type λ[A] = T[({type λ[A] = F[I, A]})#λ, A]})#λ] = gen.fr.asInstanceOf[Monad[({type λ[A] = T[({type λ[A] = F[I, A]})#λ, A]})#λ]]
+
+      // implicit def ∆∆∆∆[T[_[_], _], F[_, _, _], I1, I2](
+      //   implicit gen: ∆∆[({type λ[A] = T[({type λ[A] = F[I1, I2, A]})#λ, A]})#λ, Monad]
+      // ): Monad[({type λ[A] = T[({type λ[A] = F[I1, I2, A]})#λ, A]})#λ] = gen.fr.asInstanceOf[Monad[({type λ[A] = T[({type λ[A] = F[I1, I2, A]})#λ, A]})#λ]]
+    // }
+
+    import scalaz.OptionT
+    import utils.{UnLambda1, GenericMat}
+
+    // implicit def Unl[F[_], R[_]](implicit gen: UnLambda1[F]): Monad[F] = shapeless.lazily[Monad[R]].asInstanceOf[Monad[F]]
+
+    object GenericMat2 {
+      def apply[F[_], FR[_[_]]](implicit unl: UnLambda1[F]) = {
+        type R[t] = unl.R[t]
+        GenericMat.materialize[R, FR]
+        // unl
+      }
+
+      // def materialize[F[_], FR[_[_]]]: GenericMat[F, FR] = 
+      //   macro GenericMatMacros.materialize[F, FR]
+    }
+
+    UnLambda1[({type λ[A] = P[Int, A]})#λ]
+    UnLambda1[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]
+    
+    val a : Int = GenericMat2[({type λ[A] = P[Int, A]})#λ, Monad]
+
+    // implicitly[Monad[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]]
+    // object Toto extends SaveUrAss {
+
+      // import utils.∆∆
+      // ∆∆[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ, Monad]
+      // ∆∆∆[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]
+      // ∆∆∆[OptionT, ({type λ[A] = P[Int, A]})#λ]
+      // val m = implicitly[Monad[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]]
+      // println("RES:"+m.point(5))
+    // }
+
+    // ∆∆.materialize1[P, Monad, Int]
+    // implicit val d = optionTG1[({type λ[A] = P[Int, A]})#λ]
+    // implicitly[Generic1[({type λ[A] = OptionT[P2, A]})#λ, Monad]]
+    // implicitly[Monad[({type λ[A] = OptionT[Future, A]})#λ]]
+
+
+    // implicitly[Unapply[Monad, ({type λ[A] = P[Int, A]})#λ[Int]]]
+    // Unapply.unapply2Aux21MT[Monad, OptionT, P, Int, Int]
+    // implicitly[Monad[P2]]
+    // implicitly[Monad[({type λ[A] = OptionT[P2, A]})#λ]]
+    // implicitly[Monad[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]]
+    // implicitly[Unapply[Monad, OptionT[({type λ[A] = P[Int, A]})#λ, Int]]]
+    0 should ===(0)
+  }
 }
+
+
+
+    // trait PP[A] { self =>
+    //   type F[_]
+
+    //   def map[B](f: A => B): PP[B] = new PP[B] { type F[x] = self.F[x] }
+    //   def flatMap[B](f: A => PP[B]): PP[B] = new PP[B] { type F[x] = self.F[x] }
+    // }
+
+    // object PP {
+    //   type Aux[F0[_], A] = PP[A] { type F[x] = F0[x] }
+
+    //   implicit def pInstances[F0[_]](implicit B: Bind[F0]): Monad[({type λ[A] = PP.Aux[F0, A]})#λ] =
+    //     new Monad[({type λ[A] = PP.Aux[F0, A]})#λ] {
+    //       override def point[A](a: => A): PP.Aux[F0, A] = new PP[A] { type F[x] = F0[x] }
+
+    //       override def map[A, B](m: PP.Aux[F0, A])(f: A => B): PP.Aux[F0, B] = m.map(f).asInstanceOf[PP.Aux[F0, B]]
+    //       override def bind[A, B](m: PP.Aux[F0, A])(f: A => PP.Aux[F0, B]): PP.Aux[F0, B] = m.flatMap(f).asInstanceOf[PP.Aux[F0, B]]
+    //     }
+
+    // }
+
+    // abstract class Fix[F0[_]](implicit bindF: Bind[F0]) {
+
+    //   type P[A] = PP[A] { type F[x] = F0[x] }
+
+    //   implicit def pInstances: Monad[P] = PP.pInstances[F0]
+    // }
