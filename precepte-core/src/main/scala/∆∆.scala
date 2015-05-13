@@ -285,3 +285,36 @@ class GenericMatMacros(val c: whitebox.Context) extends CaseClassMacros {
     r
   }
 }
+
+trait Gen[F[_]]
+
+object Gen {
+
+  def apply[F[_]](implicit gen: Gen[F]): Gen[F] = gen
+
+  implicit def materialize[F[_]]: Gen[F] = 
+    macro GenMacros.materialize[F]
+
+}
+
+
+class GenMacros(val c: whitebox.Context) {
+  import c.universe._
+
+  def materialize[T[_]](implicit tTag: WeakTypeTag[T[_]]): Tree = {
+    val tpe = weakTypeOf[T[_]]
+    
+    val clsName = TypeName(c.freshName())
+
+    val r = q"""
+      final class $clsName extends _root_.utils.Gen[$tpe] { }
+      new $clsName()
+    """
+
+    println(r)
+
+    r
+  }
+}
+
+

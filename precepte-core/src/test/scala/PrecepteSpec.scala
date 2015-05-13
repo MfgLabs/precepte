@@ -733,25 +733,26 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     // }
 
     import scalaz.OptionT
-    import utils.{UnLambda1, GenericMat}
+    import utils.{UnLambda1, GenericMat, Gen}
+
+
+    Gen[Future]
+    Gen[P2]
+    Gen[({type λ[A] = P[Int, A]})#λ]
 
     // implicit def Unl[F[_], R[_]](implicit gen: UnLambda1[F]): Monad[F] = shapeless.lazily[Monad[R]].asInstanceOf[Monad[F]]
 
-    object GenericMat2 {
-      def apply[F[_], FR[_[_]]](implicit unl: UnLambda1[F]) = {
-        type R[t] = unl.R[t]
-        GenericMat.materialize[R, FR]
-        // unl
-      }
+    // object GenericMat2 {
+    //   def apply[F[_], FR[_[_]]](implicit unl: UnLambda1[F]) = {
+    //     type R[t] = unl.R[t]
+    //     GenericMat.materialize[R, FR]
+    //   }
+    // }
 
-      // def materialize[F[_], FR[_[_]]]: GenericMat[F, FR] = 
-      //   macro GenericMatMacros.materialize[F, FR]
-    }
-
-    UnLambda1[({type λ[A] = P[Int, A]})#λ]
-    UnLambda1[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]
+    // UnLambda1[({type λ[A] = P[Int, A]})#λ]
+    // UnLambda1[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]
     
-    val a : Int = GenericMat2[({type λ[A] = P[Int, A]})#λ, Monad]
+    // val a : Int = GenericMat2[({type λ[A] = P[Int, A]})#λ, Monad]
 
     // implicitly[Monad[({type λ[A] = OptionT[({type λ[A] = P[Int, A]})#λ, A]})#λ]]
     // object Toto extends SaveUrAss {
