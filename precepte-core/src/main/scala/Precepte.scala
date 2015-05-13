@@ -55,10 +55,11 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
     }
 
     final def run(state: Call.State[E, T, C], ids: Stream[Call.Id] = Stream.continually(Call.Id.gen))(implicit mo: Monad[F]): F[(Call.Root[T, C], A)] = {
-      def go[G <: Call.Graph[T, C, G] ,B](m: Precepte[B], state: Call.State[E, T, C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
+      def go[G <: Call.Graph[T, C, G], B](m: Precepte[B], state: Call.State[E, T, C], graph: G, ids: Stream[Call.Id]): F[(Stream[Call.Id], (G, B))] = {
         m match {
           case Return(a) =>
             (ids, (graph, a)).point[F]
+
           case Step(step, tags) =>
             val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
             step.run(state0).flatMap {
@@ -69,8 +70,17 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
                   (is, (graph.addChild(g),  a))
                 }
             }
-          case FlatmapK(sub, f) =>
-            ???
+          case FlatmapK(sub, next) =>
+            // XXX: kinda hackish. We're only interested in this node children
+            val g0 = Call.Root[T, C](Call.Span("dummy"), Vector.empty)
+            go(sub, state, g0, ids).flatMap { case (is0, (gi, a)) =>
+              next(a.point[F]).flatMap { prb =>
+                go(prb, state, gi, is0).map { case (is1, (g, a)) =>
+                  (is1, (graph.addChildren(g.children), a))
+                }
+              }
+            }
+            
           case Flatmap(sub, next) =>
             // XXX: kinda hackish. We're only interested in this node children
             val g0 = Call.Root[T, C](Call.Span("dummy"), Vector.empty)

@@ -562,6 +562,17 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   }
 
+  it should "run flatMapK" in {
+
+    def f1: Precepte[Int] =
+      Precepte(tags("f1")) { (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+        1.point[Future]
+      }
+
+    val (g, a) = f1.flatMapK(futI => futI.map(i => (i+1).point[Precepte])).run(nostate).futureValue
+    a should equal (2)
+  }
+
   it should "not break type inference" in {
     import scalaz.syntax.monadPlus._
     import scalaz.OptionT._
