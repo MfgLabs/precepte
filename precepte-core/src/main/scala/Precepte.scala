@@ -29,6 +29,9 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
     final def flatMapK[B](f: F[A] => F[Precepte[B]]): Precepte[B] =
       FlatmapK(self, f)
 
+    final def mapK[B](f: F[A] => F[B])(implicit F: Functor[F]): Precepte[B] =
+      flatMapK(x => f(x).map(Return.apply))
+
     def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[AP[A]] =
       this.map(a => ap.point(a))
 
