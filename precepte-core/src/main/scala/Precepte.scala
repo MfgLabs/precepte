@@ -80,7 +80,7 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
                 }
               }
             }
-            
+
           case Flatmap(sub, next) =>
             // XXX: kinda hackish. We're only interested in this node children
             val g0 = Call.Root[T, C](Call.Span("dummy"), Vector.empty)
@@ -109,7 +109,7 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
   case class FlatmapK[A, B](sub: Precepte[A], f: F[A] => F[Precepte[B]]) extends Precepte[B]
 
   trait LowPriorityInstances {
-    implicit def precepteInstances(implicit B: Bind[F]) =
+    implicit def precepteInstances(implicit B: Applicative[F]) =
       new Monad[Precepte] {
         override def point[A](a: => A): Precepte[A] =
           Return(a)
@@ -117,6 +117,14 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
           m.map(f)
         override def bind[A, B](m: Precepte[A])(f: A => Precepte[B]): Precepte[B] =
           m.flatMap(f)
+
+        // override to support parallel execution
+        override def ap[A, B](pa: => Precepte[A])(pab: => Precepte[A => B]) =
+          pa.flatMapK { fa =>
+            pab.mapK { fab =>
+              fa <*> fab
+            }.point[F]
+          }
       }
   }
 
