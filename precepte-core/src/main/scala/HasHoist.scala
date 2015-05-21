@@ -1,4 +1,5 @@
-package com.mfglabs.monitoring
+package com.mfglabs
+package precepte
 
 import scala.language.higherKinds
 

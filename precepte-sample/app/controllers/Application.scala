@@ -12,9 +12,8 @@ import anorm._
 import views._
 import models._
 
-import commons.Monitoring.TimedAction
-import com.mfglabs.monitoring.{ Precepte, Call }
-import Precepte._, Call._
+import commons.Monitoring
+import Monitoring.TimedAction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scalaz.std.scalaFuture._
@@ -24,6 +23,8 @@ import scalaz.std.option._
  * Manage a database of computers
  */
 object Application extends Controller {
+  import Monitoring.PreContext._
+  import Precepte._
 
   /**
    * This result directly redirect to the application home.

@@ -93,4 +93,4 @@ lazy val play =
 lazy val root = project.in(file("."))
 	.settings(commonSettings:_*)
 	.settings(name := "precepte-root")
-	.aggregate(core, sample)
+	.aggregate(core, play, influx, sample)

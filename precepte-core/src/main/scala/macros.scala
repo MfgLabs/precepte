@@ -1,9 +1,11 @@
-package com.mfglabs.monitoring.macros
+package com.mfglabs
+package precepte
+package macros
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 
-import com.mfglabs.monitoring.Call.Tags.Callee
+import Tags.Callee
 import scala.language.implicitConversions
 
 object Macros {
@@ -14,7 +16,7 @@ object Macros {
 
   def calleeMacro(c: Context) = {
   	import c.universe._
-  	q"""com.mfglabs.monitoring.Call.Tags.Callee(${c.internal.enclosingOwner.fullName})"""
+  	q"""_root_.com.mfglabs.precepte.Tags.Callee(${c.internal.enclosingOwner.fullName})"""
   }
 
   def paramMacro[T](c: Context)(t: c.Tree) = {

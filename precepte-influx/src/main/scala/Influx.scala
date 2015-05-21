@@ -1,4 +1,5 @@
-package com.mfglabs.monitoring
+package com.mfglabs
+package precepte
 
 import java.net.URL
 import scala.language.higherKinds
@@ -10,9 +11,7 @@ import scala.language.postfixOps
 import akka.actor.{ Actor, Props, ActorSystem }
 import Call._
 
-case class Influx[C](ctx: TaggingContext[BaseEnv, BaseTags, C, Future], influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit ex: ExecutionContext) {
-
-  import ctx._
+case class Influx[TC <: TaggingContext[BaseEnv, BaseTags, C, Future], C](ctx: TC, influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit ex: ExecutionContext) {
 
   private val builder = new com.ning.http.client.AsyncHttpClientConfig.Builder()
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
@@ -72,13 +71,13 @@ case class Influx[C](ctx: TaggingContext[BaseEnv, BaseTags, C, Future], influxdb
     }
   }
 
-  def Timed[A](category: Tags.Category)(callee: Tags.Callee)(f: State[BaseEnv, BaseTags, C] => Future[A])(implicit fu: scalaz.Functor[Future]): Precepte[A] =
-    Precepte(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, C]) =>
+  def Timed[A](category: Tags.Category)(callee: Tags.Callee)(f: State[BaseEnv, BaseTags, C] => Future[A])(implicit fu: scalaz.Functor[Future]): TC#Precepte[A] =
+    ctx.Precepte(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, C]) =>
       Timer(c.span, c.path).timed(f(c))
     }
 
-  def TimedM[A](category: Tags.Category)(callee: Tags.Callee)(f: Precepte[A])(implicit mo: scalaz.Monad[Future]): Precepte[A] =
-    Precepte(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, C]) =>
+  def TimedM[A](category: Tags.Category)(callee: Tags.Callee)(f: TC#Precepte[A])(implicit mo: scalaz.Monad[Future]): TC#Precepte[A] =
+    ctx.Precepte(BaseTags(callee, category)){ (c: State[BaseEnv, BaseTags, C]) =>
       Timer(c.span, c.path).timed(f.eval(c))
     }
 
