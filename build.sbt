@@ -3,7 +3,7 @@ import play.PlayImport.PlayKeys._
 lazy val commonSettings =  Seq(
 	organization := "com.mfglabs",
 	version := "0.1.0-SNAPSHOT",
-	scalaVersion := "2.11.4",
+	scalaVersion := "2.11.6",
 	resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
 	logLevel in update := Level.Warn
 )
