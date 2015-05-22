@@ -2,7 +2,7 @@ import play.PlayImport.PlayKeys._
 
 lazy val commonSettings =  Seq(
 	organization := "com.mfglabs",
-	version := "0.1.0-SNAPSHOT",
+	version := "0.1.0",
 	scalaVersion := "2.11.6",
 	resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
 	logLevel in update := Level.Warn
@@ -66,6 +66,13 @@ lazy val influx =
 		.settings(strictScalac)
 		.settings(
 			name := "precepte-influx",
+			publishTo := {
+			  val s3Repo = "s3://mfg-mvn-repo"
+			  if (isSnapshot.value)
+			    Some("snapshots" at s3Repo + "/snapshots")
+			  else
+			    Some("releases" at s3Repo + "/releases")
+			},
 			libraryDependencies ++= Seq(ws))
 		.dependsOn(core)
 
@@ -75,6 +82,13 @@ lazy val logback =
 		.settings(strictScalac)
 		.settings(
 			name := "precepte-logback",
+			publishTo := {
+			  val s3Repo = "s3://mfg-mvn-repo"
+			  if (isSnapshot.value)
+			    Some("snapshots" at s3Repo + "/snapshots")
+			  else
+			    Some("releases" at s3Repo + "/releases")
+			},
 			libraryDependencies ++= Seq(
 				"ch.qos.logback" % "logback-classic" % "1.1.2",
 				"net.logstash.logback" % "logstash-logback-encoder" % "4.2"))
@@ -85,8 +99,14 @@ lazy val play =
 		.settings(commonSettings:_*)
 		.settings(strictScalac)
 		.settings(
-			libraryDependencies += "com.typesafe.play" %% "play" % "2.3.7"
-			,
+			publishTo := {
+			  val s3Repo = "s3://mfg-mvn-repo"
+			  if (isSnapshot.value)
+			    Some("snapshots" at s3Repo + "/snapshots")
+			  else
+			    Some("releases" at s3Repo + "/releases")
+			},
+			libraryDependencies += "com.typesafe.play" %% "play" % "2.3.7",
 			name := "precepte-play")
 		.dependsOn(core, influx)
 
