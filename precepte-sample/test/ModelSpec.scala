@@ -15,13 +15,13 @@ class ModelSpec extends PlaySpecification {
   def dateIs(date: java.util.Date, str: String) = new java.text.SimpleDateFormat("yyyy-MM-dd").format(date) == str
 
   // --
-  import com.mfglabs.monitoring.Call
+  import com.mfglabs.precepte._
   import scala.concurrent.ExecutionContext.Implicits.global
   import scalaz.std.scalaFuture._
 
-  val env = Call.BaseEnv(Call.Tags.Host("localhost"), Call.Tags.Environment.Dev, Call.Tags.Version("1.0"))
-  private def tags(n: String) = Call.BaseTags(Call.Tags.Callee(n), Call.Tags.Category.Database)
-  def nostate = Call.State[Call.BaseEnv, Call.BaseTags, Unit](Call.Span.gen, env, Vector.empty, ())
+  val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Dev, Tags.Version("1.0"))
+  private def tags(n: String) = BaseTags(Tags.Callee(n), Tags.Category.Database)
+  def nostate = State[BaseEnv, BaseTags, Unit](Span.gen, env, Vector.empty, ())
 
   "Computer model" should {
 

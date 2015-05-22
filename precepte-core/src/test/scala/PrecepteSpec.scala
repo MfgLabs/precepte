@@ -7,16 +7,14 @@ import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.time.{Millis, Seconds, Span => TSpan}
 
 import scala.language.higherKinds
 
 class PrecepteSpec extends FlatSpec with ScalaFutures {
 
-  import Call.Tags
-
   implicit val defaultPatience =
-    PatienceConfig(timeout =  Span(300, Seconds), interval = Span(5, Millis))
+    PatienceConfig(timeout =  TSpan(300, Seconds), interval = TSpan(5, Millis))
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
@@ -24,19 +22,19 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  val taggingContext = new TaggingContext[Call.BaseEnv, Call.BaseTags, Unit, Future]
+  val taggingContext = new TaggingContext[BaseEnv, BaseTags, Unit, Future]
   import taggingContext._
   import Precepte._
 
-  val env = Call.BaseEnv(Call.Tags.Host("localhost"), Call.Tags.Environment.Test, Call.Tags.Version("1.0"))
+  val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Test, Tags.Version("1.0"))
 
-  private def tags(n: String) = Call.BaseTags(Tags.Callee(n), Tags.Category.Database)
+  private def tags(n: String) = BaseTags(Tags.Callee(n), Tags.Category.Database)
 
-  def p[C, G <: Call.Graph[Call.BaseTags, C, G]](g: G, before: String = ""): Unit = {
+  def p[C, G <: Graph[BaseTags, C, G]](g: G, before: String = ""): Unit = {
     val txt = g match {
-      case Call.Root(span, _) =>
+      case Root(span, _) =>
         s"Root[$span]"
-      case Call.GraphNode(id, _, tags, _) =>
+      case GraphNode(id, _, tags, _) =>
         s"GraphNode[$id]: $tags"
     }
 
@@ -44,17 +42,17 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     for (c <- g.children) {
       c match {
-        case node@Call.GraphNode(_, _, _, _) =>
-          p[C, Call.GraphNode[Call.BaseTags, C]](node, before + "  ")
+        case node@GraphNode(_, _, _, _) =>
+          p[C, GraphNode[BaseTags, C]](node, before + "  ")
       }
     }
   }
 
-  def toStates[C](g: Call.Root[Call.BaseTags, C]): Seq[Call.State[Call.BaseEnv, Call.BaseTags, C]] = {
-    def go(g: Call.GraphNode[Call.BaseTags, C], span: Call.Span, path: Call.Path[Call.BaseTags], states: Seq[Call.State[Call.BaseEnv, Call.BaseTags, C]]): Seq[Call.State[Call.BaseEnv, Call.BaseTags, C]] = {
-      val Call.GraphNode(id, value, tags, cs) = g
+  def toStates[C](g: Root[BaseTags, C]): Seq[State[BaseEnv, BaseTags, C]] = {
+    def go(g: GraphNode[BaseTags, C], span: Span, path: Call.Path[BaseTags], states: Seq[State[BaseEnv, BaseTags, C]]): Seq[State[BaseEnv, BaseTags, C]] = {
+      val GraphNode(id, value, tags, cs) = g
       val p = path :+ Call(id, tags)
-      val st = Call.State[Call.BaseEnv, Call.BaseTags, C](span, env, p, value)
+      val st = State[BaseEnv, BaseTags, C](span, env, p, value)
       val cst = cs.map{ c =>
         go(c, span, p, Seq.empty)
       }.flatten
@@ -67,26 +65,25 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
 
-  def nostate = Call.State[Call.BaseEnv, Call.BaseTags, Unit](Call.Span.gen, env, Vector.empty, ())
-  import Call.Tags
+  def nostate = State[BaseEnv, BaseTags, Unit](Span.gen, env, Vector.empty, ())
   import Tags.Callee
 
   "Precepte" should "trivial" in {
 
-    def f1 = Precepte(tags("trivial.f1")){ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => 1.point[Future] }
-    def f2(i: Int) = Precepte(tags("trivial.f2")){ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => s"foo $i".point[Future] }
-    def f3(i: Int) = Precepte(tags("trivial.f3")){ (_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => (i + 1).point[Future] }
+    def f1 = Precepte(tags("trivial.f1")){ (_: State[BaseEnv, BaseTags, Unit]) => 1.point[Future] }
+    def f2(i: Int) = Precepte(tags("trivial.f2")){ (_: State[BaseEnv, BaseTags, Unit]) => s"foo $i".point[Future] }
+    def f3(i: Int) = Precepte(tags("trivial.f3")){ (_: State[BaseEnv, BaseTags, Unit]) => (i + 1).point[Future] }
 
     val (graph0, result0) = f1.run(nostate).futureValue
     result0 should ===(1)
 
     println("-- graph0 --")
-    p[Unit, Call.Root[Call.BaseTags, Unit]](graph0)
+    p[Unit, Root[BaseTags, Unit]](graph0)
     println("----")
 
     val (graphm, _) = Precepte(tags("graphm0"))(Precepte(tags("graphm"))(f1)).run(nostate).futureValue
     println("-- graphm --")
-    p[Unit, Call.Root[Call.BaseTags, Unit]](graphm)
+    p[Unit, Root[BaseTags, Unit]](graphm)
     println("----")
 
     val res =
@@ -99,12 +96,12 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     result should ===("foo 1")
 
     println("-- graph --")
-    p[Unit, Call.Root[Call.BaseTags, Unit]](graph)
+    p[Unit, Root[BaseTags, Unit]](graph)
     println("----")
 
     val (graph1, result1) = Precepte(tags("trivial.anon"))(res).run(nostate).futureValue
     println("-- graph1 --")
-    p[Unit, Call.Root[Call.BaseTags, Unit]](graph1)
+    p[Unit, Root[BaseTags, Unit]](graph1)
     println("----")
 
     val res2 =
@@ -113,15 +110,15 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         r <- f2(i)
       } yield r
 
-    val (graph2, result2) = res2.run(nostate, (1 to 30).map(i => Call.Id(i.toString)).toStream).futureValue
+    val (graph2, result2) = res2.run(nostate, (1 to 30).map(i => CId(i.toString)).toStream).futureValue
     println("-- graph2 --")
-    p[Unit, Call.Root[Call.BaseTags, Unit]](graph2)
+    p[Unit, Root[BaseTags, Unit]](graph2)
     println("----")
   }
 
   it should "simple" in {
-    def f1 = Precepte(tags("simple.f1")){(_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => 1.point[Future]}
-    def f2(i: Int) = Precepte(tags("simple.f2")){(_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => s"foo $i".point[Future]}
+    def f1 = Precepte(tags("simple.f1")){(_: State[BaseEnv, BaseTags, Unit]) => 1.point[Future]}
+    def f2(i: Int) = Precepte(tags("simple.f2")){(_: State[BaseEnv, BaseTags, Unit]) => s"foo $i".point[Future]}
 
     val res = for {
       i <- f1
@@ -132,9 +129,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "optT" in {
-    val f1 = Precepte(tags("opt"))((_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => Option("foo").point[Future])
-    val f2 = Precepte(tags("opt"))((_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => Option(1).point[Future])
-    val f3 = Precepte(tags("opt"))((_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => (None: Option[Int]).point[Future])
+    val f1 = Precepte(tags("opt"))((_: State[BaseEnv, BaseTags, Unit]) => Option("foo").point[Future])
+    val f2 = Precepte(tags("opt"))((_: State[BaseEnv, BaseTags, Unit]) => Option(1).point[Future])
+    val f3 = Precepte(tags("opt"))((_: State[BaseEnv, BaseTags, Unit]) => (None: Option[Int]).point[Future])
 
 
     val res = for {
@@ -160,9 +157,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "listT" in {
-    val f1 = Precepte(tags("listT"))((_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => List("foo", "bar").point[Future])
-    val f2 = Precepte(tags("listT"))((_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => List(1, 2).point[Future])
-    val f3 = Precepte(tags("listT"))((_: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) => List[Int]().point[Future])
+    val f1 = Precepte(tags("listT"))((_: State[BaseEnv, BaseTags, Unit]) => List("foo", "bar").point[Future])
+    val f2 = Precepte(tags("listT"))((_: State[BaseEnv, BaseTags, Unit]) => List(1, 2).point[Future])
+    val f3 = Precepte(tags("listT"))((_: State[BaseEnv, BaseTags, Unit]) => List[Int]().point[Future])
 
     val res = for {
       e1 <- trans(f1)
@@ -221,18 +218,18 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     val (graph, rr) = res3.run.run(nostate).futureValue
     rr should ===(error)
-    p[Unit, Call.Root[Call.BaseTags, Unit]](graph)
+    p[Unit, Root[BaseTags, Unit]](graph)
   }
 
   it should "pass context" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Call.BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[State[BaseEnv, BaseTags, Unit]]()
 
-    def push(state: Call.State[Call.BaseEnv, Call.BaseTags, Unit]): Unit = {
+    def push(state: State[BaseEnv, BaseTags, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       1.point[Future]
     }
@@ -245,14 +242,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "preserve context on map" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Call.BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[State[BaseEnv, BaseTags, Unit]]()
 
-    def push(state: Call.State[Call.BaseEnv, Call.BaseTags, Unit]): Unit = {
+    def push(state: State[BaseEnv, BaseTags, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       1.point[Future]
     }.map(identity).map(identity).map(identity).map(identity)
@@ -267,24 +264,24 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "preserve context on flatMap" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Call.BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[State[BaseEnv, BaseTags, Unit]]()
 
-    def push(state: Call.State[Call.BaseEnv, Call.BaseTags, Unit]): Unit = {
+    def push(state: State[BaseEnv, BaseTags, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       1.point[Future]
     }
 
-    def f2(i: Int) = Precepte(tags("f2")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f2(i: Int) = Precepte(tags("f2")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       s"foo $i".point[Future]
     }
 
-    def f3(s: String) = Precepte(tags("f3")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f3(s: String) = Precepte(tags("f3")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       s"f3 $s".point[Future]
     }
@@ -301,7 +298,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "stack contexts" in {
-    def f1 = Precepte(tags("f1")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       1.point[Future]
     }
 
@@ -314,19 +311,19 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "provide context to C" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Call.BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[State[BaseEnv, BaseTags, Unit]]()
 
-    def push(state: Call.State[Call.BaseEnv, Call.BaseTags, Unit]): Unit = {
+    def push(state: State[BaseEnv, BaseTags, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")) { (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")) { (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       1.point[Future]
     }
 
-    def f2(i: Int) = Precepte(tags("f2")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f2(i: Int) = Precepte(tags("f2")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       s"foo $i".point[Future]
     }
@@ -385,19 +382,19 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "not stack context on trans" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[Call.State[Call.BaseEnv, Call.BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[State[BaseEnv, BaseTags, Unit]]()
 
-    def push(state: Call.State[Call.BaseEnv, Call.BaseTags, Unit]): Unit = {
+    def push(state: State[BaseEnv, BaseTags, Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")) { (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")) { (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       Option(1).point[Future]
     }
 
-    def f2(i: Int) = Precepte(tags("f1")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+    def f2(i: Int) = Precepte(tags("f1")){ (c: State[BaseEnv, BaseTags, Unit]) =>
       push(c)
       Option(s"foo $i").point[Future]
     }
@@ -419,9 +416,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   it should "real world wb.fr home" in {
 
-    type ST = (Call.Span, Call.Path[Call.BaseTags]) => Log
+    type ST = (Span, Call.Path[BaseTags]) => Log
 
-    val taggingContext = new TaggingContext[Call.BaseEnv, Call.BaseTags, ST, Future]
+    val taggingContext = new TaggingContext[BaseEnv, BaseTags, ST, Future]
     import taggingContext._
     import Precepte._
     import scalaz.std.option._
@@ -430,8 +427,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       def debug(s: String): Unit
     }
 
-    def Logged[A](tags: Call.BaseTags)(f: Log => Future[A]): Precepte[A] =
-      Precepte(tags) { (state: Call.State[Call.BaseEnv, Call.BaseTags, ST]) =>
+    def Logged[A](tags: BaseTags)(f: Log => Future[A]): Precepte[A] =
+      Precepte(tags) { (state: State[BaseEnv, BaseTags, ST]) =>
         f(state.value(state.span, state.path))
       }
 
@@ -481,7 +478,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     val logs = scala.collection.mutable.ArrayBuffer[String]()
 
-    case class Logger(span: Call.Span, path: Call.Path[Call.BaseTags]) extends Log {
+    case class Logger(span: Span, path: Call.Path[BaseTags]) extends Log {
       def debug(s: String): Unit = {
         logs += s"[DEBUG] ${span.value} -> /${path.mkString("/")} $s"
         ()
@@ -491,7 +488,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val getPin =
       (for {
         b   <- trans(BoardComp.get().lift[Option])
-        id  <- trans(Precepte(tags("point"))((_: Call.State[Call.BaseEnv, Call.BaseTags, ST]) => b.pin.point[Future]))
+        id  <- trans(Precepte(tags("point"))((_: State[BaseEnv, BaseTags, ST]) => b.pin.point[Future]))
         pin <- trans(CardComp.getPin(id))
       } yield pin).run
 
@@ -504,10 +501,10 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       h              <- HighlightComp.get()
     } yield (pin, cs, cards, availableTypes, h)
 
-    def logger(span: Call.Span, path: Call.Path[Call.BaseTags]): Log =
+    def logger(span: Span, path: Call.Path[BaseTags]): Log =
       Logger(span, path)
 
-    val initialState = Call.State[Call.BaseEnv, Call.BaseTags, ST](Call.Span.gen, env, Vector.empty, logger _)
+    val initialState = State[BaseEnv, BaseTags, ST](Span.gen, env, Vector.empty, logger _)
     res.eval(initialState).futureValue should ===(
       (Some((1, Card("card 1"))),
         List((1, Card("foo")), (1, Card("bar"))),
@@ -528,22 +525,22 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   it should "implement mapK" in {
 
     def f1: Precepte[Int] =
-      Precepte(tags("f1")) { (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+      Precepte(tags("f1")) { (c: State[BaseEnv, BaseTags, Unit]) =>
         1.point[Future]
       }
 
     def f2: Precepte[Int] =
-      Precepte(tags("f2")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+      Precepte(tags("f2")){ (c: State[BaseEnv, BaseTags, Unit]) =>
         Future { throw new RuntimeException("ooopps f2") }
       }
 
     def f3(i: Int): Precepte[String] =
-      Precepte(tags("f3")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+      Precepte(tags("f3")){ (c: State[BaseEnv, BaseTags, Unit]) =>
         "foo".point[Future]
       }
 
     def f4(i: Int): Precepte[String] =
-      Precepte(tags("f4")){ (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+      Precepte(tags("f4")){ (c: State[BaseEnv, BaseTags, Unit]) =>
         Future { throw new RuntimeException("ooopps f4") }
       }
 
@@ -566,7 +563,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   it should "run flatMapK" in {
 
     def f1: Precepte[Int] =
-      Precepte(tags("f1")) { (c: Call.State[Call.BaseEnv, Call.BaseTags, Unit]) =>
+      Precepte(tags("f1")) { (c: State[BaseEnv, BaseTags, Unit]) =>
         1.point[Future]
       }
 
