@@ -6,18 +6,6 @@ import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, Inde
 import scalaz.syntax.monad._
 
 class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
-  self =>
-
-  def mapEnv[E2 <: Env](env: E => E2): (TaggingContext[E2, T, C, F], self.Precepte[A] => TaggingContext[E2, T, C, F]#Precepte[A]) = {
-    val tc = new TaggingContext[E2, T, C, F]
-    def f[A]: self.Precepte[A] => tc.Precepte[A] = { (p: self.Precepte[A]) => p match {
-      case self.Return(a) => tc.Return(a)
-      case self.Step(st, tags) => tc.Step(st.mapE(f), tags)
-      case _ => throw new RuntimeException("blabla")
-    } }
-    tc -> f
-  }
-
   sealed trait Precepte[A] {
     self =>
 
