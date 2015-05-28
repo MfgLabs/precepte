@@ -25,7 +25,9 @@ abstract class Tag(val name: String, val value: String)
  * A micro-event happens (generally) locally to a system and is not distributed
  * It is identified by a local Id and enhanced with a few tags
  */
-case class Call[T <: Tags](id: CId, tags: T)
+case class Call[T <: Tags](id: CId, tags: T) {
+  def map[T2 <: Tags](f: T => T2) = Call[T2](if, f(tags))
+}
 
 object Call {
   type Path[T <: Tags] = Vector[Call[T]]
@@ -64,7 +66,10 @@ trait Env
 case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
 
 /** The state gathering all data concerning current execution context */
-case class State[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C)
+case class State[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) {
+  def mapE[E2 <: Env](f: E => E2): State[E2, T, C] = State[E2, T, C](span, f(env), path, value)
+  def mapT[T2 <: Tags](f: T => T2): State[E, T2, C] = State[E, T2, C](span, env, path, value)
+}
 
 /** The graph of execution of a Call */
 sealed trait Graph[T <: Tags, C, G <: Graph[T, C, G]] {
