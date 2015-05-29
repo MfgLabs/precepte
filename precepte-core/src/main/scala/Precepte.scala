@@ -7,23 +7,24 @@ import scalaz.syntax.monad._
 
 
 
-class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
+// class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
+class TaggingContext[S <: StateA, F[_]] {
   self =>
 
-  def contramapE[E2 <: Env](f: E2 => E)(implicit M: Monad[F]) = {
-    val tc = new TaggingContext[E2, T, C, F]
-    val nat: self.Precepte ~> tc.Precepte = new (self.Precepte ~> tc.Precepte) {
-      def apply[A](p: self.Precepte[A]) = p match {
-        case self.Return(a) => tc.Return(a)
-        case self.Step(st, tags) =>
-          tc.Precepte(tags){ state2 => p.eval(state2.mapE(f)) }
-        // case self.Flatmap(sub, next) =>
-        //   tc.Flatmap(sub.contramapE(f), i => next(i).contramapE(f))
-        case _ => throw new RuntimeException("blabla")
-      }
-    }
-    tc -> nat
-  }
+  // def contramapE[S2 <: StateA](f: S2 => S)(implicit M: Monad[F]) = {
+  //   val tc = new TaggingContext[S2, F]
+  //   val nat: self.Precepte ~> tc.Precepte = new (self.Precepte ~> tc.Precepte) {
+  //     def apply[A](p: self.Precepte[A]) = p match {
+  //       case self.Return(a) => tc.Return(a)
+  //       case self.Step(st, tags) =>
+  //         tc.Precepte(tags){ state2 => p.eval(state2.mapE(f)) }
+  //       // case self.Flatmap(sub, next) =>
+  //       //   tc.Flatmap(sub.contramapE(f), i => next(i).contramapE(f))
+  //       case _ => throw new RuntimeException("blabla")
+  //     }
+  //   }
+  //   tc -> nat
+  // }
 
   sealed trait Precepte[A] {
     self =>
@@ -54,13 +55,14 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
     def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[AP[A]] =
       this.map(a => ap.point(a))
 
-    final def eval(state: State[E, T, C], ids: Stream[CId] = Stream.continually(CId.gen))(implicit mo: Monad[F]): F[A] = {
+    final def eval(state: S, ids: Stream[CId] = Stream.continually(CId.gen))(implicit mo: Monad[F]): F[A] = {
       this match {
         case Return(a) => a.point[F]
         case Step(st, tags) =>
-          val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
+          //val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
+          val state0 = state.addCall(Call(ids.head, tags.asInstanceOf[state.T0]))
           st.run(state0).flatMap { case (c, m) =>
-            m.eval(state0.copy(value = c), ids.tail)
+            m.eval(state0.copyValue(c.asInstanceOf[state.C0]), ids.tail)
           }
         case FlatmapK(sub, f) =>
           f(sub.eval(state, ids)).flatMap { s =>
@@ -73,25 +75,25 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
       }
     }
 
-    final def run(state: State[E, T, C], ids: Stream[CId] = Stream.continually(CId.gen))(implicit mo: Monad[F]): F[(Root[T, C], A)] = {
-      def go[G <: Graph[T, C, G], B](m: Precepte[B], state: State[E, T, C], graph: G, ids: Stream[CId]): F[(Stream[CId], (G, B))] = {
+    final def run(state: S, ids: Stream[CId] = Stream.continually(CId.gen))(implicit mo: Monad[F]): F[(Root[S#T0, S#C0], A)] = {
+      def go[G <: Graph[S#T0, S#C0, G], B](m: Precepte[B], state: S, graph: G, ids: Stream[CId]): F[(Stream[CId], (G, B))] = {
         m match {
           case Return(a) =>
             (ids, (graph, a)).point[F]
 
           case Step(step, tags) =>
-            val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
+            val state0 = state.addCall(Call(ids.head, tags.asInstanceOf[state.T0]))
             step.run(state0).flatMap {
               case (c, mc) =>
                 val id = ids.head
                 val g0 = GraphNode(id, c, tags, Vector.empty)
-                go(mc, state0.copy(value = c), g0, ids.tail).map { case (is, (g, a)) =>
+                go(mc, state0.copyValue(c.asInstanceOf[state.C0]), g0, ids.tail).map { case (is, (g, a)) =>
                   (is, (graph.addChild(g),  a))
                 }
             }
           case FlatmapK(sub, next) =>
             // XXX: kinda hackish. We're only interested in this node children
-            val g0 = Root[T, C](Span("dummy"), Vector.empty)
+            val g0 = Root[S#T0, S#C0](Span("dummy"), Vector.empty)
             go(sub, state, g0, ids).flatMap { case (is0, (gi, a)) =>
               next(a.point[F]).flatMap { prb =>
                 go(prb, state, gi, is0).map { case (is1, (g, a)) =>
@@ -102,7 +104,7 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
 
           case Flatmap(sub, next) =>
             // XXX: kinda hackish. We're only interested in this node children
-            val g0 = Root[T, C](Span("dummy"), Vector.empty)
+            val g0 = Root[S#T0, S#C0](Span("dummy"), Vector.empty)
             go(sub, state, g0, ids).flatMap { case (is0, (gi, i)) =>
               go(next(i), state, gi, is0).map { case (is1, (g, a)) =>
                 (is1, (graph.addChildren(g.children), a))
@@ -110,14 +112,14 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
             }
         }
       }
-      go(this, state, Root[T, C](state.span, Vector.empty), ids).map(_._2)
+      go(this, state, Root[S#T0, S#C0](state.span, Vector.empty), ids).map(_._2)
     }
 
   }
 
   case class Return[A](a: A) extends Precepte[A]
-  case class Step[A](st: IndexedStateT[F, State[E, T, C], C, Precepte[A]], tags: T) extends Precepte[A] {
-    def run(state: State[E, T, C]): F[(C, Precepte[A])] =
+  case class Step[A](st: IndexedStateT[F, S, S#C0, Precepte[A]], tags: S#T0) extends Precepte[A] {
+    def run(state: S): F[(S#C0, Precepte[A])] =
       st.run(state)
   }
 
@@ -150,22 +152,22 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
   object Precepte extends LowPriorityInstances {
 
     trait PrecepteBuilder {
-      val tags: T
+      val tags: S#T0
       // import scalaz.Id._
 
       // def apply0[E <: Env, C, A](λ: State[E, T, C] => A): Precepte[E, T, C, Id, A] =
       //   apply[E, C, Id, A](λ)
 
-      def apply[A](λ: State[E, T, C] => F[A])(implicit F: Functor[F]): Precepte[A] =
+      def apply[A](λ: S => F[A])(implicit F: Functor[F]): Precepte[A] =
         Step[A](
-          IndexedStateT { (st: State[E, T, C]) =>
+          IndexedStateT { (st: S) =>
             for (a <- λ(st))
             yield st.value -> Return(a)
           }, tags)
 
-      def applyS[A](λ: State[E, T, C] => F[(C, A)])(implicit F: Functor[F]): Precepte[A] =
+      def applyS[A](λ: S => F[(S#C0, A)])(implicit F: Functor[F]): Precepte[A] =
         Step[A](
-          IndexedStateT { (st: State[E, T, C]) =>
+          IndexedStateT { (st: S) =>
             for (ca <- λ(st))
             yield {
               val (c, a) = ca
@@ -174,12 +176,12 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
           }, tags)
 
       def apply[A](m: Precepte[A])(implicit A: Applicative[F]): Precepte[A] =
-        Step(IndexedStateT[F, State[E, T, C], C, Precepte[A]]{ st =>
-          (st.value -> m).point[F]
+        Step(IndexedStateT[F, S, S#C0, Precepte[A]]{ st =>
+          (st.value.asInstanceOf[S#C0] -> m).point[F]
         }, tags)
     }
 
-    def apply(_tags: T) =
+    def apply(_tags: S#T0) =
       new PrecepteBuilder {
         val tags = _tags
       }

@@ -22,7 +22,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  val taggingContext = new TaggingContext[BaseEnv, BaseTags, Unit, Future]
+  val taggingContext = new TaggingContext[State[BaseEnv, BaseTags, Unit], Future]
   import taggingContext._
   import Precepte._
 
@@ -418,7 +418,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     type ST = (Span, Call.Path[BaseTags]) => Log
 
-    val taggingContext = new TaggingContext[BaseEnv, BaseTags, ST, Future]
+    val taggingContext = new TaggingContext[State[BaseEnv, BaseTags, ST], Future]
     import taggingContext._
     import Precepte._
     import scalaz.std.option._

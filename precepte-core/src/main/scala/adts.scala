@@ -66,9 +66,28 @@ trait Env
 case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
 
 /** The state gathering all data concerning current execution context */
-case class State[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) {
+trait StateA {
+  self =>
+  type E0 <: Env
+  type T0 <: Tags
+  type C0
+
+  def span: Span
+
+  def value: C0
+
+  def addCall(c: Call[T0]): self.type
+  def copyValue(c: C0): self.type
+}
+
+case class State[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) extends StateA {
+  type E0 = E ; type T0 = T ; type C0 = C
   def mapE[E2 <: Env](f: E => E2): State[E2, T, C] = State[E2, T, C](span, f(env), path, value)
   def mapT[T2 <: Tags](f: T => T2): State[E, T2, C] = State[E, T2, C](span, env, path.map(_.map(f)), value)
+
+  def addCall(c: Call[T0]) = this.copy(path = this.path :+ c).asInstanceOf[this.type]
+  def copyValue(c: C0) = this.copy(value = c).asInstanceOf[this.type]
+
 }
 
 /** The graph of execution of a Call */
