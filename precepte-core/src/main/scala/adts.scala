@@ -26,7 +26,7 @@ abstract class Tag(val name: String, val value: String)
  * It is identified by a local Id and enhanced with a few tags
  */
 case class Call[T <: Tags](id: CId, tags: T) {
-  def map[T2 <: Tags](f: T => T2) = Call[T2](if, f(tags))
+  def map[T2 <: Tags](f: T => T2) = Call[T2](id, f(tags))
 }
 
 object Call {
@@ -68,7 +68,7 @@ case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags
 /** The state gathering all data concerning current execution context */
 case class State[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) {
   def mapE[E2 <: Env](f: E => E2): State[E2, T, C] = State[E2, T, C](span, f(env), path, value)
-  def mapT[T2 <: Tags](f: T => T2): State[E, T2, C] = State[E, T2, C](span, env, path, value)
+  def mapT[T2 <: Tags](f: T => T2): State[E, T2, C] = State[E, T2, C](span, env, path.map(_.map(f)), value)
 }
 
 /** The graph of execution of a Call */
