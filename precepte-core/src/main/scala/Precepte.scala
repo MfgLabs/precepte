@@ -2,8 +2,9 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, IndexedStateT, ~> }
+import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, IndexedStateT, ~>, Isomorphism }
 import scalaz.syntax.monad._
+import Isomorphism.{ <~>, <=> }
 
 import scala.language.existentials
 
@@ -11,14 +12,14 @@ import scala.language.existentials
 class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
   self =>
 
-  def xmap[E2 <: Env, T2 <: Tags, C2, F2[_]](fEnv: E => E2)(fTags1: T => T2)(fTags2: T2 => T)(fC: C => C2)(fNat1: F ~> F2)(fNat2: F2 ~> F)(implicit M: Monad[F2], F: Functor[F]) = {
+  def xmap[E2 <: Env, T2 <: Tags, C2, F2[_]](fEnv: E => E2)(fC: C => C2)(fTags1: T <=> T2)(fNat: F2 <~> F)(implicit M: Monad[F2], F: Functor[F]) = {
     val tc = new TaggingContext[E2, T2, C2, F2]
     lazy val nat: tc.Precepte ~> self.Precepte = new (tc.Precepte ~> self.Precepte) {
       def apply[A](p2: tc.Precepte[A]) = p2 match {
         case tc.Return(a) => self.Return(a)
 
         case tc.Step(st, tags) =>
-          self.Precepte(fTags2(tags)){ state1 => fNat2(p2.eval(state1.map(fEnv)(fTags1)(fC))) }
+          self.Precepte(fTags2(tags)){ state1 => fNat.to(p2.eval(state1.map(fEnv)(fTags1)(fC))) }
         
         case fm:tc.Flatmap[i, a] =>
           self.Flatmap(nat(fm.sub), (i:i) => nat(fm.next(i)))
@@ -26,7 +27,7 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
         case fm:tc.FlatmapK[a, b] =>
           self.FlatmapK(
             nat(fm.sub),
-            (fa:F[a]) => fNat2(fm.f(fNat1(fa))).map(p2 => nat(p2))
+            (fa:F[a]) => fNat.to(fm.f(fNat.from(fa))).map(p2 => nat(p2))
           )
         case _ => throw new RuntimeException("blabla")
       }
