@@ -16,12 +16,18 @@ class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
     lazy val nat: tc.Precepte ~> self.Precepte = new (tc.Precepte ~> self.Precepte) {
       def apply[A](p2: tc.Precepte[A]) = p2 match {
         case tc.Return(a) => self.Return(a)
+
         case tc.Step(st, tags) =>
           self.Precepte(fTags2(tags)){ state1 => fNat2(p2.eval(state1.map(fEnv)(fTags1)(fC))) }
+        
         case fm:tc.Flatmap[i, a] =>
           self.Flatmap(nat(fm.sub), (i:i) => nat(fm.next(i)))
-        // case fm:tc.FlatmapK[a, b] =>
-        //   self.FlatmapK(nat(fm.sub), (fa:F[a]) => fNat2(fm.f(fNat1(fa).asInstanceOf[F2[tc.Precepte[b]]}])).map(nat _))
+        
+        case fm:tc.FlatmapK[a, b] =>
+          self.FlatmapK(
+            nat(fm.sub),
+            (fa:F[a]) => fNat2(fm.f(fNat1(fa))).map(p2 => nat(p2))
+          )
         case _ => throw new RuntimeException("blabla")
       }
     }
