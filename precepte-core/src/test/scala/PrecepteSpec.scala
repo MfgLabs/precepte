@@ -578,4 +578,55 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
   }
 
+  it should "xmap" in {
+    import scalaz.Isomorphism
+    import scala.language.existentials
+
+    case class Ctx(toto: Int)
+    val (tc2, nat) = taggingContext.xmap[BaseEnv, BaseTags, Ctx , Future](
+      Isomorphism.isoRefl[BaseTags], Isomorphism.isoNaturalRefl[Future],
+      e => e, c => Ctx(5)
+    )
+
+    val p2 = tc2.Precepte(tags("f1")) { st =>
+      1.point[Future]
+    }
+
+    val p = nat(p2)
+
+    p.eval(nostate).futureValue should ===(1)
+  }
+
+  it should "iso" in {
+    import scalaz.Isomorphism
+    import Isomorphism.<=>
+    import scala.language.existentials
+
+    def mkIso[A, B](to0: A => B, from0: B => A) = new (A <=> B) {
+      def to = to0
+      def from = from0
+    }
+
+    case class Ctx(toto: Int)
+
+    val (tc2, iso) = taggingContext.iso[BaseEnv, BaseTags, Ctx , Future](
+      Isomorphism.isoRefl[BaseEnv], 
+      Isomorphism.isoRefl[BaseTags],
+      mkIso(Unit => Ctx(5), ctx => ()),
+      Isomorphism.isoNaturalRefl[Future]
+    )
+
+    val p2 = tc2.Precepte(tags("f1")) { st =>
+      1.point[Future]
+    }
+
+    val p = iso.from(p2)
+    val p3 = iso.to(p)
+
+    def nostate2 = State[BaseEnv, BaseTags, Ctx](Span.gen, env, Vector.empty, Ctx(1))
+
+    p.eval(nostate).futureValue should ===(1)
+    p3.eval(nostate2).futureValue should ===(p2.eval(nostate2).futureValue)
+  }
+
 }

@@ -12,14 +12,70 @@ import scala.language.existentials
 class TaggingContext[E <: Env, T <: Tags, C, F[_]] {
   self =>
 
-  def xmap[E2 <: Env, T2 <: Tags, C2, F2[_]](fEnv: E => E2)(fC: C => C2)(fTags1: T <=> T2)(fNat: F2 <~> F)(implicit M: Monad[F2], F: Functor[F]) = {
+  def iso[E2 <: Env, T2 <: Tags, C2, F2[_]](
+    fE: E <=> E2, fT: T <=> T2, fC: C <=> C2,
+    fF: F2 <~> F
+  )(implicit M: Monad[F2], F: Monad[F]): (TaggingContext[E2, T2, C2, F2], Precepte <~> TaggingContext[E2, T2, C2, F2]#Precepte) = {
     val tc = new TaggingContext[E2, T2, C2, F2]
-    lazy val nat: tc.Precepte ~> self.Precepte = new (tc.Precepte ~> self.Precepte) {
-      def apply[A](p2: tc.Precepte[A]) = p2 match {
-        case tc.Return(a) => self.Return(a)
+
+    lazy val nat: self.Precepte <~> tc.Precepte =
+      new (self.Precepte <~> tc.Precepte) {
+        def from = new (tc.Precepte ~> self.Precepte) {
+          def apply[A](p2: tc.Precepte[A]): self.Precepte[A] = p2 match {
+            case tc.Return(a) =>
+              self.Return(a)
+
+            case tc.Step(st, tags) =>
+              self.Precepte(fT.from(tags)){ state1 => fF.to(p2.eval(state1.map((fE.to _)())((fT.to _)())((fC.to _)()))) }
+            
+            case fm:tc.Flatmap[i, a] =>
+              self.Flatmap(nat.from(fm.sub), (i:i) => nat.from(fm.next(i)))
+            
+            case fm:tc.FlatmapK[a, b] =>
+              self.FlatmapK(
+                nat.from(fm.sub),
+                (fa:F[a]) => fF.to(fm.f(fF.from(fa))).map(p2 => nat.from(p2))
+              )
+            case _ => throw new RuntimeException("blabla")
+          }
+        }
+
+        def to = new (self.Precepte ~> tc.Precepte) {
+          def apply[A](p: self.Precepte[A]): tc.Precepte[A] = p match {
+            case self.Return(a) =>
+              tc.Return(a)
+
+            case self.Step(st, tags) =>
+              tc.Precepte(fT.to(tags)){ state1 => fF.from(p.eval(state1.map((fE.from _)())((fT.from _)())((fC.from _)()))) }
+            
+            case fm:self.Flatmap[i, a] =>
+              tc.Flatmap(nat.to(fm.sub), (i:i) => nat.to(fm.next(i)))
+            
+            case fmk:self.FlatmapK[a, b] =>
+              tc.FlatmapK(
+                nat.to(fmk.sub),
+                (fa:F2[a]) => fF.from(fmk.f(fF.to(fa))).map(p => nat.to(p))
+              )
+            case _ => throw new RuntimeException("blabla")
+          }
+        }
+      }
+
+    tc -> nat.asInstanceOf[self.Precepte <~> TaggingContext[E2, T2, C2, F2]#Precepte]
+  }
+
+
+  def xmap[E2 <: Env, T2 <: Tags, C2, F2[_]](
+    fTags1: T <=> T2, fNat: F2 <~> F, fEnv: E => E2, fC: C => C2
+  )(implicit M: Monad[F2], F: Functor[F]): (TaggingContext[E2, T2, C2, F2], TaggingContext[E2, T2, C2, F2]#Precepte ~> Precepte) = {
+    val tc = new TaggingContext[E2, T2, C2, F2]
+    lazy val nat: TaggingContext[E2, T2, C2, F2]#Precepte ~> self.Precepte = new (TaggingContext[E2, T2, C2, F2]#Precepte ~> self.Precepte) {
+      def apply[A](p2: TaggingContext[E2, T2, C2, F2]#Precepte[A]) = p2 match {
+        case tc.Return(a) =>
+          self.Return(a)
 
         case tc.Step(st, tags) =>
-          self.Precepte(fTags2(tags)){ state1 => fNat.to(p2.eval(state1.map(fEnv)(fTags1)(fC))) }
+          self.Precepte(fTags1.from(tags)){ state1 => fNat.to(p2.eval(state1.map(fEnv)((fTags1.to _)())(fC))) }
         
         case fm:tc.Flatmap[i, a] =>
           self.Flatmap(nat(fm.sub), (i:i) => nat(fm.next(i)))
