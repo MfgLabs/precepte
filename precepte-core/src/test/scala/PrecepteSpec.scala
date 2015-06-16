@@ -22,9 +22,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  // val taggingContext = new TaggingContext[BaseEnv, BaseTags, Unit, Future]
-  type PST[C] = PStateBase[BaseEnv, BaseTags, C]
-  val taggingContext = new TaggingContext[BaseTags, PST[Unit], Future]
+  val taggingContext = new TCTX0[Future, Unit]
   import taggingContext._
   import Precepte._
 
@@ -50,8 +48,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     }
   }
 
-  def toStates[C](g: Root[BaseTags, PST[C]]): Seq[PStateBase[BaseEnv, BaseTags, C]] = {
-    def go(g: GraphNode[BaseTags, PST[C]], span: Span, path: Call.Path[BaseTags], states: Seq[PStateBase[BaseEnv, BaseTags, C]]): Seq[PStateBase[BaseEnv, BaseTags, C]] = {
+  def toStates[C](g: Root[BaseTags, PST0[C]]): Seq[PStateBase[BaseEnv, BaseTags, C]] = {
+    def go(g: GraphNode[BaseTags, PST0[C]], span: Span, path: Call.Path[BaseTags], states: Seq[PStateBase[BaseEnv, BaseTags, C]]): Seq[PStateBase[BaseEnv, BaseTags, C]] = {
       val GraphNode(id, value, tags, cs) = g
       val p = path :+ Call(id, tags)
       val st = PStateBase[BaseEnv, BaseTags, C](span, env, p, value.value)
@@ -80,12 +78,12 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     result0 should ===(1)
 
     println("-- graph0 --")
-    p[Unit, PST[Unit], Root[BaseTags, PST[Unit]]](graph0)
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph0)
     println("----")
 
     val (graphm, _) = Precepte(tags("graphm0"))(Precepte(tags("graphm"))(f1)).run(nostate).futureValue
     println("-- graphm --")
-    p[Unit, PST[Unit], Root[BaseTags, PST[Unit]]](graphm)
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graphm)
     println("----")
 
     val res =
@@ -98,12 +96,12 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     result should ===("foo 1")
 
     println("-- graph --")
-    p[Unit, PST[Unit], Root[BaseTags, PST[Unit]]](graph)
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph)
     println("----")
 
     val (graph1, result1) = Precepte(tags("trivial.anon"))(res).run(nostate).futureValue
     println("-- graph1 --")
-    p[Unit, PST[Unit], Root[BaseTags, PST[Unit]]](graph1)
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph1)
     println("----")
 
     val res2 =
@@ -114,7 +112,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     val (graph2, result2) = res2.run(nostate, (1 to 30).map(i => CId(i.toString)).toStream).futureValue
     println("-- graph2 --")
-    p[Unit, PST[Unit], Root[BaseTags, PST[Unit]]](graph2)
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph2)
     println("----")
   }
 
@@ -220,7 +218,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     val (graph, rr) = res3.run.run(nostate).futureValue
     rr should ===(error)
-    p[Unit, PST[Unit], Root[BaseTags, PST[Unit]]](graph)
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph)
   }
 
   it should "pass context" in {

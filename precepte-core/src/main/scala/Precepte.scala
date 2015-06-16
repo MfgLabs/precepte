@@ -6,6 +6,7 @@ import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, Inde
 import scalaz.syntax.monad._
 
 class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
+  
   sealed trait Precepte[A] {
     self =>
 
