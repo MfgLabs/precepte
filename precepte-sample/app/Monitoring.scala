@@ -13,8 +13,8 @@ object Monitoring {
 
 	import play.api.libs.json._
 
-  object PreContext extends TaggingContext[BaseEnv, BaseTags, Unit, Future]
-  type ST = State[BaseEnv, BaseTags, Unit]
+  object PreContext extends TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags, Unit], Future]
+  type ST = PStateBase[BaseEnv, BaseTags, Unit]
 
 	val env = BaseEnv(
 		Tags.Host(java.net.InetAddress.getLocalHost().getHostName()),
@@ -43,7 +43,7 @@ object Monitoring {
 	}
 
 	object MonitoringContext {
-		def apply[C](st: State[BaseEnv, BaseTags, C]): MonitoringContext = MonitoringContext(st.span, st.path)
+		def apply[C](st: PStateBase[BaseEnv, BaseTags, C]): MonitoringContext = MonitoringContext(st.span, st.path)
 	}
 }
 

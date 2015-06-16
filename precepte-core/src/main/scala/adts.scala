@@ -59,21 +59,25 @@ object Tags {
 }
 
 
-/** The typed environment in which an event happens */
-trait Env
-case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
 
 /** The state gathering all data concerning current execution context */
 trait PState[T <: Tags]
 
 
+/** A hidden State Monad */
 trait PStatable[T <: Tags, S <: PState[T]] {
   def run(s: S, id: CId, tags: T): S
 }
 
+
+/** The typed environment in which an event happens */
+trait Env
+case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
+
 case class PStateBase[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) extends PState[T]
 
 object PStateBase {
+  
   implicit def pstatable[E <: Env, T <: Tags, C] = new PStatable[T, PStateBase[E, T, C]] {
     def run(s: PStateBase[E, T, C], id: CId, tags: T): PStateBase[E, T, C] = s.copy(path = s.path :+ Call(id, tags))
   }
@@ -92,7 +96,6 @@ sealed trait Graph[T <: Tags, S <: PState[T], G <: Graph[T, S, G]] {
     addChildren(Vector(c))
 }
 
-// case class GraphNode[T <: Tags, C](id: CId, value: C, tags: T, children: Vector[GraphNode[T, C]]) extends Graph[T, C, GraphNode[T, C]] {
 case class GraphNode[T <: Tags, S <: PState[T]](id: CId, value: S, tags: T, children: Vector[GraphNode[T, S]]) extends Graph[T, S, GraphNode[T, S]] {
   def addChildren(cs: Vector[GraphNode[T, S]]): GraphNode[T, S] =
     this.copy(children = children ++ cs)
