@@ -30,7 +30,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   private def tags(n: String) = BaseTags(Tags.Callee(n), Tags.Category.Database)
 
-  def p[C, S <: PStateBase[BaseEnv, BaseTags, C], G <: Graph[BaseTags, S, G]](g: G, before: String = ""): Unit = {
+  def p[C, S <: PST0[C], G <: Graph[BaseTags, S, G]](g: G, before: String = ""): Unit = {
     val txt = g match {
       case Root(span, _) =>
         s"Root[$span]"
@@ -48,11 +48,11 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     }
   }
 
-  def toStates[C](g: Root[BaseTags, PST0[C]]): Seq[PStateBase[BaseEnv, BaseTags, C]] = {
-    def go(g: GraphNode[BaseTags, PST0[C]], span: Span, path: Call.Path[BaseTags], states: Seq[PStateBase[BaseEnv, BaseTags, C]]): Seq[PStateBase[BaseEnv, BaseTags, C]] = {
+  def toStates[C](g: Root[BaseTags, PST0[C]]): Seq[PST0[C]] = {
+    def go(g: GraphNode[BaseTags, PST0[C]], span: Span, path: Call.Path[BaseTags], states: Seq[PST0[C]]): Seq[PST0[C]] = {
       val GraphNode(id, value, tags, cs) = g
       val p = path :+ Call(id, tags)
-      val st = PStateBase[BaseEnv, BaseTags, C](span, env, p, value.value)
+      val st = PST0[C](span, env, p, value.value)
       val cst = cs.map{ c =>
         go(c, span, p, Seq.empty)
       }.flatten
@@ -65,14 +65,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
 
-  def nostate = PStateBase[BaseEnv, BaseTags, Unit](Span.gen, env, Vector.empty, ())
+  def nostate = PST0[Unit](Span.gen, env, Vector.empty, ())
   import Tags.Callee
 
   "Precepte" should "trivial" in {
 
-    def f1 = Precepte(tags("trivial.f1")){ (_: PStateBase[BaseEnv, BaseTags, Unit]) => 1.point[Future] }
-    def f2(i: Int) = Precepte(tags("trivial.f2")){ (_: PStateBase[BaseEnv, BaseTags, Unit]) => s"foo $i".point[Future] }
-    def f3(i: Int) = Precepte(tags("trivial.f3")){ (_: PStateBase[BaseEnv, BaseTags, Unit]) => (i + 1).point[Future] }
+    def f1 = Precepte(tags("trivial.f1")){ (_: PST0[Unit]) => 1.point[Future] }
+    def f2(i: Int) = Precepte(tags("trivial.f2")){ (_: PST0[Unit]) => s"foo $i".point[Future] }
+    def f3(i: Int) = Precepte(tags("trivial.f3")){ (_: PST0[Unit]) => (i + 1).point[Future] }
 
     val (graph0, result0) = f1.run(nostate).futureValue
     result0 should ===(1)
@@ -117,8 +117,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "simple" in {
-    def f1 = Precepte(tags("simple.f1")){(_: PStateBase[BaseEnv, BaseTags, Unit]) => 1.point[Future]}
-    def f2(i: Int) = Precepte(tags("simple.f2")){(_: PStateBase[BaseEnv, BaseTags, Unit]) => s"foo $i".point[Future]}
+    def f1 = Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
+    def f2(i: Int) = Precepte(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
 
     val res = for {
       i <- f1
@@ -129,9 +129,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "optT" in {
-    val f1 = Precepte(tags("opt"))((_: PStateBase[BaseEnv, BaseTags, Unit]) => Option("foo").point[Future])
-    val f2 = Precepte(tags("opt"))((_: PStateBase[BaseEnv, BaseTags, Unit]) => Option(1).point[Future])
-    val f3 = Precepte(tags("opt"))((_: PStateBase[BaseEnv, BaseTags, Unit]) => (None: Option[Int]).point[Future])
+    val f1 = Precepte(tags("opt"))((_: PST0[Unit]) => Option("foo").point[Future])
+    val f2 = Precepte(tags("opt"))((_: PST0[Unit]) => Option(1).point[Future])
+    val f3 = Precepte(tags("opt"))((_: PST0[Unit]) => (None: Option[Int]).point[Future])
 
 
     val res = for {
@@ -157,9 +157,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "listT" in {
-    val f1 = Precepte(tags("listT"))((_: PStateBase[BaseEnv, BaseTags, Unit]) => List("foo", "bar").point[Future])
-    val f2 = Precepte(tags("listT"))((_: PStateBase[BaseEnv, BaseTags, Unit]) => List(1, 2).point[Future])
-    val f3 = Precepte(tags("listT"))((_: PStateBase[BaseEnv, BaseTags, Unit]) => List[Int]().point[Future])
+    val f1 = Precepte(tags("listT"))((_: PST0[Unit]) => List("foo", "bar").point[Future])
+    val f2 = Precepte(tags("listT"))((_: PST0[Unit]) => List(1, 2).point[Future])
+    val f3 = Precepte(tags("listT"))((_: PST0[Unit]) => List[Int]().point[Future])
 
     val res = for {
       e1 <- trans(f1)
@@ -222,14 +222,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "pass context" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[PStateBase[BaseEnv, BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
-    def push(state: PStateBase[BaseEnv, BaseTags, Unit]): Unit = {
+    def push(state: PST0[Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       push(c)
       1.point[Future]
     }
@@ -242,14 +242,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "preserve context on map" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[PStateBase[BaseEnv, BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
-    def push(state: PStateBase[BaseEnv, BaseTags, Unit]): Unit = {
+    def push(state: PST0[Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       push(c)
       1.point[Future]
     }.map(identity).map(identity).map(identity).map(identity)
@@ -264,24 +264,24 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "preserve context on flatMap" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[PStateBase[BaseEnv, BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
-    def push(state: PStateBase[BaseEnv, BaseTags, Unit]): Unit = {
+    def push(state: PST0[Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       push(c)
       1.point[Future]
     }
 
-    def f2(i: Int) = Precepte(tags("f2")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f2(i: Int) = Precepte(tags("f2")){ (c: PST0[Unit]) =>
       push(c)
       s"foo $i".point[Future]
     }
 
-    def f3(s: String) = Precepte(tags("f3")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f3(s: String) = Precepte(tags("f3")){ (c: PST0[Unit]) =>
       push(c)
       s"f3 $s".point[Future]
     }
@@ -298,7 +298,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "stack contexts" in {
-    def f1 = Precepte(tags("f1")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       1.point[Future]
     }
 
@@ -311,19 +311,19 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "provide context to C" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[PStateBase[BaseEnv, BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
-    def push(state: PStateBase[BaseEnv, BaseTags, Unit]): Unit = {
+    def push(state: PST0[Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")) { (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")) { (c: PST0[Unit]) =>
       push(c)
       1.point[Future]
     }
 
-    def f2(i: Int) = Precepte(tags("f2")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f2(i: Int) = Precepte(tags("f2")){ (c: PST0[Unit]) =>
       push(c)
       s"foo $i".point[Future]
     }
@@ -382,19 +382,19 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "not stack context on trans" in {
-    val ctxs = scala.collection.mutable.ArrayBuffer[PStateBase[BaseEnv, BaseTags, Unit]]()
+    val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
-    def push(state: PStateBase[BaseEnv, BaseTags, Unit]): Unit = {
+    def push(state: PST0[Unit]): Unit = {
       ctxs += state
       ()
     }
 
-    def f1 = Precepte(tags("f1")) { (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f1 = Precepte(tags("f1")) { (c: PST0[Unit]) =>
       push(c)
       Option(1).point[Future]
     }
 
-    def f2(i: Int) = Precepte(tags("f1")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+    def f2(i: Int) = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       push(c)
       Option(s"foo $i").point[Future]
     }
@@ -418,9 +418,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     type ST = (Span, Call.Path[BaseTags]) => Log
 
-    type STT = PStateBase[BaseEnv, BaseTags, ST]
-
-    val taggingContext = new TaggingContext[BaseTags, STT, Future]
+    val taggingContext = new TaggingContext[BaseTags, PST0[ST], Future]
     import taggingContext._
     import Precepte._
     import scalaz.std.option._
@@ -430,7 +428,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     }
 
     def Logged[A](tags: BaseTags)(f: Log => Future[A]): Precepte[A] =
-      Precepte(tags) { (state: PStateBase[BaseEnv, BaseTags, ST]) =>
+      Precepte(tags) { (state: PST0[ST]) =>
         f(state.value(state.span, state.path))
       }
 
@@ -490,7 +488,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val getPin =
       (for {
         b   <- trans(BoardComp.get().lift[Option])
-        id  <- trans(Precepte(tags("point"))((_: PStateBase[BaseEnv, BaseTags, ST]) => b.pin.point[Future]))
+        id  <- trans(Precepte(tags("point"))((_: PST0[ST]) => b.pin.point[Future]))
         pin <- trans(CardComp.getPin(id))
       } yield pin).run
 
@@ -506,7 +504,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     def logger(span: Span, path: Call.Path[BaseTags]): Log =
       Logger(span, path)
 
-    val initialState = PStateBase[BaseEnv, BaseTags, ST](Span.gen, env, Vector.empty, logger _)
+    val initialState = PST0[ST](Span.gen, env, Vector.empty, logger _)
     res.eval(initialState).futureValue should ===(
       (Some((1, Card("card 1"))),
         List((1, Card("foo")), (1, Card("bar"))),
@@ -527,22 +525,22 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   it should "implement mapK" in {
 
     def f1: Precepte[Int] =
-      Precepte(tags("f1")) { (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+      Precepte(tags("f1")) { (c: PST0[Unit]) =>
         1.point[Future]
       }
 
     def f2: Precepte[Int] =
-      Precepte(tags("f2")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+      Precepte(tags("f2")){ (c: PST0[Unit]) =>
         Future { throw new RuntimeException("ooopps f2") }
       }
 
     def f3(i: Int): Precepte[String] =
-      Precepte(tags("f3")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+      Precepte(tags("f3")){ (c: PST0[Unit]) =>
         "foo".point[Future]
       }
 
     def f4(i: Int): Precepte[String] =
-      Precepte(tags("f4")){ (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+      Precepte(tags("f4")){ (c: PST0[Unit]) =>
         Future { throw new RuntimeException("ooopps f4") }
       }
 
@@ -565,7 +563,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   it should "run flatMapK" in {
 
     def f1: Precepte[Int] =
-      Precepte(tags("f1")) { (c: PStateBase[BaseEnv, BaseTags, Unit]) =>
+      Precepte(tags("f1")) { (c: PST0[Unit]) =>
         1.point[Future]
       }
 
