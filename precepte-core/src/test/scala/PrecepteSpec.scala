@@ -22,7 +22,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   import scalaz.syntax.monad._
   import scalaz.EitherT
 
-  val taggingContext = new TCTX0[Future, Unit]
+  val taggingContext = new PCTX0[Future, Unit]
   import taggingContext._
   import Precepte._
 

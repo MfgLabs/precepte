@@ -11,6 +11,6 @@ package object precepte {
     def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): PST0[C] = PStateBase(span, env, path, value)
   }
 
-  type TCTX0[F[_], C] = TaggingContext[BaseTags, PST0[C], F]
+  type PCTX0[F[_], C] = TaggingContext[BaseTags, PST0[C], F]
 
 }
