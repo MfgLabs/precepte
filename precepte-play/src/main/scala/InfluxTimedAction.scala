@@ -14,17 +14,17 @@ object InfluxTimedAction {
   // )(implicit ex: ExecutionContext) =
   //   new TimedAction(initialC)(ctx, influx)
 
-  def apply[C, TC <: TaggingContext[BaseEnv, BaseTags, C, Future]](initialC: C)(
+  def apply[C, TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags, C], Future]](initialC: C)(
     ctx: TC,
     influxdbURL: java.net.URL,
     env: BaseEnv,
     system: ActorSystem
   )(implicit ex: ExecutionContext) =
-    new InfluxTimedAction(initialC, ctx, Influx[TC, C](ctx, influxdbURL, env, system))
+    new InfluxTimedAction(initialC, ctx, Influx[C, TC](ctx, influxdbURL, env, system))
 }
 
-class InfluxTimedAction[TC <: TaggingContext[BaseEnv, BaseTags, C, Future], C](
-  val initialC: C, val ctx: TC, val influx: Influx[TC, C]
+class InfluxTimedAction[TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags, C], Future], C](
+  val initialC: C, val ctx: TC, val influx: Influx[C, TC]
 )(implicit ex: ExecutionContext) {
   import ctx._
 
@@ -38,7 +38,7 @@ class InfluxTimedAction[TC <: TaggingContext[BaseEnv, BaseTags, C, Future], C](
         a <- ts.get(ROUTE_ACTION_METHOD)
       } yield s"$c.$a").getOrElse(request.toString)
 
-      val initialState = State[BaseEnv, BaseTags, C](Span.gen, influx.env, Vector.empty, initialC)
+      val initialState = PStateBase[BaseEnv, BaseTags, C](Span.gen, influx.env, Vector.empty, initialC)
       f(Tags.Category.Api, Tags.Callee(name), request).eval(initialState)
     }
 

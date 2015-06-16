@@ -21,7 +21,7 @@ class ModelSpec extends PlaySpecification {
 
   val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Dev, Tags.Version("1.0"))
   private def tags(n: String) = BaseTags(Tags.Callee(n), Tags.Category.Database)
-  def nostate = State[BaseEnv, BaseTags, Unit](Span.gen, env, Vector.empty, ())
+  def nostate = PST0(Span.gen, env, Vector.empty, ())
 
   "Computer model" should {
 
