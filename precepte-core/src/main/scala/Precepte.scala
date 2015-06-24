@@ -26,8 +26,66 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
     def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[AP[A]] =
       this.map(a => ap.point(a))
 
+    final def resume(state: S, ids: Stream[CId] = Stream.continually(CId.gen))(implicit fu: Functor[F], ps: PStatable[T, S]): (F[(S, Precepte[A])] \/ A) = this match {
+      case Return(a) => \/-(a)
+
+      case Step(st, tags) =>
+        val state0 = ps.run(state, ids.head, tags)
+        -\/(st.run(state0))
+
+      case Flatmap(sub, next) =>
+        sub match {
+          case Return(a) => next(a.asInstanceOf[Any]).resume(state, ids)
+          
+          case Step(st, tags) =>
+            val state0 = ps.run(state, ids.head, tags)
+            -\/(st.run(state0).map { case (s, p) => s -> p.flatMap(next) })
+
+          case Flatmap(sub2, next2) =>
+            sub2.flatMap(z => next2(z).flatMap(next)).resume(state, ids)
+
+          case FlatmapK(subk, fk) =>
+            subk.flatMapK(z => fk(z).map(_.flatMap(next))).resume(state, ids)
+        }
+
+      // case FlatmapK(sub, fk) =>
+        // sub match {
+          // case Return(a) => next(a.asInstanceOf[Any]).resume(state, ids)
+          
+          // case Step(st, tags) =>
+
+          // case Flatmap(sub2, next2) =>
+
+          // case FlatmapK(subk, fk) =>
+        // }
+    }
+
     final def eval(state: S, ids: Stream[CId] = Stream.continually(CId.gen))(implicit mo: Monad[F], ps: PStatable[T, S]): F[A] = {
-      this match {
+      // @scala.annotation.tailrec
+      def go[B](m: Precepte[B], state: S, ids: Stream[CId]): F[B] = {
+        m match {
+          case Return(a) => a.point[F]
+          case Step(st, tags) =>
+            val state0 = ps.run(state, ids.head, tags)
+            st.run(state0).flatMap { case (s, m) =>
+              go(m, s, ids.tail)
+            }
+          case FlatmapK(sub, f) =>
+            f(go(sub, state, ids)).flatMap { s =>
+              // s.eval(state, ids.tail) // XXX: not sure
+              go(s, state, ids.tail)
+            }
+          case Flatmap(sub, next) =>
+            // sub.eval(state, ids)
+            go(sub, state, ids).flatMap { case i =>
+              // next(i).eval(state, ids.tail)
+              go(next(i), state, ids.tail)
+            }
+        }
+      }
+
+      go(this, state, ids)
+      /*this match {
         case Return(a) => a.point[F]
         case Step(st, tags) =>
           // val state0 = state.copy(path = state.path :+ Call(ids.head, tags))
@@ -43,7 +101,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
           sub.eval(state, ids).flatMap { case i =>
             next(i).eval(state, ids.tail)
           }
-      }
+      }*/
     }
 
     final def run(state: S, ids: Stream[CId] = Stream.continually(CId.gen))(implicit mo: Monad[F], ps: PStatable[T, S], rt: Rootable[T, S]): F[(Root[T, S], A)] = {

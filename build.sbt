@@ -10,19 +10,20 @@ lazy val commonSettings =  Seq(
 
 lazy val strictScalac =
 	scalacOptions ++= Seq(
-		"-Yrangepos",
-		"-Xlint",
-		"-deprecation",
-		"-Xfatal-warnings",
-		"-feature",
-		"-encoding", "UTF-8",
-		"-unchecked",
-		"-Yno-adapted-args",
-		"-Ywarn-dead-code",
-		"-Ywarn-numeric-widen",
-		"-Ywarn-value-discard",
-		"-Xfuture",
-		"-Ywarn-unused-import")
+		"-Yrangepos"
+		//, "-Xlint",
+		,"-deprecation"
+		//, "-Xfatal-warnings"
+		, "-feature"
+		, "-encoding", "UTF-8"
+		//, "-unchecked"
+		, "-Yno-adapted-args"
+		, "-Ywarn-dead-code"
+		, "-Ywarn-numeric-widen"
+		, "-Ywarn-value-discard"
+		, "-Xfuture"
+		//, "-Ywarn-unused-import"
+)
 
 lazy val core =
 	project.in(file("precepte-core"))

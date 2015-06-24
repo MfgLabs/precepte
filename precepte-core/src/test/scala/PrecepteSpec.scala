@@ -3,7 +3,7 @@ package precepte
 
 import org.scalatest._
 import Matchers._
-import Inspectors._
+// import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -24,7 +24,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   val taggingContext = new PCTX0[Future, Unit]
   import taggingContext._
-  import Precepte._
+  // import Precepte._
 
   val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Test, Tags.Version("1.0"))
 
@@ -67,7 +67,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   def nostate = PST0[Unit](Span.gen, env, Vector.empty, ())
   import Tags.Callee
-
+/*
   "Precepte" should "trivial" in {
 
     def f1 = Precepte(tags("trivial.f1")){ (_: PST0[Unit]) => 1.point[Future] }
@@ -155,6 +155,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     res3.run.eval(nostate).futureValue should ===(None)
   }
+
 
   it should "listT" in {
     val f1 = Precepte(tags("listT"))((_: PST0[Unit]) => List("foo", "bar").point[Future])
@@ -578,4 +579,19 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
   }
 
+
+*/
+
+  it should "not stack overflow" in {
+    def pre(i: Int) = Precepte(tags(s"stack_$i"))((_: PST0[Unit]) => List(i).point[Future])
+
+    val f1 = Precepte(tags("stacko"))((_: PST0[Unit]) => List("foo", "bar").point[Future])
+    val pf = List.fill(10000)(5).foldLeft(
+      pre(0)
+    ){ case (p, i) =>
+      p.flatMap(_ => pre(i))
+    }
+
+    pf.eval(nostate).futureValue should equal (List(5))
+  }
 }
