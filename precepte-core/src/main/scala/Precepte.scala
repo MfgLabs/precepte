@@ -8,7 +8,7 @@ import scalaz.syntax.monad._
 import scala.annotation.tailrec
 
 class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
-  
+
   case class ResumeStep[A](result: F[(Precepte[A], S, PIdSeries)] \/ (A, S, PIdSeries), f: Seq[F[A] => Precepte[A]] = Seq())
   case class ResumeGraphStep[G <: Graph[T, S, G], A](result: F[(Precepte[A], S, PIdSeries, G)] \/ (A, S, PIdSeries, G), f: Seq[F[A] => Precepte[A]] = Seq())
 
@@ -46,7 +46,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
           case Return(a) =>
             // println("Flatmap - Return")
             next(a.asInstanceOf[Any]).resume(state, ids, fs)
-          
+
           case Step(st, tags) =>
             // println("Flatmap - Step")
             val (state0, ids0) = ps.run(state, ids, tags)
@@ -72,14 +72,14 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
           case Return(a) =>
             // println("ZZ0")
             ResumeStep(-\/(fk(a.point[F]).map(Return(_))), ids, fs)
-          
+
           case Step(st, tags) =>
             // println("ZZ1")
             val (state0, ids0) = ps.run(state, ids, tags)
             // repass state as a Step in a MapK means the mapK chain is finished
             ResumeStep(-\/(st.eval(state0).map(_.mapK(fk))), ids0, fs)
 
-          case Flatmap(sub2, next2) =>  
+          case Flatmap(sub2, next2) =>
             // println("ZZ2")
             sub2.flatMap(z => next2(z).mapK(fk)).resume(state, ids, fs)
 
@@ -93,34 +93,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
         }*/
 
       case FlatmapK(subk, fk) =>
-        println("FlatMapK")
-        subk.asInstanceOf[Precepte[A]].resume(state, ids, (fs :+ fk).asInstanceOf[Seq[F[A] => Precepte[A]]])
-        /*subk match {
-          case Return(a) =>
-            println("FlatMapK - Return")
-            fk(a.point[F]).resume(state, ids)
-          
-          case Step(st, tags) =>
-            println("FlatMapK - Step")
-            val state0 = ps.run(state, ids.head, tags)
-            // repass state as a Step in a FlatmapK means the flatMapK chain is finished
-            -\/(st.eval(state0).map(_.flatMapK(fk)))
-
-          case s@Flatmap(sub, next) =>
-            println("FlatMapK - Flatmap")
-            s.resume(state, ids) match {
-              case -\/(fsp) => -\/(fsp.map(_.flatMapK(fk)))
-              case \/-(a) => \/-(a.asInstanceOf[A])
-            }
-
-          case MapK(subk2, fk2) =>
-            println("FlatMapK - MapK")
-            subk2.flatMapK(z => fk(fk2(z))).resume(state, ids)
-
-          case FlatmapK(subk2, fk2) =>
-            println("FlatMapK - FlatmapK")
-            subk2.flatMapK { z => fk2(z).flatMapK(fk) }.resume(state, ids)
-        }*/
+        subk.map(_.point[F]).flatMap(fk).resume(state, ids, fs)
     }
 
     final def eval0(state: S, ids: PIdSeries /*= Stream.continually(PId.gen)*/ = PIdStream(), fs: Seq[F[A] => Precepte[A]] = Seq())(implicit mo: Monad[F], ps: PStatable[T, S]): F[(A, S, PIdSeries)] = {
@@ -129,7 +102,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
           fsp.flatMap { case (p0, s0, ids0) => p0.eval0(s0, ids0, fs) }
 
         // case ResumeStep(-\/(fsp), fk +: fs) =>
-          // fsp.flatMap { case (p0, s0, ids0) => 
+          // fsp.flatMap { case (p0, s0, ids0) =>
           //   p0.eval(s0, ids0) match {
           //     case ResumeStep(-\/(fsp), fs1) =>
 
@@ -167,7 +140,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
           case Return(a) =>
             // println("Flatmap - Return")
             next(a.asInstanceOf[Any]).resumeGraph(state, ids, graph, fs)
-          
+
           case Step(st, tags) =>
             // println("Flatmap - Step")
             val (s0, ids0, g0) = psg.run(state, ids, tags)
@@ -193,14 +166,14 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
           case Return(a) =>
             // println("ZZ0")
             ResumeStep(-\/(fk(a.point[F]).map(Return(_))), ids, fs)
-          
+
           case Step(st, tags) =>
             // println("ZZ1")
             val (state0, ids0) = ps.run(state, ids, tags)
             // repass state as a Step in a MapK means the mapK chain is finished
             ResumeStep(-\/(st.eval(state0).map(_.mapK(fk))), ids0, fs)
 
-          case Flatmap(sub2, next2) =>  
+          case Flatmap(sub2, next2) =>
             // println("ZZ2")
             sub2.flatMap(z => next2(z).mapK(fk)).resume(state, ids, fs)
 
@@ -220,7 +193,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
     }
 
     final def runGraph(state: S, ids: PIdSeries = PIdStream())(implicit mo: Monad[F], psg: PGraphStatable[T, S], rt: Rootable[T, S]): F[(A, S, PIdSeries, Root[T, S])] = {
-      
+
       def go[G <: Graph[T, S, G], B](p: Precepte[B], state: S, ids: PIdSeries, graph: G, fs: Seq[F[B] => Precepte[B]] = Seq()): F[(B, S, PIdSeries, G)] = {
 
         p.resumeGraph(state, ids, graph, fs) match {
@@ -236,7 +209,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
       go(this, state, ids, rt.toRoot(state))
     }
       // @scala.annotation.tailrec
-      // def go[B](m: Precepte[B], state: S, ids: Stream[PId]): F[B] = 
+      // def go[B](m: Precepte[B], state: S, ids: Stream[PId]): F[B] =
 
       // {
       //   m match {
@@ -258,7 +231,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
       //       }
 
       //     // case FlatmapK(subk, nextk) =>
-      //       // go(nextk(go(subk, state, ids)), 
+      //       // go(nextk(go(subk, state, ids)),
       //       // .flatMap { s =>
       //       //   // s.eval(state, ids.tail) // XXX: not sure
       //       //   go(s, state, ids.tail)
@@ -333,7 +306,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
     //   (state: S, ids: Stream[PId] = Stream.continually(PId.gen))
     //   (f: A => G[B])
     //   (implicit ft: Traverse[F], mo: Monad[F], ps: PStatable[T, S]): G[Precepte[B]] = {
-      
+
     //   self.resume(state, ids) match {
     //     case -\/(fs) =>
     //       val v: Int = ft.traverseImpl(fs){ case ((s, p)) => p.traverse[G, B](s, ids)(f) }
