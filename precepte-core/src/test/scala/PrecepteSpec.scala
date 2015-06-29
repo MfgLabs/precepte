@@ -70,7 +70,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
 
   import Tags.Callee
-
+/*
   "Precepte" should "trivial" in {
 
     def f1 = Precepte(tags("trivial.f1")){ (_: PST0[Unit]) => 1.point[Future] }
@@ -275,7 +275,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     ctxs.toList should ===(toStates(graph).toList)
   }
-/*
+
   it should "preserve context on flatMap" in {
     val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
@@ -309,7 +309,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     ctxs.length should ===(3)
     ctxs.toList should ===(toStates(graph).toList.drop(1))
   }
-*/
+
   it should "stack contexts" in {
     def f1 = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       1.point[Future]
@@ -322,7 +322,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     graph.children should have length 1
     graph.children.head.children should have length 1
   }
-/*
+
   it should "provide context to C" in {
     val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
@@ -596,12 +596,29 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
   }
 
+*/
+
+
+  it should "eval flatMapK failure" in {
+
+    def f1: Precepte[Int] =
+      Precepte(tags("f1")) { (c: PST0[Unit]) =>
+        Future { throw new RuntimeException("ooopps f1") }
+      }
+
+    val a = f1
+      .flatMapK(futI => Precepte(tags("f")){ _ => Future("recover") })
+      .flatMap { a => println(s"A:$a"); 1.point[Precepte] }
+      .eval(nostate).futureValue
+    a should equal (1)
+  }
+
 
 
   it should "not stack overflow" in {
     def pre(l: List[Int], i: Int) = Precepte(tags(s"stack_$i"))((_: PST0[Unit]) => l.point[Future])
 
-    val l = List.iterate(0, 1000){ i => i + 1 }
+    val l = List.iterate(0, 100000){ i => i + 1 }
 
     val pf = l.foldLeft(
       pre(List(), 0)
@@ -609,8 +626,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       p.flatMap(l => pre(i +: l, i))
     }
 
-    pf.eval0(nostate).futureValue should equal (l.reverse)
+    pf.eval(nostate).futureValue should equal (l.reverse)
   }
-*/
+
 
 }
