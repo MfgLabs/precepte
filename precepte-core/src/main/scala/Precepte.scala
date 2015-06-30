@@ -12,12 +12,12 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
   trait ResumeStep[A]
   case class FlatMapStep[A](v: F[(Precepte[A], S, PIdSeries)]) extends ResumeStep[A]
   case class ReturnStep[A](v: (A, S, PIdSeries)) extends ResumeStep[A]
-  case class KStep[A](v: Precepte[A]) extends ResumeStep[A]
+  case class KStep[A](v: PrecepteK[A]) extends ResumeStep[A]
 
   trait ResumeGraphStep[G <: Graph[T, S, G], A]
   case class FlatMapGraphStep[G <: Graph[T, S, G], A](v: F[(Precepte[A], S, PIdSeries, G)]) extends ResumeGraphStep[G, A]
   case class ReturnGraphStep[G <: Graph[T, S, G], A](v: (A, S, PIdSeries, G)) extends ResumeGraphStep[G, A]
-  case class KGraphStep[G <: Graph[T, S, G], A](v: Precepte[A]) extends ResumeGraphStep[G, A]
+  case class KGraphStep[G <: Graph[T, S, G], A](v: PrecepteK[A]) extends ResumeGraphStep[G, A]
 
   sealed trait Precepte[A] {
     self =>
@@ -73,11 +73,11 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
             subk.flatMapK(z => fk(z).flatMap(next)).resume(state, ids)
         }
 
-      case MapK(subk, fk) =>
-        KStep(this)
+      case k@MapK(_,_) =>
+        KStep(k)
 
-      case FlatmapK(subk, fk) =>
-        KStep(this)
+      case k@FlatmapK(_,_) =>
+        KStep(k)
     }
 
     final def eval0(state: S, ids: PIdSeries = PIdStream())(implicit mo: Monad[F], ps: PStatable[T, S]): F[(A, S, PIdSeries)] = {
@@ -144,11 +144,11 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
             subk.flatMapK(z => fk(z).flatMap(next)).resumeGraph(state, ids, graph)
         }
 
-      case MapK(subk, fk) =>
-        KGraphStep(this)
+      case k@MapK(_, _) =>
+        KGraphStep(k)
 
-      case FlatmapK(subk, fk) =>
-        KGraphStep(this)
+      case k@FlatmapK(_, _) =>
+        KGraphStep(k)
 
     }
 
@@ -197,10 +197,12 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
     type _I = I
   }
 
-  case class MapK[A, B](sub: Precepte[A], f: F[A] => F[B]) extends Precepte[B]
+  trait PrecepteK[A] extends Precepte[A]
+
+  case class MapK[A, B](sub: Precepte[A], f: F[A] => F[B]) extends PrecepteK[B]
 
   // case class FlatmapK[A, B](sub: Precepte[A], f: F[A] => F[Precepte[B]]) extends Precepte[B]
-  case class FlatmapK[A, B](sub: Precepte[A], f: F[A] => Precepte[B]) extends Precepte[B]
+  case class FlatmapK[A, B](sub: Precepte[A], f: F[A] => Precepte[B]) extends PrecepteK[B]
 
   trait LowPriorityInstances {
     implicit def precepteMonadInstance(implicit B: Applicative[F]) =
