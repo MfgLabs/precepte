@@ -70,7 +70,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
 
   import Tags.Callee
-/*
+
   "Precepte" should "trivial" in {
 
     def f1 = Precepte(tags("trivial.f1")){ (_: PST0[Unit]) => 1.point[Future] }
@@ -309,7 +309,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     ctxs.length should ===(3)
     ctxs.toList should ===(toStates(graph).toList.drop(1))
   }
-
+/*
   it should "stack contexts" in {
     def f1 = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       1.point[Future]
