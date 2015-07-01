@@ -71,62 +71,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   import Tags.Callee
 
-  "Precepte" should "trivial" in {
-
-    def f1 = Precepte(tags("trivial.f1")){ (_: PST0[Unit]) => 1.point[Future] }
-    def f2(i: Int) = Precepte(tags("trivial.f2")){ (_: PST0[Unit]) => s"foo $i".point[Future] }
-    def f3(i: Int) = Precepte(tags("trivial.f3")){ (_: PST0[Unit]) => (i + 1).point[Future] }
-
-    val (result0, _, _, graph0) = f1.runGraph(nostate, ids).futureValue
-    result0 should ===(1)
-    graph0.children.size should ===(1)
-    graph0.children(0).id should ===(PId("1"))
-
-    println("-- graph0 --")
-    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph0)
-    println("----")
-
-    val (_, _, _, graphm) = Precepte(tags("graphm0"))(Precepte(tags("graphm"))(f1)).runGraph(nostate).futureValue
-    println("-- graphm --")
-    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graphm)
-    println("----")
-
-    val res =
-      for {
-        i <- f1
-        r <- f2(i)
-      } yield r
-
-    val (result, _, _, graph) = res.runGraph(nostate, ids).futureValue
-    graph.children.size should ===(2)
-    graph.children(0).id should ===(PId("1"))
-    graph.children(1).id should ===(PId("2"))
-
-    result should ===("foo 1")
-
-    println("-- graph --")
-    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph)
-    println("----")
-
-    val (result1, _, _, graph1) = Precepte(tags("trivial.anon"))(res).runGraph(nostate).futureValue
-
-    println("-- graph1 --")
-    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph1)
-    println("----")
-
-    val res2 =
-      for {
-        i <- Precepte(tags("trivial.anon2"))(f1)
-        r <- f2(i)
-      } yield r
-
-    val (result2, _, _, graph2) = res2.runGraph(nostate, ids).futureValue
-    println("-- graph2 --")
-    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph2)
-    println("----")
-  }
-
-  it should "simple" in {
+  "Precepte" should "run/eval simple" in {
     def f1 = Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
     def f2(i: Int) = Precepte(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
 
@@ -135,7 +80,66 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       r <- f2(i)
     } yield r
 
-    res.eval(nostate).futureValue should ===("foo 1")
+    val (a, s, ids) = res.run(nostate).futureValue
+    a should ===("foo 1")
+    s.env should ===(env)
+    s.path.size should ===(2)
+    s.path(0).tags should ===(tags("simple.f1"))
+    s.path(1).tags should ===(tags("simple.f2"))
+
+    val a0 = res.eval(nostate).futureValue
+    a0 should ===("foo 1")
+  }
+
+  it should "observe simple" in {
+    def f1 =
+      Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
+        .flatMap(a => Precepte(tags("simple.f1.1")){(_: PST0[Unit]) => (a+1).point[Future]})
+        .flatMap(a => Precepte(tags("simple.f1.2")){(_: PST0[Unit]) => (a+1).point[Future]})
+        .flatMap(a => Precepte(tags("simple.f1.3")){(_: PST0[Unit]) => (a+1).point[Future]})
+    def f2(i: Int) =
+      Precepte(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
+        .flatMap(a => Precepte(tags("simple.f2.1")){(_: PST0[Unit]) => s"$a.1".point[Future]})
+        .flatMap(a => Precepte(tags("simple.f2.2")){(_: PST0[Unit]) => s"$a.2".point[Future]})
+    def f3(s: String) =
+      Precepte(tags("simple.f3")){(_: PST0[Unit]) => s"$s finito".point[Future]}
+
+    val res = for {
+      i <- f1
+      s <- f2(i)
+      r <- f3(s)
+    } yield r
+
+    val (a, s, ids, graph) = res.observe0(nostate).futureValue
+    println("-- graph0 --")
+    val tree = graph.toTree
+    val g = tree.drawTree
+    println(g)
+    // p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph)
+    println("----")
+
+    val sf1 = tree.subForest(0)
+    val Node0(_, t1) = sf1.rootLabel
+    t1 should ===(tags("simple.f1"))
+    val Node0(_, t11) = sf1.subForest(0).rootLabel
+    t11 should ===(tags("simple.f1.1"))
+    val Node0(_, t12) = sf1.subForest(1).rootLabel
+    t12 should ===(tags("simple.f1.2"))
+    val Node0(_, t13) = sf1.subForest(2).rootLabel
+    t13 should ===(tags("simple.f1.3"))
+
+    val sf2 = tree.subForest(1)
+    val Node0(_, t2) = sf2.rootLabel
+    t2 should ===(tags("simple.f2"))
+    val Node0(_, t21) = sf2.subForest(0).rootLabel
+    t21 should ===(tags("simple.f2.1"))
+    val Node0(_, t22) = sf2.subForest(1).rootLabel
+    t22 should ===(tags("simple.f2.2"))
+
+    val sf3 = tree.subForest(2)
+    val Node0(_, t3) = sf3.rootLabel
+    t3 should ===(tags("simple.f3"))
+
   }
 
 
@@ -229,11 +233,93 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    val (rr, _, _, graph) = res3.run.runGraph(nostate).futureValue
-    rr should ===(error)
-    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph)
+    val (rr0, _, _, graph0) = res3.run.observe0(nostate).futureValue
+    rr0 should ===(error)
+    println("-- graph0 --")
+    val tree = graph0.toTree
+    println(tree.drawTree)
+    println("----")
+
+    val sf = tree.subForest(0)
+    sf.subForest should be(empty)
+    val Node0(_, t) = sf.rootLabel
+    t should ===(tags("f3"))
+
+    // val (rr1, _, _, graph1) = res3.run.observe(nostate).futureValue
+    // rr1 should ===(error)
+    // println("-- graph1 --")
+    // p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph1)
+    // println("----")
+
   }
 
+
+
+  it should "trivial" in {
+
+    def f1 = Precepte(tags("trivial.f1")){ (_: PST0[Unit]) => 1.point[Future] }
+    def f2(i: Int) = Precepte(tags("trivial.f2")){ (_: PST0[Unit]) => s"foo $i".point[Future] }
+    def f3(i: Int) = Precepte(tags("trivial.f3")){ (_: PST0[Unit]) => (i + 1).point[Future] }
+
+    val (result0, _, _, graph0) = f1.observe(nostate, ids).futureValue
+    result0 should ===(1)
+    graph0.children.size should ===(1)
+    graph0.children(0).id should ===(PId("1"))
+
+    println("-- graph0 --")
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph0)
+    println("----")
+
+    val (_, _, _, graphm) = Precepte(tags("graphm0"))(Precepte(tags("graphm"))(f1)).observe(nostate).futureValue
+    println("-- graphm --")
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graphm)
+    println("----")
+
+    val res =
+      for {
+        i <- f1
+        r <- f2(i)
+      } yield r
+
+
+    val (result11, _, _, graph11) = res.observe0(nostate, ids).futureValue
+    println("-- graph11 --")
+    val tree11 = graph11.toTree
+    println(tree11.drawTree)
+    println("----")
+
+    result11 should ===("foo 1")
+
+    val (result12, _, _, graph12) = res.observe(nostate, ids).futureValue
+    graph12.children.size should ===(2)
+    graph12.children(0).id should ===(PId("1"))
+    graph12.children(1).id should ===(PId("2"))
+
+    result12 should ===("foo 1")
+
+    println("-- graph12 --")
+    p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph12)
+    println("----")
+
+    // val (result1, _, _, graph1) = Precepte(tags("trivial.anon"))(res).observe(nostate).futureValue
+
+    // println("-- graph1 --")
+    // p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph1)
+    // println("----")
+
+    // val res2 =
+    //   for {
+    //     i <- Precepte(tags("trivial.anon2"))(f1)
+    //     r <- f2(i)
+    //   } yield r
+
+    // val (result2, _, _, graph2) = res2.observe(nostate, ids).futureValue
+    // println("-- graph2 --")
+    // p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph2)
+    // println("----")
+  }
+
+/*
   it should "pass context" in {
     val ctxs = scala.collection.mutable.ArrayBuffer[PST0[Unit]]()
 
@@ -309,7 +395,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     ctxs.length should ===(3)
     ctxs.toList should ===(toStates(graph).toList.drop(1))
   }
-/*
+
   it should "stack contexts" in {
     def f1 = Precepte(tags("f1")){ (c: PST0[Unit]) =>
       1.point[Future]

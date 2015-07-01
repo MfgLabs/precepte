@@ -1,18 +1,23 @@
 package com.mfglabs
 package precepte
 
+
 /** Span uniquely identifies a macro-event managed by Precepte
  * and potentially constituted of multiple micro-events.
  * A macro-event doesn't need to be local to a system, can be distributed in space & time...
  */
-case class Span(value: String) extends AnyVal
+case class Span(value: String) extends AnyVal {
+  override def toString = s"span($value)"
+}
 
 object Span {
   def gen = Span(java.util.UUID.randomUUID.toString)
 }
 
 /** Id uniquely identifies a micro-event in the scope of a macro-event managed by Precepte */
-case class PId(value: String) extends AnyVal
+case class PId(value: String) extends AnyVal {
+  override def toString = s"pid($value)"
+}
 
 object PId {
   def gen = PId(scala.util.Random.alphanumeric.take(7).mkString)
@@ -34,12 +39,18 @@ object Call {
 /** A typed group of tags */
 trait Tags
 object NoTags extends Tags
-case class BaseTags(callee: Tags.Callee, category: Tags.Category) extends Tags
+case class BaseTags(callee: Tags.Callee, category: Tags.Category) extends Tags  {
+  override def toString = s"($callee, $category)"
+}
 
 object Tags {
-  case class Callee(override val value: String) extends Tag("callee", value)
+  case class Callee(override val value: String) extends Tag("callee", value) {
+    override def toString = s"callee($value)"
+  }
 
-  abstract class Category(value: String) extends Tag("category", value)
+  abstract class Category(value: String) extends Tag("category", value) {
+    override def toString = s"category($value)"
+  }
   object Category {
     def unapply(c: Category) = Some(c.value)
     object Api extends Category("api")
@@ -131,4 +142,16 @@ trait Rootable[T <: Tags, S <: PState[T]] {
 
 case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PIdSeries {
   def run() = ids.head -> PIdStream(ids.tail)
+}
+
+sealed trait Node
+case class NodeR(span: Span) extends Node {
+  override def toString = s"root($span)"
+}
+case class Node0[T <: Tags](id: PId, tags: T) extends Node {
+  override def toString = s"node($tags, $id)"
+}
+
+object Node {
+  implicit def show[T <: Tags] = scalaz.Show.showA[Node]
 }
