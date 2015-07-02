@@ -193,7 +193,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
     }
 
 
-    def applyRoot(zipper: TreeLoc[Node], nbSub: Int) =
+    private def applyRoot(zipper: TreeLoc[Node], nbSub: Int) =
       (1 to nbSub).foldLeft(zipper){ case (z, i) => println(s"$i"); z.root }
 
     @tailrec private final def resumeObserve0(state: S, ids: PIdSeries, zipper: TreeLoc[Node], nbSub: Int = 0, cur: Int = 0)(implicit fu: Monad[F], psg: PGraphStatable[T, S], rt: Rootable[T, S]): ResumeTreeStep[A] = this match {
@@ -223,8 +223,12 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
               st.run(s0).map { case (s, p) =>
                 ( p.flatMap(next),
                   s,
-                  ids0, 
+                  ids0,
+                  // embedded flatmap => right
                   if(cur > 1) { println("right"); zipper.insertRight(Tree.leaf(Node0(g0.id, tags))) }
+                  // flatmap at 1st level just under root => right
+                  else if (cur == 0 && nbSub == 0 && zipper.parent.isDefined) { println("right0"); zipper.insertRight(Tree.leaf(Node0(g0.id, tags))) }
+                  // else => down last
                   else { println("down"); zipper.insertDownLast(Tree.leaf(Node0(g0.id, tags))) },
                   nbSub,
                   cur + 1
