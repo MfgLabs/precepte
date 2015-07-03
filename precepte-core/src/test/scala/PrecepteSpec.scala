@@ -843,4 +843,42 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 */
 
+
+  it should "iso" in {
+    def pre(l: List[Int], i: Int) = Precepte(tags(s"stack_$i"))((_: PST0[Unit]) => l.point[Future])
+
+    import scalaz.{ ~>, <~, NaturalTransformation }
+    import scalaz.Isomorphism.<~>
+
+    val to0 = new (Future ~> Future) {
+      def apply[A](fa: Future[A]) = {
+        val f = Future {
+          println("before")
+        }.flatMap(_ => fa)
+        .map{a => println(s"this is $a"); a}
+        f.onComplete( _ => println("after") )
+        f
+      }
+    }
+
+    val from0 = NaturalTransformation.refl[Future]
+
+    val iso0 = new (Future <~> Future) {
+      def from = from0
+      def to = to0
+    }
+    val tagiso = taggingContext.iso(iso0)
+
+    val l = List.iterate(0, 20000){ i => i + 1 }
+
+    val pf = l.foldLeft(
+      pre(List(), 0)
+    ){ case (p, i) =>
+      p.flatMap(l => pre(i +: l, i))
+    }
+
+    pf.eval(nostate).futureValue should equal (l.reverse)
+
+    // tagiso.iso.to(pf).eval(nostate).futureValue
+  }
 }

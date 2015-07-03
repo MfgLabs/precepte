@@ -2,13 +2,164 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, State, Traverse }
+import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, State, Traverse, ~> }
+import scalaz.Isomorphism.<~>
 import scalaz.syntax.monad._
 
 import scala.annotation.tailrec
 import scalaz.{TreeLoc, Tree}
 
 class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
+  self =>
+
+  trait TaggingContextIso[F2[_]] {
+
+    val tc: TaggingContext[T, S, F2]
+
+    val iso: self.Precepte <~> tc.Precepte
+  }
+
+
+  def iso[F2[_]](isoF: F <~> F2)(implicit mf: Monad[F], mf2: Monad[F2]) = new TaggingContextIso[F2] {
+    override val tc = new TaggingContext[T, S, F2]
+
+    override lazy val iso: self.Precepte <~> tc.Precepte = new (self.Precepte <~> tc.Precepte) {
+
+      def to = new (self.Precepte ~> tc.Precepte) {
+        def apply[A](p: self.Precepte[A]): tc.Precepte[A] = p match {
+
+          case self.Return(a) =>
+            tc.Return(a)
+
+          case self.Step(st, tags) =>
+            tc.Step[A](
+              IndexedStateT { (s: S) =>
+                isoF.to(st(s).map{ case (s, p) => s -> iso.to(p) })
+              }, tags
+            )
+
+          case fm:self.Flatmap[i, a] =>
+            tc.Flatmap(iso.to(fm.sub), (i:i) => iso.to(fm.next(i)))
+          
+          case fm:self.FlatmapK[a, b] =>
+            tc.FlatmapK(
+              iso.to(fm.sub),
+              (f2: F2[a]) => iso.to(fm.f(isoF.from(f2)))
+            )
+
+        }
+      }
+
+      def from = new (tc.Precepte ~> self.Precepte) {
+        def apply[A](p2: tc.Precepte[A]): self.Precepte[A] = p2 match {
+
+          case tc.Return(a) =>
+            self.Return(a)
+
+          case tc.Step(st, tags) =>
+            self.Step[A](
+              IndexedStateT { (s: S) =>
+                isoF.from(st(s).map{ case (s, p) => s -> iso.from(p) })
+              }, tags
+            )
+
+          case fm:tc.Flatmap[i, a] =>
+            self.Flatmap(iso.from(fm.sub), (i:i) => iso.from(fm.next(i)))
+          
+          case fm:tc.FlatmapK[a, b] =>
+            self.FlatmapK(
+              iso.from(fm.sub),
+              (f: F[a]) => iso.from(fm.f(isoF.to(f)))
+            )
+
+        }
+      }
+    }
+  }
+
+/*
+
+  def iso[T2 <: Tags, F2[_]](
+    fT: T <=> T2, fF: F2 <~> F
+  )(implicit M: Monad[F2], F: Monad[F]): (TaggingContext[T2, F2], Precepte <~> TaggingContext[T2, F2]#Precepte) = {
+    val tc = new TaggingContext[T2, S2, F2]
+
+    lazy val iso: self.Precepte <~> tc.Precepte =
+      new (self.Precepte <~> tc.Precepte) {
+        def from = new (tc.Precepte ~> self.Precepte) {
+          def apply[A](p2: tc.Precepte[A]): self.Precepte[A] = p2 match {
+            case tc.Return(a) =>
+              self.Return(a)
+
+            case tc.Step(st, tags) =>
+              self.Precepte(
+                fT.from(tags)
+              ){ state1 => fF.to(p2.eval(state1.map((fE.to _)())((fT.to _)())((fC.to _)()))) }
+            
+            case fm:tc.Flatmap[i, a] =>
+              self.Flatmap(iso.from(fm.sub), (i:i) => iso.from(fm.next(i)))
+            
+            case fm:tc.FlatmapK[a, b] =>
+              self.FlatmapK(
+                iso.from(fm.sub),
+                (fa:F[a]) => fF.to(fm.f(fF.from(fa))).map(p2 => iso.from(p2))
+              )
+            case _ => throw new RuntimeException("blabla")
+          }
+        }
+
+        def to = new (self.Precepte ~> tc.Precepte) {
+          def apply[A](p: self.Precepte[A]): tc.Precepte[A] = p match {
+            case self.Return(a) =>
+              tc.Return(a)
+
+            case self.Step(st, tags) =>
+              tc.Precepte(fT.to(tags)){ state1 => fF.from(p.eval(state1.map((fE.from _)())((fT.from _)())((fC.from _)()))) }
+            
+            case fm:self.Flatmap[i, a] =>
+              tc.Flatmap(iso.to(fm.sub), (i:i) => iso.to(fm.next(i)))
+            
+            case fmk:self.FlatmapK[a, b] =>
+              tc.FlatmapK(
+                iso.to(fmk.sub),
+                (fa:F2[a]) => fF.from(fmk.f(fF.to(fa))).map(p => iso.to(p))
+              )
+            case _ => throw new RuntimeException("blabla")
+          }
+        }
+      }
+
+    tc -> iso.asInstanceOf[self.Precepte <~> TaggingContext[E2, T2, C2, F2]#Precepte]
+  }
+*/
+
+  // def xmap[E2 <: Env, T2 <: Tags, C2, F2[_]](
+  //   fTags1: T <=> T2, fiso: F2 <~> F, fEnv: E => E2, fC: C => C2
+  // )(implicit M: Monad[F2], F: Functor[F]): (TaggingContext[E2, T2, C2, F2], TaggingContext[E2, T2, C2, F2]#Precepte ~> Precepte) = {
+  //   val tc = new TaggingContext[E2, T2, C2, F2]
+  //   lazy val iso: TaggingContext[E2, T2, C2, F2]#Precepte ~> self.Precepte = new (TaggingContext[E2, T2, C2, F2]#Precepte ~> self.Precepte) {
+  //     def apply[A](p2: TaggingContext[E2, T2, C2, F2]#Precepte[A]) = p2 match {
+  //       case tc.Return(a) =>
+  //         self.Return(a)
+
+  //       case tc.Step(st, tags) =>
+  //         self.Precepte(fTags1.from(tags)){ state1 => fiso.to(p2.eval(state1.map(fEnv)((fTags1.to _)())(fC))) }
+        
+  //       case fm:tc.Flatmap[i, a] =>
+  //         self.Flatmap(iso(fm.sub), (i:i) => iso(fm.next(i)))
+        
+  //       case fm:tc.FlatmapK[a, b] =>
+  //         self.FlatmapK(
+  //           iso(fm.sub),
+  //           (fa:F[a]) => fiso.to(fm.f(fiso.from(fa))).map(p2 => iso(p2))
+  //         )
+  //       case _ => throw new RuntimeException("blabla")
+  //     }
+  //   }
+  //   tc -> iso
+  // }
+
+
 
   trait ResumeStep[A]
   case class FlatMapStep[A](v: F[(Precepte[A], S, PIdSeries)]) extends ResumeStep[A]
@@ -49,37 +200,37 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
 
     @tailrec private final def resume(state: S, ids: PIdSeries)(implicit fu: Monad[F], ps: PStatable[T, S]): ResumeStep[A] = this match {
       case Return(a) =>
-        println(s"EVAL R $this")
+        // println(s"EVAL R $this")
         ReturnStep((a, state, ids))
 
       case Step(st, tags) =>
-        println(s"EVAL S $this")
+        // println(s"EVAL S $this")
         val (state0, ids0) = ps.run(state, ids, tags)
         FlatMapStep(st.run(state0).map { case (s, p) => (p, s, ids0) })
 
       case Flatmap(sub, next) =>
-        println(s"EVAL Flatmap $this")
+        // println(s"EVAL Flatmap $this")
         sub match {
           case Return(a) =>
-            println("EVAL Flatmap - Return")
+            // println("EVAL Flatmap - Return")
             next(a.asInstanceOf[Any]).resume(state, ids)
 
           case Step(st, tags) =>
-            println("EVAL Flatmap - Step")
+            // println("EVAL Flatmap - Step")
             val (state0, ids0) = ps.run(state, ids, tags)
             // repass state as a Step in a Flatmap means the flatMap chain is finished
             FlatMapStep(st.run(state0).map { case (s, p) => (p.flatMap(next), state, ids0) })
 
           case Flatmap(sub2, next2) =>
-            println("EVAL Flatmap - Flatmap")
+            // println("EVAL Flatmap - Flatmap")
             sub2.flatMap(z => next2(z).flatMap(next)).resume(state, ids)
 
           case MapK(subk, fk) =>
-            println("EVAL Flatmap - MapK")
+            // println("EVAL Flatmap - MapK")
             subk.mapK(z => fk(z).map(next)).flatMap(identity).resume(state, ids)
 
           case FlatmapK(subk, fk) =>
-            println("EVAL Flatmap - FlatmapK")
+            // println("EVAL Flatmap - FlatmapK")
             subk.flatMapK(z => fk(z).flatMap(next)).resume(state, ids)
         }
 
