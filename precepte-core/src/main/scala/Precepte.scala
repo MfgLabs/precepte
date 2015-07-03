@@ -49,37 +49,37 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
 
     @tailrec private final def resume(state: S, ids: PIdSeries)(implicit fu: Monad[F], ps: PStatable[T, S]): ResumeStep[A] = this match {
       case Return(a) =>
-        // println("R")
+        println(s"EVAL R $this")
         ReturnStep((a, state, ids))
 
       case Step(st, tags) =>
-        // println("S")
+        println(s"EVAL S $this")
         val (state0, ids0) = ps.run(state, ids, tags)
         FlatMapStep(st.run(state0).map { case (s, p) => (p, s, ids0) })
 
       case Flatmap(sub, next) =>
-        // println("Flatmap")
+        println(s"EVAL Flatmap $this")
         sub match {
           case Return(a) =>
-            // println("Flatmap - Return")
+            println("EVAL Flatmap - Return")
             next(a.asInstanceOf[Any]).resume(state, ids)
 
           case Step(st, tags) =>
-            // println("Flatmap - Step")
+            println("EVAL Flatmap - Step")
             val (state0, ids0) = ps.run(state, ids, tags)
             // repass state as a Step in a Flatmap means the flatMap chain is finished
-            FlatMapStep(st.run(state0).map { case (s, p) => (p.flatMap(next), s, ids0) })
+            FlatMapStep(st.run(state0).map { case (s, p) => (p.flatMap(next), state, ids0) })
 
           case Flatmap(sub2, next2) =>
-            // println("Flatmap - Flatmap")
+            println("EVAL Flatmap - Flatmap")
             sub2.flatMap(z => next2(z).flatMap(next)).resume(state, ids)
 
           case MapK(subk, fk) =>
-            // println("Flatmap - MapK")
+            println("EVAL Flatmap - MapK")
             subk.mapK(z => fk(z).map(next)).flatMap(identity).resume(state, ids)
 
           case FlatmapK(subk, fk) =>
-            // println("Flatmap - FlatmapK")
+            println("EVAL Flatmap - FlatmapK")
             subk.flatMapK(z => fk(z).flatMap(next)).resume(state, ids)
         }
 
@@ -202,9 +202,15 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
         ReturnTreeStep((a, state, ids, zipper))
 
       case Step(st, tags) =>
-        println("S")
+        println(s"Step $this $nbSub $cur")
         val (s0, ids0, g0) = psg.run(state, ids, tags)
-        STreeStep(st.run(s0).map { case (s, p) => (p, s, ids0, zipper.insertRight(Tree.leaf(Node0(g0.id, tags)))) })
+        STreeStep(st.run(s0).map { case (s, p) =>
+          (
+            p, s, ids0,
+            if (cur == 0 && nbSub == 0) zipper.insertDownLast(Tree.leaf(Node0(g0.id, tags)))
+            else zipper.insertRight(Tree.leaf(Node0(g0.id, tags)))
+          )
+        })
 
 
       case f@Flatmap(sub, next) =>
@@ -227,11 +233,13 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
                   // embedded flatmap => right
                   if(cur > 1) { println("right"); zipper.insertRight(Tree.leaf(Node0(g0.id, tags))) }
                   // flatmap at 1st level just under root => right
-                  else if (cur == 0 && nbSub == 0 && zipper.parent.isDefined) { println("right0"); zipper.insertRight(Tree.leaf(Node0(g0.id, tags))) }
+                  else if (cur == nbSub && zipper.parent.isDefined) { println("right0"); zipper.insertRight(Tree.leaf(Node0(g0.id, tags))) }
                   // else => down last
                   else { println("down"); zipper.insertDownLast(Tree.leaf(Node0(g0.id, tags))) },
                   nbSub,
-                  cur + 1
+                  if(cur > 1) cur + 1
+                  else if (cur == nbSub && zipper.parent.isDefined) cur
+                  else cur + 1
                 )
               }
             )
