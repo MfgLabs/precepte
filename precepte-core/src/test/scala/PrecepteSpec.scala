@@ -855,7 +855,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         val f = Future {
           println("before")
         }.flatMap(_ => fa)
-        .map{a => println(s"this is $a"); a}
+        // .map{a => println(s"this is $a"); a}
         f.onComplete( _ => println("after") )
         f
       }
@@ -877,8 +877,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       p.flatMap(l => pre(i +: l, i))
     }
 
-    pf.eval(nostate).futureValue should equal (l.reverse)
+    // pf.eval(nostate).futureValue should equal (l.reverse)
 
-    // tagiso.iso.to(pf).eval(nostate).futureValue
+    tagiso.iso.to(pf).eval(nostate).futureValue
   }
 }

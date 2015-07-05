@@ -39,7 +39,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
             )
 
           case fm:self.Flatmap[i, a] =>
-            tc.Flatmap(iso.to(fm.sub), (i:i) => iso.to(fm.next(i)))
+            tc.Flatmap(() => iso.to(fm.sub()), (i:i) => iso.to(fm.next(i)))
           
           case fm:self.FlatmapK[a, b] =>
             tc.FlatmapK(
@@ -64,7 +64,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
             )
 
           case fm:tc.Flatmap[i, a] =>
-            self.Flatmap(iso.from(fm.sub), (i:i) => iso.from(fm.next(i)))
+            self.Flatmap(() => iso.from(fm.sub()), (i:i) => iso.from(fm.next(i)))
           
           case fm:tc.FlatmapK[a, b] =>
             self.FlatmapK(
@@ -181,7 +181,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
     self =>
 
     final def flatMap[B](f: A => Precepte[B]): Precepte[B] =
-      Flatmap[A, B](self, f)
+      Flatmap[A, B](() => self, f)
 
     final def map[B](f: A => B): Precepte[B] =
       flatMap(a => Return(f(a)))
@@ -210,7 +210,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
 
       case Flatmap(sub, next) =>
         // println(s"EVAL Flatmap $this")
-        sub match {
+        sub() match {
           case Return(a) =>
             // println("EVAL Flatmap - Return")
             next(a.asInstanceOf[Any]).resume(state, ids)
@@ -221,9 +221,10 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
             // repass state as a Step in a Flatmap means the flatMap chain is finished
             FlatMapStep(st.run(state0).map { case (s, p) => (p.flatMap(next), state, ids0) })
 
-          case Flatmap(sub2, next2) =>
+          case f:Flatmap[i, a] =>
             // println("EVAL Flatmap - Flatmap")
-            sub2.flatMap(z => next2(z).flatMap(next)).resume(state, ids)
+            (Flatmap(f.sub, (z:i) => f.next(z).flatMap(next)):Precepte[A]).resume(state, ids)
+            // sub2().flatMap(z => next2(z).flatMap(next)).resume(state, ids)
 
           case MapK(subk, fk) =>
             // println("EVAL Flatmap - MapK")
@@ -281,7 +282,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
 
       case Flatmap(sub, next) =>
         // println("Flatmap")
-        sub match {
+        sub() match {
           case Return(a) =>
             // println("Flatmap - Return")
             next(a.asInstanceOf[Any]).resumeObserve(state, ids, graph)
@@ -292,9 +293,11 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
             // repass state as a Step in a Flatmap means the flatMap chain is finished
             FlatMapGraphStep(st.run(s0).map { case (s, p) => (p.flatMap(next), s, ids0, graph.addChild(g0)) })
 
-          case Flatmap(sub2, next2) =>
+          case f:Flatmap[i, a] =>
+            // (sub2, next2)
             // println("Flatmap - Flatmap")
-            sub2.flatMap(z => next2(z).flatMap(next)).resumeObserve(state, ids, graph)
+            (Flatmap(f.sub, (z:i) => f.next(z).flatMap(next)):Precepte[A]).resumeObserve(state, ids, graph)
+            // sub2().flatMap(z => next2(z).flatMap(next)).resumeObserve(state, ids, graph)
 
           case MapK(subk, fk) =>
             // println("Flatmap - MapK")
@@ -366,7 +369,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
 
       case f@Flatmap(sub, next) =>
         println(s"Flatmap $f $nbSub $cur")
-        sub match {
+        sub() match {
           case Return(a) =>
             println("Flatmap - Return")
             if(cur <= nbSub) next(a.asInstanceOf[Any]).resumeObserve0(state, ids, zipper, nbSub, cur)
@@ -395,9 +398,10 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
               }
             )
 
-          case Flatmap(sub2, next2) =>
+          case f:Flatmap[i, a] =>
             // println("Flatmap - Flatmap")
-            sub2.flatMap(z => next2(z).flatMap(next)).resumeObserve0(state, ids, zipper, nbSub + 1, cur)
+            (Flatmap(f.sub, (z:i) => f.next(z).flatMap(next)):Precepte[A]).resumeObserve0(state, ids, zipper, nbSub + 1, cur)
+            // sub2.flatMap(z => next2(z).flatMap(next)).resumeObserve0(state, ids, zipper, nbSub + 1, cur)
 
           case MapK(subk, fk) =>
             // println("Flatmap - MapK")
@@ -461,7 +465,7 @@ class TaggingContext[T <: Tags, S <: PState[T], F[_]] {
     //   st.run(state)
   }
 
-  case class Flatmap[I, A](sub: Precepte[I], next: I => Precepte[A]) extends Precepte[A] {
+  case class Flatmap[I, A](sub: () => Precepte[I], next: I => Precepte[A]) extends Precepte[A] {
     type _I = I
   }
 
