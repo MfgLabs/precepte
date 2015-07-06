@@ -94,36 +94,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   //   a0 should ===("foo 1")
   // }
 
-  "Precepte" should "Prout" in {
-    import scalaz.~>
-    def f1 = Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
-    def f2(i: Int) = Precepte(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
-
-    val res = for {
-      i <- f1
-      r <- f2(i)
-    } yield r
-
-    def now() = System.nanoTime()
-
-    import Precepte.IS
-    val f = new (IS ~> IS) {
-      def apply[A](fa: IS[A]) = {
-        fa.mapK { fsa =>
-          val t = now()
-          fsa.map { x =>
-            val diff = now() - t
-            println(s"Execution Time: $diff")
-            println(s"State was: $x")
-            x
-          }
-        }
-      }
-    }
-
-    val (a, s) = res.mapSuspension(f).run(nostate).futureValue
-
-  }
+  
 /*
   it should "observe simple" in {
     def f1 =
@@ -874,7 +845,51 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     pf.eval(nostate).futureValue should equal (l.reverse)
   }
 
+*/
 
+  it should "not stack overflow" in {
+    def pre(l: List[Int], i: Int) = Precepte(tags(s"stack_$i"))((_: PST0[Unit]) => l.point[Future])
+
+    val l = List.iterate(0, 100000){ i => i + 1 }
+
+    val pf = l.foldLeft(
+      pre(List(), 0)
+    ){ case (p, i) =>
+      p.flatMap(l => pre(i +: l, i))
+    }
+
+    pf.eval(nostate).futureValue should equal (l.reverse)
+  }
+/*
+  it should "mapStepState" in {
+    import scalaz.~>
+    def f1 = Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
+    def f2(i: Int) = Precepte(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
+
+    val res = for {
+      i <- f1
+      r <- f2(i)
+    } yield r
+
+    def now() = System.nanoTime()
+
+    val f = new (StepState ~> StepState) {
+      def apply[A](fa: StepState[A]) = {
+        fa.mapK { fsa =>
+          val t = now()
+          fsa.map { x =>
+            val diff = now() - t
+            println(s"Execution Time: $diff")
+            println(s"State was: $x")
+            x
+          }
+        }
+      }
+    }
+
+    val (a, s) = res.mapStep(f).run(nostate).futureValue
+
+  }
 
   it should "iso" in {
     def pre(l: List[Int], i: Int) = Precepte(tags(s"stack_$i"))((_: PST0[Unit]) => l.point[Future])
@@ -914,4 +929,5 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     tagiso.iso.to(pf).eval(nostate).futureValue
   }
 */
+
 }

@@ -6,17 +6,17 @@ import scala.language.higherKinds
 package object precepte {
 
   case class ManagedState0[T <: Tags](path: Call.Path[T], ids: PIdStream = PIdStream())
-  case class FreeState0[E <: Env, T <: Tags, C](span: Span, env: E, value: C)
+  case class UnManagedState0[E <: Env, T <: Tags, C](span: Span, env: E, value: C)
 
   type PIS0 = ManagedState0[BaseTags]
-  type PES0[C] = FreeState0[BaseEnv, BaseTags, C]
+  type PES0[C] = UnManagedState0[BaseEnv, BaseTags, C]
   type PST0[C] = PState0[BaseTags, PIS0, PES0[C]]
 
   object PST0 {
     def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): PST0[C] =
       PState0[BaseTags, PIS0, PES0[C]] (
         ManagedState0(path),
-        FreeState0(span, env, value)
+        UnManagedState0(span, env, value)
       )
   }
 
@@ -28,6 +28,6 @@ package object precepte {
       val is0 = ManagedState0(s.managed.path :+ Call(id, tags), next)
       s.copy(managed = is0)
     }
-    def updateFree(s: PST0[C], ext: PES0[C]): PST0[C] = s.copy(free = ext)
+    def updateUnmanaged(s: PST0[C], unmanaged: PES0[C]): PST0[C] = s.copy(unmanaged = unmanaged)
   }
 }

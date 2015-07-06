@@ -74,9 +74,9 @@ object Tags {
 /** The state gathering all data concerning current execution context */
 trait PState[T <: Tags]
 
-case class PState0[Tags, ManagedState, FreeState](
+case class PState0[Tags, ManagedState, UnmanagedState](
   managed: ManagedState,
-  free: FreeState
+  unmanaged: UnmanagedState
 )
 
 trait PIdSeries {
@@ -90,7 +90,7 @@ trait PStatable[T <: Tags, S <: PState[T]] {
 
 trait PStateUpdater[Tags, MS, FS, S <: PState0[Tags, MS, FS]] {
   def appendTags(s: S, t: Tags): S
-  def updateFree(s: S, ext: FS): S
+  def updateUnmanaged(s: S, ext: FS): S
 }
 
 /** A hidden State Monad */
