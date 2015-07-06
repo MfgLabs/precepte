@@ -72,7 +72,30 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   import Tags.Callee
 
-  "Precepte" should "run/eval simple" in {
+  // "Precepte" should "run/eval simple" in {
+  //   def f1 = Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
+  //   def f2(i: Int) = Precepte(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
+
+  //   val res = for {
+  //     i <- f1
+  //     r <- f2(i)
+  //   } yield r
+
+  //   val (a, s) = res.run(nostate).futureValue
+  //   a should ===("foo 1")
+
+  //   println(s"$s")
+  //   s.free.env should ===(env)
+  //   s.managed.path.size should ===(2)
+  //   s.managed.path(0).tags should ===(tags("simple.f1"))
+  //   s.managed.path(1).tags should ===(tags("simple.f2"))
+
+  //   val a0 = res.eval(nostate).futureValue
+  //   a0 should ===("foo 1")
+  // }
+
+  "Precepte" should "Prout" in {
+    import scalaz.~>
     def f1 = Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
     def f2(i: Int) = Precepte(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
 
@@ -81,17 +104,25 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       r <- f2(i)
     } yield r
 
-    val (a, s) = res.run(nostate).futureValue
-    a should ===("foo 1")
+    def now() = System.nanoTime()
 
-    println(s"$s")
-    s.free.env should ===(env)
-    s.managed.path.size should ===(2)
-    s.managed.path(0).tags should ===(tags("simple.f1"))
-    s.managed.path(1).tags should ===(tags("simple.f2"))
+    import Precepte.IS
+    val f = new (IS ~> IS) {
+      def apply[A](fa: IS[A]) = {
+        fa.mapK { fsa =>
+          val t = now()
+          fsa.map { x =>
+            val diff = now() - t
+            println(s"Execution Time: $diff")
+            println(s"State was: $x")
+            x
+          }
+        }
+      }
+    }
 
-    val a0 = res.eval(nostate).futureValue
-    a0 should ===("foo 1")
+    val (a, s) = res.mapSuspension(f).run(nostate).futureValue
+
   }
 /*
   it should "observe simple" in {

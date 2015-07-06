@@ -40,7 +40,7 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
 
           case fm:self.Flatmap[i, a] =>
             tc.Flatmap(() => iso.to(fm.sub()), (i:i) => iso.to(fm.next(i)))
-          
+
           case fm:self.FlatmapK[a, b] =>
             tc.FlatmapK(
               iso.to(fm.sub),
@@ -65,7 +65,7 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
 
           case fm:tc.Flatmap[i, a] =>
             self.Flatmap(() => iso.from(fm.sub()), (i:i) => iso.from(fm.next(i)))
-          
+
           case fm:tc.FlatmapK[a, b] =>
             self.FlatmapK(
               iso.from(fm.sub),
@@ -115,6 +115,20 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
     def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[AP[A]] =
       this.map(a => ap.point(a))
 
+    // more or less...
+    final def mapSuspension(f: Precepte.IS ~> Precepte.IS)(implicit F: Functor[F]): Precepte[A] =
+      this match {
+        case Return(a) =>
+          Return(a)
+        case Step(st, tags) =>
+          Step(f(st).map(_.mapSuspension(f)), tags)
+        case fl@Flatmap(sub, next) =>
+          Flatmap(() => sub().mapSuspension(f), (n: fl._I) => next(n).mapSuspension(f))
+        case k@MapK(sub, next) => MapK(sub.mapSuspension(f), next)
+        case k@FlatmapK(sub, next) => FlatmapK(sub.mapSuspension(f), (fa: F[k._A]) => next(fa).mapSuspension(f))
+      }
+
+
     @tailrec private final def resume(state: S)(implicit fu: Monad[F], upd: PStateUpdater[Tags, InS, ExtS, S]): ResumeStep[A] = this match {
       case Return(a) =>
         // println(s"EVAL R $this")
@@ -125,7 +139,7 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
         val state0 = upd.appendTags(state, tags)
         // val (state0, ids0) = ps.run(state, ids, tags)
         // append tags to managed state and propagate this new managed state to next step
-        FlatMapStep(st.run(state0).map { case (exts, p) => (p, upd.updateFree(state0, exts)) })
+        FlatMapStep(st.run(state0).map { case (s, p) => (p, s) })
 
       case Flatmap(sub, next) =>
         // println(s"EVAL Flatmap $this")
@@ -138,9 +152,9 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
             // println("EVAL Flatmap - Step")
             val state0 = upd.appendTags(state, tags)
             // repass state as a Step in a Flatmap means the flatMap chain is finished
-            // DO NOT APPEND TAGS TO 
-            FlatMapStep(st.run(state0).map { case (exts, p) =>
-              (p.flatMap(next), upd.updateFree(state, exts))
+            // DO NOT APPEND TAGS TO
+            FlatMapStep(st.run(state0).map { case (s, p) =>
+              (p.flatMap(next), upd.updateFree(state, s.free))
             })
 
           case f:Flatmap[i, a] =>
@@ -180,10 +194,10 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
             case MapK(subk, fk) =>
               val f = subk.run(state)
               // retry/recover with last state/ids
-              fk(f.map(_._1)).map(a => (a, state))     
+              fk(f.map(_._1)).map(a => (a, state))
           }
-          
-          
+
+
       }
     }
 
@@ -262,9 +276,9 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
     //           case MapK(subk, fk) =>
     //             val f = go(subk, state, ids, graph)
     //             // retry/recover with last state/ids
-    //             fk(f.map(_._1)).map(a => (a, state, ids, graph))              
+    //             fk(f.map(_._1)).map(a => (a, state, ids, graph))
     //         }
-                        
+
     //       }
     //   }
 
@@ -370,9 +384,9 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
               case MapK(subk, fk) =>
                 val f = go(subk, state, ids, zipper)
                 // retry/recover with last state/ids
-                fk(f.map(_._1)).map(a => (a, state, ids, zipper))              
+                fk(f.map(_._1)).map(a => (a, state, ids, zipper))
             }
-                        
+
           }
       }
 
@@ -386,7 +400,7 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
 
   // case class ReturnK[A](a: F[A]) extends Precepte[A]
 
-  case class Step[A](st: IndexedStateT[F, S, ExtS, Precepte[A]], tags: Tags) extends Precepte[A] {
+  case class Step[A](st: IndexedStateT[F, S, S, Precepte[A]], tags: Tags) extends Precepte[A] {
     // def run(state: (S, PId)): F[(C, Precepte[A])] =
     //   st.run(state)
   }
@@ -400,7 +414,9 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
   case class MapK[A, B](sub: Precepte[A], f: F[A] => F[B]) extends PrecepteK[B]
 
   // case class FlatmapK[A, B](sub: Precepte[A], f: F[A] => F[Precepte[B]]) extends Precepte[B]
-  case class FlatmapK[A, B](sub: Precepte[A], f: F[A] => Precepte[B]) extends PrecepteK[B]
+  case class FlatmapK[A, B](sub: Precepte[A], f: F[A] => Precepte[B]) extends PrecepteK[B] {
+    type _A = A
+  }
 
   trait LowPriorityInstances {
     implicit def precepteMonadInstance(implicit B: Applicative[F]) =
@@ -425,6 +441,8 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
 
   object Precepte extends LowPriorityInstances {
 
+    type IS[A] = IndexedStateT[F, S, S, Precepte[A]]
+
     trait PrecepteBuilder {
       val tags: Tags
       // import scalaz.Id._
@@ -436,10 +454,10 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
         Step[A](
           IndexedStateT { (st: S) =>
             for (a <- λ(st))
-            yield st.free -> Return(a)
+            yield st -> Return(a)
           }, tags)
 
-      def applyS[A](λ: S => F[(ExtS, A)])(implicit F: Functor[F]): Precepte[A] =
+      def applyS[A](λ: S => F[(S, A)])(implicit F: Functor[F]): Precepte[A] =
         Step[A](
           IndexedStateT { (st: S) =>
             for (ca <- λ(st))
@@ -450,8 +468,8 @@ class TaggingContext[Tags, InS, ExtS, S <: PState0[Tags, InS, ExtS], F[_]] {
           }, tags)
 
       def apply[A](m: Precepte[A])(implicit A: Applicative[F]): Precepte[A] =
-        Step(IndexedStateT[F, S, ExtS, Precepte[A]]{ st =>
-          (st.free -> m).point[F]
+        Step(IndexedStateT[F, S, S, Precepte[A]]{ st =>
+          (st -> m).point[F]
         }, tags)
     }
 
