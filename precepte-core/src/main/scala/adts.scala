@@ -74,6 +74,11 @@ object Tags {
 /** The state gathering all data concerning current execution context */
 trait PState[T <: Tags]
 
+case class PState0[Tags, ManagedState, FreeState](
+  managed: ManagedState,
+  free: FreeState
+)
+
 trait PIdSeries {
   def run(): (PId, PIdSeries)
 }
@@ -81,6 +86,11 @@ trait PIdSeries {
 /** A hidden State Monad */
 trait PStatable[T <: Tags, S <: PState[T]] {
   def run(s: S, ids: PIdSeries, tags: T): (S, PIdSeries)
+}
+
+trait PStateUpdater[Tags, MS, FS, S <: PState0[Tags, MS, FS]] {
+  def appendTags(s: S, t: Tags): S
+  def updateFree(s: S, ext: FS): S
 }
 
 /** A hidden State Monad */
@@ -92,6 +102,7 @@ trait PGraphStatable[T <: Tags, S <: PState[T]] {
 /** The typed environment in which an event happens */
 trait Env
 case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
+
 
 case class PStateBase[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) extends PState[T]
 

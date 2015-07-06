@@ -30,6 +30,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   private def tags(n: String) = BaseTags(Tags.Callee(n), Tags.Category.Database)
 
+/*
   def p[C, S <: PST0[C], G <: Graph[BaseTags, S, G]](g: G, before: String = ""): Unit = {
     val txt = g match {
       case Root(span, _) =>
@@ -63,7 +64,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       go(c, g.span, Vector.empty, Seq.empty)
     }.flatten
   }
-
+*/
 
   def nostate = PST0[Unit](Span.gen, env, Vector.empty, ())
 
@@ -80,14 +81,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       r <- f2(i)
     } yield r
 
-    val (a, s, ids) = res.run(nostate).futureValue
+    val (a, s) = res.run(nostate).futureValue
     a should ===("foo 1")
 
     println(s"$s")
-    s.env should ===(env)
-    s.path.size should ===(2)
-    s.path(0).tags should ===(tags("simple.f1"))
-    s.path(1).tags should ===(tags("simple.f2"))
+    s.free.env should ===(env)
+    s.managed.path.size should ===(2)
+    s.managed.path(0).tags should ===(tags("simple.f1"))
+    s.managed.path(1).tags should ===(tags("simple.f2"))
 
     val a0 = res.eval(nostate).futureValue
     a0 should ===("foo 1")
@@ -841,7 +842,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     pf.eval(nostate).futureValue should equal (l.reverse)
   }
-*/
+
 
 
   it should "iso" in {
@@ -881,4 +882,5 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     tagiso.iso.to(pf).eval(nostate).futureValue
   }
+*/
 }
