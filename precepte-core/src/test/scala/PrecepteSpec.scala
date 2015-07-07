@@ -919,12 +919,45 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 */
 
   it should "iso state" in {
-    trait DB
-    trait Logger
-    case class S(db: DB, logger: Logger)
-    case class S2(db: DB)
-    // val taggingContext = new PCTX0[Future, Unit]
-    // import taggingContext._
+    trait DB {
+      def callDB(): Unit = println("DB.callDB")
+    }
+    trait Logger {
+      def log(str: String): Unit = println(s"log $str")
+    }
+    trait Service {
+      def doit(): Unit = println("Service.doit")
+    }
+    case class S(db: DB, logger: Logger, service: Service, ctx: String)
+    case class S2(db: DB, logger: Logger, ctx: String)
+
+    val tctx = new PCTX0[Future, S]
+
+    def f1(): tctx.Precepte[Unit] =
+      tctx.Precepte(tags("f1")){ (s: PST0[S]) => Future { s.unmanaged.value.db.callDB() } }
+
+    val db = new DB {}
+    val logger = new Logger {}
+    val service = new Service {}
+
+    val tctxiso = tctx.isoUnmanagedState(
+      (s: PES0[S]) => s.copy(value = S2(s.value.db, s.value.logger, s.value.ctx)),
+      (s: PES0[S2]) => s.copy(value = S(s.value.db, s.value.logger, service, s.value.ctx))
+    )
+
+    def f2(): tctxiso.tc.Precepte[Unit] =
+      tctxiso.tc.Precepte(tags("f2")){ (s: PST0[S]) => Future { s.unmanaged.value.db.callDB() } }
+
+    val p = for {
+      a <- f1
+      b <- tctxiso.iso.from(f2())
+    } yield (())
+
+    val nostate = PST0[S](Span.gen, env, Vector.empty, S(db, logger, service, "CTX"))
+
+    p.eval(nostate).futureValue
+    
+
     // val tagiso = taggingContext.iso(iso0)
   }
 }

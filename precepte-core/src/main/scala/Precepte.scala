@@ -28,63 +28,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
     val iso: self.Precepte <~> tc.Precepte
   }
 
-  // def iso[F2[_]](isoF: F <~> F2)(implicit mf: Monad[F], mf2: Monad[F2]) = new TaggingContextIso[F2] {
-  //   override val tc = new TaggingContext[Tags, ManagedState, UnmanagedState, S, F2]
-
-  //   override lazy val iso: self.Precepte <~> tc.Precepte = new (self.Precepte <~> tc.Precepte) {
-
-  //     def to = new (self.Precepte ~> tc.Precepte) {
-  //       def apply[A](p: self.Precepte[A]): tc.Precepte[A] = p match {
-
-  //         case self.Return(a) =>
-  //           tc.Return(a)
-
-  //         case self.Step(st, tags) =>
-  //           tc.Step[A](
-  //             IndexedStateT { (s: S) =>
-  //               isoF.to(st(s).map{ case (s, p) => s -> iso.to(p) })
-  //             }, tags
-  //           )
-
-  //         case f@self.Flatmap(sub, next) =>
-  //           tc.Flatmap(() => iso.to(sub()), (i:f._I) => iso.to(next(i)))
-
-  //         case f@self.FlatmapK(subk, fk) =>
-  //           tc.FlatmapK(
-  //             iso.to(subk),
-  //             (f2: F2[(S, f._A)]) => iso.to(fk(isoF.from(f2)))
-  //           )
-
-  //       }
-  //     }
-
-  //     def from = new (tc.Precepte ~> self.Precepte) {
-  //       def apply[A](p2: tc.Precepte[A]): self.Precepte[A] = p2 match {
-
-  //         case tc.Return(a) =>
-  //           self.Return(a)
-
-  //         case tc.Step(st, tags) =>
-  //           self.Step[A](
-  //             IndexedStateT { (s: S) =>
-  //               isoF.from(st(s).map{ case (s, p) => s -> iso.from(p) })
-  //             }, tags
-  //           )
-
-  //         case f@tc.Flatmap(sub, next) =>
-  //           self.Flatmap(() => iso.from(sub()), (i:f._I) => iso.from(next(i)))
-
-  //         case f@tc.FlatmapK(subk, fk) =>
-  //           self.FlatmapK(
-  //             iso.from(subk),
-  //             (ff: F[(S, f._A)]) => iso.from(fk(isoF.to(ff)))
-  //           )
-
-  //       }
-  //     }
-  //   }
-  // }
-
   def isoF[F2[_]](isoFF: F <~> F2)(implicit mf: Monad[F], mf2: Monad[F2]) =
     iso0[Tags, ManagedState, UnmanagedState, S, F2](isoRefl, isoRefl, isoFF)
 
@@ -98,6 +41,12 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
     iso0[Tags, ManagedState2, UnmanagedState2, S2, F](isoRefl, new (S <=> S2) {
       def to = toS2
       def from = fromS2
+    }, isoNaturalRefl)
+
+  def isoUnmanagedState[UnmanagedState2, S2 <: PState0[Tags, ManagedState, UnmanagedState2]](toS2: UnmanagedState => UnmanagedState2, fromS2: UnmanagedState2 => UnmanagedState)(implicit mf: Monad[F]) =
+    iso0[Tags, ManagedState, UnmanagedState2, S2, F](isoRefl, new (S <=> S2) {
+      def to = (s: S) => PState0[Tags, ManagedState, UnmanagedState2](managed = s.managed, unmanaged = toS2(s.unmanaged)).asInstanceOf[S2]
+      def from = (s2: S2) => PState0[Tags, ManagedState, UnmanagedState](managed = s2.managed, unmanaged = fromS2(s2.unmanaged)).asInstanceOf[S]
     }, isoNaturalRefl)
 
   def iso0[Tags2, ManagedState2, UnmanagedState2, S2 <: PState0[Tags2, ManagedState2, UnmanagedState2], F2[_]](
