@@ -88,7 +88,8 @@ trait PStatable[T <: Tags, S <: PState[T]] {
   def run(s: S, ids: PIdSeries, tags: T): (S, PIdSeries)
 }
 
-trait PStateUpdater[Tags, MS, FS, S <: PState0[Tags, MS, FS]] {
+trait PStateUpdater[Tags, MS, FS] {
+  type S = PState0[Tags, MS, FS]
   def appendTags(s: S, t: Tags): S
   def updateUnmanaged(s: S, ext: FS): S
 }

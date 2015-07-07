@@ -934,7 +934,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val tctx = new PCTX0[Future, S]
 
     def f1(): tctx.Precepte[Unit] =
-      tctx.Precepte(tags("f1")){ (s: PST0[S]) => Future { s.unmanaged.value.db.callDB() } }
+      tctx.Precepte(tags("f1")){ (s: PST0[S]) => Future { s.unmanaged.value.service.doit() } }
 
     val db = new DB {}
     val logger = new Logger {}
@@ -946,7 +946,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     )
 
     def f2(): tctxiso.tc.Precepte[Unit] =
-      tctxiso.tc.Precepte(tags("f2")){ (s: PST0[S]) => Future { s.unmanaged.value.db.callDB() } }
+      tctxiso.tc.Precepte(tags("f2")){ (s: PST0[S2]) => Future { s.unmanaged.value.db.callDB() } }
 
     val p = for {
       a <- f1

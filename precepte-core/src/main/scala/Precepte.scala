@@ -9,51 +9,53 @@ import scalaz.syntax.monad._
 import scala.annotation.tailrec
 import scalaz.{TreeLoc, Tree}
 
-class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, ManagedState, UnmanagedState], F[_]] {
+class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
   self =>
 
+  type S = PState0[Tags, ManagedState, UnmanagedState]
+  
   type StepState[A] = StateT[F, S, Precepte[A]]
 
   trait TaggingContextIso[F2[_]] {
 
-    val tc: TaggingContext[Tags, ManagedState, UnmanagedState, S, F2]
+    val tc: TaggingContext[Tags, ManagedState, UnmanagedState, F2]
 
     val iso: self.Precepte <~> tc.Precepte
   }
 
-  trait TaggingContextIso0[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, ManagedState, UnmanagedState], F2[_]] {
-
-    val tc: TaggingContext[Tags, ManagedState, UnmanagedState, S, F2]
+  trait TaggingContextIso0[Tags, ManagedState, UnmanagedState, F2[_]] {
+    
+    val tc: TaggingContext[Tags, ManagedState, UnmanagedState, F2]
 
     val iso: self.Precepte <~> tc.Precepte
   }
 
   def isoF[F2[_]](isoFF: F <~> F2)(implicit mf: Monad[F], mf2: Monad[F2]) =
-    iso0[Tags, ManagedState, UnmanagedState, S, F2](isoRefl, isoRefl, isoFF)
+    iso0[Tags, ManagedState, UnmanagedState, F2](isoRefl, isoRefl, isoFF)
 
-  def isoState[Tags2, ManagedState2, UnmanagedState2, S2 <: PState0[Tags2, ManagedState2, UnmanagedState2]](isoT: Tags <=> Tags2, isoS: S <=> S2)(implicit mf: Monad[F]) =
-    iso0[Tags2, ManagedState2, UnmanagedState2, S2, F](isoT, isoS, isoNaturalRefl)
+  def isoState[Tags2, ManagedState2, UnmanagedState2](isoT: Tags <=> Tags2, isoS: S <=> PState0[Tags2, ManagedState2, UnmanagedState2])(implicit mf: Monad[F]) =
+    iso0[Tags2, ManagedState2, UnmanagedState2, F](isoT, isoS, isoNaturalRefl)
 
-  def isoState[ManagedState2, UnmanagedState2, S2 <: PState0[Tags, ManagedState2, UnmanagedState2]](isoS: S <=> S2)(implicit mf: Monad[F]) =
-    iso0[Tags, ManagedState2, UnmanagedState2, S2, F](isoRefl, isoS, isoNaturalRefl)
+  def isoState[ManagedState2, UnmanagedState2](isoS: S <=> PState0[Tags, ManagedState2, UnmanagedState2])(implicit mf: Monad[F]) =
+    iso0[Tags, ManagedState2, UnmanagedState2, F](isoRefl, isoS, isoNaturalRefl)
 
-  def isoState[ManagedState2, UnmanagedState2, S2 <: PState0[Tags, ManagedState2, UnmanagedState2]](toS2: S => S2, fromS2: S2 => S)(implicit mf: Monad[F]) =
-    iso0[Tags, ManagedState2, UnmanagedState2, S2, F](isoRefl, new (S <=> S2) {
+  def isoState[ManagedState2, UnmanagedState2](toS2: S => PState0[Tags, ManagedState2, UnmanagedState2], fromS2: PState0[Tags, ManagedState2, UnmanagedState2] => S)(implicit mf: Monad[F]) =
+    iso0[Tags, ManagedState2, UnmanagedState2, F](isoRefl, new (S <=> PState0[Tags, ManagedState2, UnmanagedState2]) {
       def to = toS2
       def from = fromS2
     }, isoNaturalRefl)
 
-  def isoUnmanagedState[UnmanagedState2, S2 <: PState0[Tags, ManagedState, UnmanagedState2]](toS2: UnmanagedState => UnmanagedState2, fromS2: UnmanagedState2 => UnmanagedState)(implicit mf: Monad[F]) =
-    iso0[Tags, ManagedState, UnmanagedState2, S2, F](isoRefl, new (S <=> S2) {
-      def to = (s: S) => PState0[Tags, ManagedState, UnmanagedState2](managed = s.managed, unmanaged = toS2(s.unmanaged)).asInstanceOf[S2]
-      def from = (s2: S2) => PState0[Tags, ManagedState, UnmanagedState](managed = s2.managed, unmanaged = fromS2(s2.unmanaged)).asInstanceOf[S]
+  def isoUnmanagedState[UnmanagedState2](toS2: UnmanagedState => UnmanagedState2, fromS2: UnmanagedState2 => UnmanagedState)(implicit mf: Monad[F]) =
+    iso0[Tags, ManagedState, UnmanagedState2, F](isoRefl, new (S <=> PState0[Tags, ManagedState, UnmanagedState2]) {
+      def to = (s: S) => PState0[Tags, ManagedState, UnmanagedState2](managed = s.managed, unmanaged = toS2(s.unmanaged))
+      def from = (s2: PState0[Tags, ManagedState, UnmanagedState2]) => PState0(managed = s2.managed, unmanaged = fromS2(s2.unmanaged))
     }, isoNaturalRefl)
 
-  def iso0[Tags2, ManagedState2, UnmanagedState2, S2 <: PState0[Tags2, ManagedState2, UnmanagedState2], F2[_]](
-    isoT: Tags <=> Tags2, isoS: S <=> S2, isoF: F <~> F2
-  )(implicit mf: Monad[F], mf2: Monad[F2]) = new TaggingContextIso0[Tags2, ManagedState2, UnmanagedState2, S2, F2] {
+  def iso0[Tags2, ManagedState2, UnmanagedState2, F2[_]](
+    isoT: Tags <=> Tags2, isoS: S <=> PState0[Tags2, ManagedState2, UnmanagedState2], isoF: F <~> F2
+  )(implicit mf: Monad[F], mf2: Monad[F2]) = new TaggingContextIso0[Tags2, ManagedState2, UnmanagedState2, F2] {
 
-    override val tc = new TaggingContext[Tags2, ManagedState2, UnmanagedState2, S2, F2]
+    override val tc = new TaggingContext[Tags2, ManagedState2, UnmanagedState2, F2]
 
     override lazy val iso: self.Precepte <~> tc.Precepte = new (self.Precepte <~> tc.Precepte) {
 
@@ -65,7 +67,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
 
           case self.Step(st, tags) =>
             tc.Step[A](
-              IndexedStateT { (s2: S2) =>
+              IndexedStateT { (s2: tc.S) =>
                 isoF.to(st(isoS.from(s2)).map{ case (s, p) => isoS.to(s) -> iso.to(p) })
               }, isoT.to(tags)
             )
@@ -76,7 +78,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
           case f@self.FlatmapK(subk, fk) =>
             tc.FlatmapK(
               iso.to(subk),
-              (f2: F2[(S2, f._A)]) => iso.to(fk(isoF.from(f2.map{ case (s2, fa) => isoS.from(s2) -> fa })))
+              (f2: F2[(tc.S, f._A)]) => iso.to(fk(isoF.from(f2.map{ case (s2, fa) => isoS.from(s2) -> fa })))
             )
 
         }
@@ -146,7 +148,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
     def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[AP[A]] =
       this.map(a => ap.point(a))
 
-    @tailrec private final def resume(state: S)(implicit fu: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState, S]): ResumeStep[A] = this match {
+    @tailrec private final def resume(state: S)(implicit fu: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): ResumeStep[A] = this match {
       case Return(a) =>
         // println(s"EVAL R $this")
         ReturnStep((state, a))
@@ -193,7 +195,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
         KStep(k)
     }
 
-    final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState, S]): F[(S, A)] = {
+    final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[(S, A)] = {
       this.resume(state) match {
         case FlatMapStep(fsp) =>
           fsp.flatMap { case (p0, s0) => p0.run(s0) }
@@ -217,7 +219,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
       }
     }
 
-    final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState, S]): F[A] =
+    final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[A] =
       this.run(state).map(_._2)
 
 
@@ -531,7 +533,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
             yield st -> Return(a)
           }, tags)
 
-      def applyS[A](λ: S => F[(UnmanagedState, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState, S]): Precepte[A] =
+      def applyS[A](λ: S => F[(UnmanagedState, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): Precepte[A] =
         Step[A](
           IndexedStateT { (st: S) =>
             for (ca <- λ(st))
