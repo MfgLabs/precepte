@@ -847,19 +847,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
 */
 
-  it should "not stack overflow" in {
-    def pre(l: List[Int], i: Int) = Precepte(tags(s"stack_$i"))((_: PST0[Unit]) => l.point[Future])
 
-    val l = List.iterate(0, 100000){ i => i + 1 }
-
-    val pf = l.foldLeft(
-      pre(List(), 0)
-    ){ case (p, i) =>
-      p.flatMap(l => pre(i +: l, i))
-    }
-
-    pf.eval(nostate).futureValue should equal (l.reverse)
-  }
 /*
   it should "mapStepState" in {
     import scalaz.~>
@@ -930,4 +918,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 */
 
+  it should "iso state" in {
+    trait DB
+    trait Logger
+    case class S(db: DB, logger: Logger)
+    case class S2(db: DB)
+    // val taggingContext = new PCTX0[Future, Unit]
+    // import taggingContext._
+    // val tagiso = taggingContext.iso(iso0)
+  }
 }

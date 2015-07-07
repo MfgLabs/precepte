@@ -91,6 +91,15 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, S <: PState0[Tags, Mana
   def isoState[Tags2, ManagedState2, UnmanagedState2, S2 <: PState0[Tags2, ManagedState2, UnmanagedState2]](isoT: Tags <=> Tags2, isoS: S <=> S2)(implicit mf: Monad[F]) =
     iso0[Tags2, ManagedState2, UnmanagedState2, S2, F](isoT, isoS, isoNaturalRefl)
 
+  def isoState[ManagedState2, UnmanagedState2, S2 <: PState0[Tags, ManagedState2, UnmanagedState2]](isoS: S <=> S2)(implicit mf: Monad[F]) =
+    iso0[Tags, ManagedState2, UnmanagedState2, S2, F](isoRefl, isoS, isoNaturalRefl)
+
+  def isoState[ManagedState2, UnmanagedState2, S2 <: PState0[Tags, ManagedState2, UnmanagedState2]](toS2: S => S2, fromS2: S2 => S)(implicit mf: Monad[F]) =
+    iso0[Tags, ManagedState2, UnmanagedState2, S2, F](isoRefl, new (S <=> S2) {
+      def to = toS2
+      def from = fromS2
+    }, isoNaturalRefl)
+
   def iso0[Tags2, ManagedState2, UnmanagedState2, S2 <: PState0[Tags2, ManagedState2, UnmanagedState2], F2[_]](
     isoT: Tags <=> Tags2, isoS: S <=> S2, isoF: F <~> F2
   )(implicit mf: Monad[F], mf2: Monad[F2]) = new TaggingContextIso0[Tags2, ManagedState2, UnmanagedState2, S2, F2] {
