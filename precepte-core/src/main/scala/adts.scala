@@ -108,7 +108,7 @@ case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags
 case class PStateBase[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) extends PState[T]
 
 object PStateBase {
-  
+
   implicit def pstatable[E <: Env, T <: Tags, C] = new PStatable[T, PStateBase[E, T, C]] {
     def run(s: PStateBase[E, T, C], ids: PIdSeries, tags: T): (PStateBase[E, T, C], PIdSeries) = {
       val (id, next) = ids.run()

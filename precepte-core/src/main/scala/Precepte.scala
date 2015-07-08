@@ -13,7 +13,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
   self =>
 
   type S = PState0[Tags, ManagedState, UnmanagedState]
-  
+
   type StepState[A] = StateT[F, S, Precepte[A]]
 
   trait TaggingContextIso[F2[_]] {
@@ -24,7 +24,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
   }
 
   trait TaggingContextIso0[Tags, ManagedState, UnmanagedState, F2[_]] {
-    
+
     val tc: TaggingContext[Tags, ManagedState, UnmanagedState, F2]
 
     val iso: self.Precepte <~> tc.Precepte
@@ -150,24 +150,19 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
     @tailrec private final def resume(state: S)(implicit fu: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): ResumeStep[A] = this match {
       case Return(a) =>
-        // println(s"EVAL R $this")
         ReturnStep((state, a))
 
       case Step(st, tags) =>
-        // println(s"EVAL S $this")
         val state0 = upd.appendTags(state, tags)
         // append tags to managed state and propagate this new managed state to next step
         FlatMapStep(st.run(state0).map { case (s, p) => (p, s) })
 
       case Flatmap(sub, next) =>
-        // println(s"EVAL Flatmap $this")
         sub() match {
           case Return(a) =>
-            // println("EVAL Flatmap - Return")
             next(a).resume(state)
 
           case Step(st, tags) =>
-            // println("EVAL Flatmap - Step")
             val state0 = upd.appendTags(state, tags)
             // repass state as a Step in a Flatmap means the flatMap chain is finished
             // Do not reuse appended segment but original state
@@ -176,15 +171,12 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
             })
 
           case f@Flatmap(sub2, next2) =>
-            // println("EVAL Flatmap - Flatmap")
             (Flatmap(sub2, (z:f._I) => next2(z).flatMap(next)):Precepte[A]).resume(state)
 
           case MapK(subk, fk) =>
-            // println("EVAL Flatmap - MapK")
             subk.mapK(z => fk(z).map(next)).flatMap(identity).resume(state)
 
           case FlatmapK(subk, fk) =>
-            // println("EVAL Flatmap - FlatmapK")
             subk.flatMapK(z => fk(z).flatMap(next)).resume(state)
         }
 
