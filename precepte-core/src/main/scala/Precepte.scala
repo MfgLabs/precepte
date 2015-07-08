@@ -216,153 +216,18 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
     final def observe(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[(A, S, PIdSeries, TreeLoc[Node])] = ???
 
-
-    /*@tailrec private final def resumeStepState(state: S)(implicit fu: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState, S]): ResumeStepState[A] = this match {
-      case Return(a) =>
-        // println(s"EVAL R $this")
-        ReturnStepStateResume((a, state))
-
-      case Step(st, tags) =>
-        // println(s"EVAL S $this")
-        val state0 = upd.appendTags(state, tags)
-        // val (state0, ids0) = ps.run(state, ids, tags)
-        // append tags to managed state and propagate this new managed state to next step
-        FlatMapStep(st.run(state0).map { case (s, p) => (p, s) })
-
-      case Flatmap(sub, next) =>
-        // println(s"EVAL Flatmap $this")
-        sub() match {
-          case Return(a) =>
-            // println("EVAL Flatmap - Return")
-            next(a).resume(state)
-
-          case Step(st, tags) =>
-            // println("EVAL Flatmap - Step")
-            val state0 = upd.appendTags(state, tags)
-            // repass state as a Step in a Flatmap means the flatMap chain is finished
-            // DO NOT APPEND TAGS TO
-            FlatMapStep(st.run(state0).map { case (s, p) =>
-              (p.flatMap(next), upd.updateUnmanaged(state, s.unmanaged))
-            })
-
-          case f@Flatmap(sub2, next2) =>
-            // println("EVAL Flatmap - Flatmap")
-            (Flatmap(sub2, (z:f._I) => next2(z).flatMap(next)):Precepte[A]).resume(state)
-
-          case MapK(subk, fk) =>
-            // println("EVAL Flatmap - MapK")
-            subk.mapK(z => fk(z).map(next)).flatMap(identity).resume(state)
-
-          case FlatmapK(subk, fk) =>
-            // println("EVAL Flatmap - FlatmapK")
-            subk.flatMapK(z => fk(z).flatMap(next)).resume(state)
-        }
-
-      case k@MapK(_,_) =>
-        KStep(k)
-
-      case k@FlatmapK(_,_) =>
-        KStep(k)
-    }*/
-
+    // TODO: tailrec
     final def mapStep(f: StepState ~> StepState)(implicit F: Functor[F]): Precepte[A] =
       this match {
         case Return(a) =>
           Return(a)
-
         case Step(st, tags) =>
           Step(f(st).map(_.mapStep(f)), tags)
-
         case fl@Flatmap(sub, next) =>
           Flatmap(() => sub().mapStep(f), (n: fl._I) => next(n).mapStep(f))
-
         case MapK(sub, next) => MapK(sub.mapStep(f), next)
-
         case k@FlatmapK(sub, next) => FlatmapK(sub.mapStep(f), (fa: F[(S, k._A)]) => next(fa).mapStep(f))
       }
-
-
-    // @tailrec private final def resumeObserve[G <: Graph[T, S, G]](state: S, ids: PIdSeries, graph: G)(
-    //   implicit fu: Monad[F], psg: PGraphStatable[T, S], rt: Rootable[T, S]
-    // ): ResumeGraphStep[G, A] = this match {
-    //   case Return(a) =>
-    //     // println("R")
-    //     ReturnGraphStep((a, state, ids, graph))
-
-    //   case Step(st, tags) =>
-    //     // println("S")
-    //     // add segment and retrieve new idseries
-    //     val (s0, ids0, g0) = psg.run(state, ids, tags)
-    //     // eval new state
-    //     FlatMapGraphStep(st.run(s0).map { case (s, p) => (p, s, ids, graph.addChild(g0)) })
-
-
-    //   case Flatmap(sub, next) =>
-    //     // println("Flatmap")
-    //     sub() match {
-    //       case Return(a) =>
-    //         // println("Flatmap - Return")
-    //         next(a.asManagedStatetanceOf[Any]).resumeObserve(state, ids, graph)
-
-    //       case Step(st, tags) =>
-    //         // println("Flatmap - Step")
-    //         val (s0, ids0, g0) = psg.run(state, ids, tags)
-    //         // repass state as a Step in a Flatmap means the flatMap chain is finished
-    //         FlatMapGraphStep(st.run(s0).map { case (s, p) => (p.flatMap(next), s, ids0, graph.addChild(g0)) })
-
-    //       case f:Flatmap[i, a] =>
-    //         // (sub2, next2)
-    //         // println("Flatmap - Flatmap")
-    //         (Flatmap(f.sub, (z:i) => f.next(z).flatMap(next)):Precepte[A]).resumeObserve(state, ids, graph)
-    //         // sub2().flatMap(z => next2(z).flatMap(next)).resumeObserve(state, ids, graph)
-
-    //       case MapK(subk, fk) =>
-    //         // println("Flatmap - MapK")
-    //         subk.mapK(z => fk(z).map(next)).flatMap(identity).resumeObserve(state, ids, graph)
-
-    //       case FlatmapK(subk, fk) =>
-    //         // println("Flatmap - FlatmapK")
-    //         subk.flatMapK(z => fk(z).flatMap(next)).resumeObserve(state, ids, graph)
-    //     }
-
-    //   case k@MapK(_, _) =>
-    //     KGraphStep(k)
-
-    //   case k@FlatmapK(_, _) =>
-    //     KGraphStep(k)
-
-    // }
-
-    // final def observe(state: S, ids: PIdSeries = PIdStream())(implicit mo: Monad[F], psg: PGraphStatable[T, S], rt: Rootable[T, S]): F[(A, S, PIdSeries, Root[T, S])] = {
-
-    //   def go[G <: Graph[T, S, G], B](p: Precepte[B], state: S, ids: PIdSeries, graph: G): F[(B, S, PIdSeries, G)] = {
-
-    //     p.resumeObserve(state, ids, graph) match {
-    //       case FlatMapGraphStep(fsp) =>
-    //         fsp.flatMap { case (p0, s0, ids0, g0) => go(p0, s0, ids0, g0) }
-
-    //       case ReturnGraphStep(asi) =>
-    //         asi.point[F]
-
-    //       case KGraphStep(p) =>
-    //         p match {
-    //           case FlatmapK(subk, fk) =>
-    //             val f = go(subk, state, ids, graph)
-    //             // retry/recover with last state/ids
-    //             go(fk(f.map(_._1)), state, ids, graph)
-
-    //           case MapK(subk, fk) =>
-    //             val f = go(subk, state, ids, graph)
-    //             // retry/recover with last state/ids
-    //             fk(f.map(_._1)).map(a => (a, state, ids, graph))
-    //         }
-
-    //       }
-    //   }
-
-    //   go(this, state, ids, rt.toRoot(state))
-    // }
-
 
     /*private def applyRoot(zipper: TreeLoc[Node], nbSub: Int) =
       (1 to nbSub).foldLeft(zipper){ case (z, i) => println(s"$i"); z.root }
@@ -515,10 +380,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
     trait PrecepteBuilder {
       val tags: Tags
-      // import scalaz.Id._
-
-      // def apply0[E <: Env, C, A](λ: State[E, T, C] => A): Precepte[E, T, C, Id, A] =
-      //   apply[E, C, Id, A](λ)
 
       def apply[A](λ: S => F[A])(implicit F: Functor[F]): Precepte[A] =
         Step[A](
