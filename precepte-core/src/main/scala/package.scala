@@ -10,11 +10,11 @@ package object precepte {
 
   type PIS0 = ManagedState0[BaseTags]
   type PES0[C] = UnManagedState0[BaseEnv, C]
-  type PST0[C] = PState0[BaseTags, PIS0, PES0[C]]
+  type PST0[C] = PState[BaseTags, PIS0, PES0[C]]
 
   object PST0 {
     def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): PST0[C] =
-      PState0[BaseTags, PIS0, PES0[C]] (
+      PState[BaseTags, PIS0, PES0[C]] (
         ManagedState0(path),
         UnManagedState0(span, env, value)
       )

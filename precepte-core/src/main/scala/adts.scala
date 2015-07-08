@@ -69,12 +69,8 @@ object Tags {
   case class Version(override val value: String) extends Tag("version", value)
 }
 
-
-
 /** The state gathering all data concerning current execution context */
-trait PState[T <: Tags]
-
-case class PState0[Tags, ManagedState, UnmanagedState](
+case class PState[Tags, ManagedState, UnmanagedState](
   managed: ManagedState,
   unmanaged: UnmanagedState)
 
@@ -83,7 +79,7 @@ trait PIdSeries {
 }
 
 trait PStateUpdater[Tags, MS, FS] {
-  type S = PState0[Tags, MS, FS]
+  type S = PState[Tags, MS, FS]
   def appendTags(s: S, t: Tags): S
   def updateUnmanaged(s: S, ext: FS): S
 }
