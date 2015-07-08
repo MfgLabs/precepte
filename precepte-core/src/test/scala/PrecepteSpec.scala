@@ -920,21 +920,25 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   it should "iso state" in {
     trait DB {
-      def callDB(): Unit = println("DB.callDB")
+      def callDB(): Future[String] = Future { "DB.callDB" }
     }
     trait Logger {
-      def log(str: String): Unit = println(s"log $str")
+      def log(str: String): Future[String] = Future { s"log $str" }
     }
     trait Service {
-      def doit(): Unit = println("Service.doit")
+      def doit(): Future[String] = Future { "Service.doit" }
     }
-    case class S(db: DB, logger: Logger, service: Service, ctx: String)
-    case class S2(db: DB, logger: Logger, ctx: String)
+    case class S(db: DB, logger: Logger, service: Service, ctx: Seq[String])
+    case class S2(db: DB, logger: Logger, ctx: Seq[String])
 
     val tctx = new PCTX0[Future, S]
 
-    def f1(): tctx.Precepte[Unit] =
-      tctx.Precepte(tags("f1")){ (s: PST0[S]) => Future { s.unmanaged.value.service.doit() } }
+    def f1(): tctx.Precepte[String] =
+      tctx.Precepte(tags("f1")).applyS { (s: PST0[S]) => 
+        s.unmanaged.value.service.doit().map { a =>
+          s.unmanaged.copy(value = s.unmanaged.value.copy(ctx = s.unmanaged.value.ctx :+ a)) -> a
+        }
+      }
 
     val db = new DB {}
     val logger = new Logger {}
@@ -945,17 +949,21 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       (s: PES0[S2]) => s.copy(value = S(s.value.db, s.value.logger, service, s.value.ctx))
     )
 
-    def f2(): tctxiso.tc.Precepte[Unit] =
-      tctxiso.tc.Precepte(tags("f2")){ (s: PST0[S2]) => Future { s.unmanaged.value.db.callDB() } }
+    def f2(): tctxiso.tc.Precepte[String] =
+      tctxiso.tc.Precepte(tags("f2")).applyS{ (s: PST0[S2]) => 
+        s.unmanaged.value.db.callDB().map { a =>
+          s.unmanaged.copy(value = s.unmanaged.value.copy(ctx = s.unmanaged.value.ctx :+ a)) -> a
+        }
+      }
 
     val p = for {
       a <- f1
       b <- tctxiso.iso.from(f2())
     } yield (())
 
-    val nostate = PST0[S](Span.gen, env, Vector.empty, S(db, logger, service, "CTX"))
+    val nostate = PST0[S](Span.gen, env, Vector.empty, S(db, logger, service, Seq()))
 
-    p.eval(nostate).futureValue
+    println("RES:"+p.run(nostate).futureValue)
     
 
     // val tagiso = taggingContext.iso(iso0)
