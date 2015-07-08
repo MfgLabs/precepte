@@ -214,6 +214,8 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[A] =
       this.run(state).map(_._2)
 
+    final def observe(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[(A, S, PIdSeries, TreeLoc[Node])] = ???
+
 
     /*@tailrec private final def resumeStepState(state: S)(implicit fu: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState, S]): ResumeStepState[A] = this match {
       case Return(a) =>

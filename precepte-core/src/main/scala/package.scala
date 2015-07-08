@@ -5,7 +5,7 @@ import scala.language.higherKinds
 
 package object precepte {
 
-  case class ManagedState0[T <: Tags](path: Call.Path[T], ids: PIdStream = PIdStream())
+  case class ManagedState0[T <: Tags](path: Call.Path[T], ids: PIdSeries = PIdStream())
   case class UnManagedState0[E <: Env, C](span: Span, env: E, value: C)
 
   type PIS0 = ManagedState0[BaseTags]

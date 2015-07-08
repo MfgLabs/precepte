@@ -76,16 +76,10 @@ trait PState[T <: Tags]
 
 case class PState0[Tags, ManagedState, UnmanagedState](
   managed: ManagedState,
-  unmanaged: UnmanagedState
-)
+  unmanaged: UnmanagedState)
 
 trait PIdSeries {
   def run(): (PId, PIdSeries)
-}
-
-/** A hidden State Monad */
-trait PStatable[T <: Tags, S <: PState[T]] {
-  def run(s: S, ids: PIdSeries, tags: T): (S, PIdSeries)
 }
 
 trait PStateUpdater[Tags, MS, FS] {
@@ -94,63 +88,10 @@ trait PStateUpdater[Tags, MS, FS] {
   def updateUnmanaged(s: S, ext: FS): S
 }
 
-/** A hidden State Monad */
-trait PGraphStatable[T <: Tags, S <: PState[T]] {
-  def run(s: S, ids: PIdSeries, tags: T): (S, PIdSeries, GraphNode[T, S])
-}
-
 
 /** The typed environment in which an event happens */
 trait Env
 case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
-
-
-case class PStateBase[E <: Env, T <: Tags, C](span: Span, env: E, path: Call.Path[T], value: C) extends PState[T]
-
-object PStateBase {
-
-  implicit def pstatable[E <: Env, T <: Tags, C] = new PStatable[T, PStateBase[E, T, C]] {
-    def run(s: PStateBase[E, T, C], ids: PIdSeries, tags: T): (PStateBase[E, T, C], PIdSeries) = {
-      val (id, next) = ids.run()
-      s.copy(path = s.path :+ Call(id, tags)) -> next
-    }
-  }
-
-  implicit def pgraphstatable[E <: Env, T <: Tags, C] = new PGraphStatable[T, PStateBase[E, T, C]] {
-    def run(s: PStateBase[E, T, C], ids: PIdSeries, tags: T): (PStateBase[E, T, C], PIdSeries, GraphNode[T, PStateBase[E, T, C]]) = {
-      val (id, next) = ids.run()
-      val g0 = GraphNode(id, s, tags, Vector.empty)
-      (s.copy(path = s.path :+ Call(id, tags)), next, g0)
-    }
-  }
-
-
-  implicit def rootable[E <: Env, T <: Tags, C] = new Rootable[T, PStateBase[E, T, C]] {
-    def toRoot(s: PStateBase[E, T, C]): Root[T, PStateBase[E, T, C]] = Root[T, PStateBase[E, T, C]](s.span, Vector.empty)
-  }
-}
-
-/** The graph of execution of a Call */
-// sealed trait Graph[T <: Tags, C, G <: Graph[T, C, G]] {
-sealed trait Graph[T <: Tags, S <: PState[T], G <: Graph[T, S, G]] {
-  val children: Vector[GraphNode[T, S]]
-  def addChildren(cs: Vector[GraphNode[T, S]]): G
-  def addChild(c: GraphNode[T, S]): G = addChildren(Vector(c))
-}
-
-case class GraphNode[T <: Tags, S <: PState[T]](id: PId, value: S, tags: T, children: Vector[GraphNode[T, S]]) extends Graph[T, S, GraphNode[T, S]] {
-  def addChildren(cs: Vector[GraphNode[T, S]]): GraphNode[T, S] =
-    this.copy(children = children ++ cs)
-}
-
-case class Root[T <: Tags, S <: PState[T]](span: Span, children: Vector[GraphNode[T, S]]) extends Graph[T, S, Root[T, S]] {
-  def addChildren(cs: Vector[GraphNode[T, S]]): Root[T, S] =
-    this.copy(children = children ++ cs)
-}
-
-trait Rootable[T <: Tags, S <: PState[T]] {
-  def toRoot(s: S): Root[T, S]
-}
 
 case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PIdSeries {
   def run() = ids.head -> PIdStream(ids.tail)
