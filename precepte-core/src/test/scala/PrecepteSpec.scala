@@ -94,8 +94,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   //   a0 should ===("foo 1")
   // }
 
-  
-/*
+
+
   it should "observe simple" in {
     def f1 =
       Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
@@ -109,45 +109,50 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     def f3(s: String) =
       Precepte(tags("simple.f3")){(_: PST0[Unit]) => s"$s finito".point[Future]}
 
-    val res = for {
-      i <- f1
-      s <- f2(i)
-      r <- f3(s)
-    } yield r
+    val res = Precepte(tags("root")) {
+      for {
+        i <- f1
+        s <- f2(i)
+        r <- f3(s)
+      } yield r
+    }
 
-    val (a, s, ids, graph) = res.observe0(nostate).futureValue
+    val (s, a, graph) = res.observe(nostate).futureValue
     println("-- graph0 --")
-    val tree = graph.toTree
-    val g = tree.drawTree
-    println(g)
-    // p[Unit, PST0[Unit], Root[BaseTags, PST0[Unit]]](graph)
-    println("----")
+    for {
+      g <- graph
+    } println(g.unmanaged)
 
-    val sf1 = tree.subForest(0)
-    val Node0(_, t1) = sf1.rootLabel
-    t1 should ===(tags("simple.f1"))
-    val Node0(_, t11) = sf1.subForest(0).rootLabel
-    t11 should ===(tags("simple.f1.1"))
-    val Node0(_, t12) = sf1.subForest(1).rootLabel
-    t12 should ===(tags("simple.f1.2"))
-    val Node0(_, t13) = sf1.subForest(2).rootLabel
-    t13 should ===(tags("simple.f1.3"))
 
-    val sf2 = tree.subForest(1)
-    val Node0(_, t2) = sf2.rootLabel
-    t2 should ===(tags("simple.f2"))
-    val Node0(_, t21) = sf2.subForest(0).rootLabel
-    t21 should ===(tags("simple.f2.1"))
-    val Node0(_, t22) = sf2.subForest(1).rootLabel
-    t22 should ===(tags("simple.f2.2"))
+    // val g = tree.drawTree
+    // println(g)
+    // println("----")
 
-    val sf3 = tree.subForest(2)
-    val Node0(_, t3) = sf3.rootLabel
-    t3 should ===(tags("simple.f3"))
+    // val sf1 = tree.subForest(0)
+    // val Node0(_, t1) = sf1.rootLabel
+    // t1 should ===(tags("simple.f1"))
+    // val Node0(_, t11) = sf1.subForest(0).rootLabel
+    // t11 should ===(tags("simple.f1.1"))
+    // val Node0(_, t12) = sf1.subForest(1).rootLabel
+    // t12 should ===(tags("simple.f1.2"))
+    // val Node0(_, t13) = sf1.subForest(2).rootLabel
+    // t13 should ===(tags("simple.f1.3"))
+
+    // val sf2 = tree.subForest(1)
+    // val Node0(_, t2) = sf2.rootLabel
+    // t2 should ===(tags("simple.f2"))
+    // val Node0(_, t21) = sf2.subForest(0).rootLabel
+    // t21 should ===(tags("simple.f2.1"))
+    // val Node0(_, t22) = sf2.subForest(1).rootLabel
+    // t22 should ===(tags("simple.f2.2"))
+
+    // val sf3 = tree.subForest(2)
+    // val Node0(_, t3) = sf3.rootLabel
+    // t3 should ===(tags("simple.f3"))
 
   }
 
-
+  /*
   it should "optT" in {
     val f1 = Precepte(tags("opt"))((_: PST0[Unit]) => Option("foo").point[Future])
     val f2 = Precepte(tags("opt"))((_: PST0[Unit]) => Option(1).point[Future])
@@ -934,7 +939,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val tctx = new PCTX0[Future, S]
 
     def f1(): tctx.Precepte[String] =
-      tctx.Precepte(tags("f1")).applyS { (s: PST0[S]) => 
+      tctx.Precepte(tags("f1")).applyS { (s: PST0[S]) =>
         s.unmanaged.value.service.doit().map { a =>
           s.unmanaged.copy(value = s.unmanaged.value.copy(ctx = s.unmanaged.value.ctx :+ a)) -> a
         }
@@ -950,7 +955,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     )
 
     def f2(): tctxiso.tc.Precepte[String] =
-      tctxiso.tc.Precepte(tags("f2")).applyS{ (s: PST0[S2]) => 
+      tctxiso.tc.Precepte(tags("f2")).applyS{ (s: PST0[S2]) =>
         s.unmanaged.value.db.callDB().map { a =>
           s.unmanaged.copy(value = s.unmanaged.value.copy(ctx = s.unmanaged.value.ctx :+ a)) -> a
         }
@@ -964,7 +969,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val nostate = PST0[S](Span.gen, env, Vector.empty, S(db, logger, service, Seq()))
 
     println("RES:"+p.run(nostate).futureValue)
-    
+
 
     // val tagiso = taggingContext.iso(iso0)
   }

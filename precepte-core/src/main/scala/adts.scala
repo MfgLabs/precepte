@@ -92,15 +92,3 @@ case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags
 case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PIdSeries {
   def run() = ids.head -> PIdStream(ids.tail)
 }
-
-sealed trait Node
-case class NodeR(span: Span) extends Node {
-  override def toString = s"root($span)"
-}
-case class Node0[T <: Tags](id: PId, tags: T) extends Node {
-  override def toString = s"node($tags, $id)"
-}
-
-object Node {
-  implicit def show[T <: Tags] = scalaz.Show.showA[Node]
-}
