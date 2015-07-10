@@ -123,6 +123,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       g <- graph
     } println(g.unmanaged)
 
+    println("-- |@| --")
+    val (s2, a2, graph2) = (f1 |@| f1).tupled.observe(nostate).futureValue
+    println(graph2)
+    // for {
+    //   g <- graph2
+    // } yield println(g.unmanaged)
+
 
     // val g = tree.drawTree
     // println(g)
