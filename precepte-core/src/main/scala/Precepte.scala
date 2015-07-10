@@ -74,13 +74,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
           case f@self.Flatmap(sub, next) =>
             tc.Flatmap(() => iso.to(sub()), (i:f._I) => iso.to(next(i)))
-
-          case f@self.FlatmapK(subk, fk) =>
-            tc.FlatmapK(
-              iso.to(subk),
-              (f2: F2[(tc.S, f._A)]) => iso.to(fk(isoF.from(f2.map{ case (s2, fa) => isoS.from(s2) -> fa })))
-            )
-
         }
       }
 
@@ -99,13 +92,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
           case f@tc.Flatmap(sub, next) =>
             self.Flatmap(() => iso.from(sub()), (i:f._I) => iso.from(next(i)))
-
-          case f@tc.FlatmapK(subk, fk) =>
-            self.FlatmapK(
-              iso.from(subk),
-              (ff: F[(S, f._A)]) => iso.from(fk(isoF.to(ff.map { case (s, fa) => isoS.to(s) -> fa })))
-            )
-
         }
       }
     }
@@ -114,7 +100,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
   trait ResumeStep[A, T]
   case class FlatMapStep[A, T](v: F[(Precepte[A], S, T)]) extends ResumeStep[A, T]
   case class ReturnStep[A, T](v: (S, A, T)) extends ResumeStep[A, T]
-  case class KStep[A, T](v: PrecepteK[A]) extends ResumeStep[A, T]
 
   sealed trait Precepte[A] {
     self =>
@@ -124,15 +109,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
     final def map[B](f: A => B): Precepte[B] =
       flatMap(a => Return(f(a)))
-
-    final def flatMapK[B](f: F[(S, A)] => Precepte[B]): Precepte[B] =
-      FlatmapK(self, f)
-
-    /** alias for flatMapK */
-    final def introspect[B](f: F[(S, A)] => Precepte[B]): Precepte[B] = flatMapK(f)
-
-    final def mapK[B](f: F[(S, A)] => F[B])(implicit F: Functor[F]): Precepte[B] =
-      MapK(self, f)
 
     def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[AP[A]] =
       this.map(a => ap.point(a))
@@ -162,19 +138,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
           case f@Flatmap(sub2, next2) =>
             (Flatmap(sub2, (z:f._I) => next2(z).flatMap(next)):Precepte[A]).resume(state, t, z)
-
-          case MapK(subk, fk) =>
-            subk.mapK(z => fk(z).map(next)).flatMap(identity).resume(state, t, z)
-
-          case FlatmapK(subk, fk) =>
-            subk.flatMapK(z => fk(z).flatMap(next)).resume(state, t, z)
         }
-
-      case k@MapK(_,_) =>
-        KStep(k)
-
-      case k@FlatmapK(_,_) =>
-        KStep(k)
     }
 
     final def scan[T](state: S, t: T, z: (S, T) => T)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[(S, A, T)] =
@@ -183,18 +147,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
           fsp.flatMap { case (p0, s0, t0) => p0.scan(s0, t0, z) }
         case ReturnStep(sat) =>
           sat.point[F]
-        case KStep(p) =>
-          p match {
-            case FlatmapK(subk, fk) =>
-              val f = subk.scan(state, t, z).map { case (s, a, t) => (s, a) }
-              // retry/recover with last state/ids
-              fk(f).scan(state, t, z)
-
-            case MapK(subk, fk) =>
-              val f = subk.scan(state, t, z).map { case (s, a, t) => (s, a) }
-              // retry/recover with last state/ids
-              fk(f).map(a => (state, a, t))
-          }
       }
 
 
@@ -216,8 +168,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
           Step(f(st).map(_.mapStep(f)), tags)
         case fl@Flatmap(sub, next) =>
           Flatmap(() => sub().mapStep(f), (n: fl._I) => next(n).mapStep(f))
-        case MapK(sub, next) => MapK(sub.mapStep(f), next)
-        case k@FlatmapK(sub, next) => FlatmapK(sub.mapStep(f), (fa: F[(S, k._A)]) => next(fa).mapStep(f))
       }
   }
 
@@ -227,14 +177,6 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
   case class Flatmap[I, A](sub: () => Precepte[I], next: I => Precepte[A]) extends Precepte[A] {
     type _I = I
-  }
-
-  trait PrecepteK[A] extends Precepte[A]
-
-  case class MapK[A, B](sub: Precepte[A], f: F[(S, A)] => F[B]) extends PrecepteK[B]
-
-  case class FlatmapK[A, B](sub: Precepte[A], f: F[(S, A)] => Precepte[B]) extends PrecepteK[B] {
-    type _A = A
   }
 
   trait LowPriorityManagedStatetances {
@@ -249,11 +191,7 @@ class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
 
         // override to support parallel execution
         override def ap[A, B](pa: => Precepte[A])(pab: => Precepte[A => B]) =
-          pa.flatMapK { fa =>
-            pab.mapK { fab =>
-              fa <*> fab.map { case (s, ab) => (s: (S, A)) => ab(s._2) }
-            }
-          }
+          ???
       }
 
   }
