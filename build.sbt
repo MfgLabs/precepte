@@ -3,7 +3,7 @@ import play.PlayImport.PlayKeys._
 lazy val commonSettings =  Seq(
 	organization := "com.mfglabs",
 	version := "0.1.1-SNAPSHOT",
-	scalaVersion := "2.11.6",
+	scalaVersion := "2.11.7",
 	resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
 	logLevel in update := Level.Warn
 )
@@ -40,8 +40,10 @@ lazy val core =
 			},
 			libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 			libraryDependencies ++= Seq(
-			  "org.scalaz" %% "scalaz-core" % "7.1.0",
-			  "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test"))
+			    "org.scalaz" 			%% "scalaz-core" 			% "7.1.0"
+			  , "com.chuusai"     %% "shapeless"      	% "2.2.4"
+			  , "org.scalatest" 	%  "scalatest_2.11" 	% "2.2.1" 	% "test"
+			  ))
 
 lazy val sample =
 	project.in(file("precepte-sample"))

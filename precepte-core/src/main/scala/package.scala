@@ -30,4 +30,6 @@ package object precepte {
     }
     def updateUnmanaged(s: PST0[C], unmanaged: PES0[C]): PST0[C] = s.copy(unmanaged = unmanaged)
   }
+
+  type Pre0[F[_], C, A] = Pre[BaseTags, PIS0, PES0[C], F, A]
 }

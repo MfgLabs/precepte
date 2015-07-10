@@ -9,6 +9,9 @@ import scalaz.syntax.monad._
 import scala.annotation.tailrec
 import scalaz.{TreeLoc, Tree}
 
+import shapeless._
+
+
 class TaggingContext[Tags, ManagedState, UnmanagedState, F[_]] {
   self =>
 
