@@ -20,8 +20,6 @@ package object precepte {
       )
   }
 
-  type PCTX0[F[_], C] = TaggingContext[BaseTags, PIS0, PES0[C], F]
-
   implicit def updater0[C] = new PStateUpdater[BaseTags, PIS0, PES0[C]] {
     def appendTags(s: PST0[C], tags: BaseTags) = {
       val (id, next) = s.managed.ids.run()
