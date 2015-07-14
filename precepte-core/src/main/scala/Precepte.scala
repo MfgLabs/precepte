@@ -30,8 +30,7 @@ sealed trait Precepte[A] {
     Flatmap[Tags, ManagedState, UnmanagedState, F, A, B](() => self, f)
 
   final def map[B](f: A => B): Pre[B] =
-    ???
-    // flatMap(a => Return(f(a)))
+    flatMap(a => Return[Tags, ManagedState, UnmanagedState, F, B](f(a)))
 
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Pre[AP[A]] =
     ???
