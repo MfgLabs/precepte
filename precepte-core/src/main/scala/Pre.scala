@@ -170,4 +170,5 @@ trait LowPriorityManagedStatetances {
       type λ[α] = G[A, α]
       trans[Tags, ManagedState, UnmanagedState, F, λ, B](m)(new *->*[λ] {}, hh)
     }
+
   }

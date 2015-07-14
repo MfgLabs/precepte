@@ -782,16 +782,130 @@ class PreSpec extends FlatSpec with ScalaFutures {
   }
 */
   it should "not break type inference" in {
-    import scalaz.syntax.monadPlus._
+    // import scalaz.syntax.monadPlus._
+    import scalaz.syntax.Ops
     import scalaz.OptionT._
-    import scalaz.{Monad, MonadPlus, Applicative}
+    import scalaz._
+    import scala.language.implicitConversions
+    // import shapeless._
 
     val f1 = Option(1).point[P]
 
-    implicitly[Monad[P]]
-    implicitly[Applicative[P]]
+    // implicitly[Monad[P]]
+    // implicitly[Applicative[P]]
     // implicitly[MonadPlus[P]]
-    // optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
+    
+    trait Dummy1[F[_]]
+    object Dummy1 {
+
+      implicit def mkDummy1[F[_]]: Dummy1[F] = new Dummy1[F] {}
+      // implicit def f(
+      //   implicit nosi: NoSI2712[Dummy1]
+      // ) = nosi.mkTC
+
+    }    
+
+    // final class MonadPlusOps[F[_],A](val self: F[A])(implicit val F: MonadPlus[F]) extends Ops[F[A]] {
+    //   ////
+    //   import Leibniz.===
+
+    //   def filter(f: A => Boolean) =
+    //     F.filter(self)(f)
+      
+    //   def withFilter(f: A => Boolean) =
+    //     filter(f)
+
+    //   final def uniteU[T](implicit T: Unapply[Foldable, A]): F[T.A] =
+    //     F.uniteU(self)(T)
+
+    //   def unite[T[_], B](implicit ev: A === T[B], T: Foldable[T]): F[B] = {
+    //     val ftb: F[T[B]] = ev.subst(self)
+    //     F.unite[T, B](ftb)
+    //   }
+
+    //   final def separate[G[_, _], B, C](implicit ev: A === G[B, C], G: Bifoldable[G]): (F[B], F[C]) =
+    //     F.separate(ev.subst(self))
+
+    //   ////
+    // }
+
+    // implicitly[Dummy1[P]]
+    // implicitly[Dummy1[({ type λ[α] = Pre[Tags, PIS0, PES0[Unit], Future, α] })#λ]]
+    implicitly[Monad[({ type λ[α] = Pre[Tags, PIS0, PES0[Unit], Future, α] })#λ]]
+
+    // Split1[({ type λ[t] = List[(t, t)] })#λ, Dummy1, Dummy1]
+
+    // val n = new NoSI2712H[Monad] {}
+    // import n._
+    // implicit def f[TC[_[_]]](
+    //   implicit nosi: NoSI2712[TC]
+    // ) = nosi.mkTC
+
+    // val a0 = f[Dummy1]
+    // implicitly[Monad[({ type λ[α] = Pre0[Future, Unit, α] })#λ]]
+    // implicitly[Dummy1[({ type λ[α] = Pre0[Future, Unit, α] })#λ]]
+
+    // implicitly[Una[OptionT[P, Int], OptionT]]
+
+    // implicit def koko[L[_], A](l: L[A])(implicit split1: Split1[L, Dummy1, Dummy1]): split1.O[split1.I[A]] = {
+    //   split1.unpack(l)
+    // }
+    
+    // implicit def koko[TPA, TC[_[_], _], F[_[_]]](l: TPA)(implicit una: Una[TPA, TC, F]): TC[una.P, una.A] = una.unpack(l)
+    // koko(List((5, 5)))
+
+    // type T = OptionT[P, Int]
+    // implicitly[Unapply[MonadPlus, OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int]]]
+    
+    // import scalaz.Leibniz.===
+    // val leibniz: OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int] === OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int] = scalaz.Leibniz.refl
+
+    import scalaz.syntax.ext.MonadPlusOpsExt._
+
+    // PreHackSI2712.materialize[
+    //   OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int],
+    //   OptionT,
+    //   MonadPlus,
+    //   Future,
+    //   BaseTags,
+    //   PIS0,
+    //   PES0[Unit],
+    //   Int
+    // ]
+
+    val a = optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
+
+    // implicit def f[TCA](tca: TCA)(implicit nosi: NoSI2712T[TCA, OptionT, MonadPlus]) =
+    //   new MonadPlusOps[nosi.T, nosi.A](nosi.leibniz(tca))(nosi.MTC)
+      /*new Unapply[M0, TCA] {
+        type M[x] = nosi.T[x]
+        type A = nosi.A
+        def TC = nosi.MTC
+        def leibniz = leibniz
+      }*/
+    // type X[T] = OptionT[P, T]
+    // implicitly[MonadPlus[X]]
+    // type P[x] = ({ type λ[α] = Pre0[Future, Unit, α] })#λ[x]
+    // type T[x] = OptionT[P, x]
+    // val una = implicitly[Una[OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int], OptionT]]
+
+    // implicitly[MonadPlus[({ type λ[α] = OptionT[P, α] })#λ]]
+    // implicitly[MonadPlus[({ type λ[α] = OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, α] })#λ]]
+    // shapeless.lazily[scalaz.MonadPlus[T]]
+
+    // val una2 = implicitly[Una2[OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int], OptionT, Future, Int]]
+
+    // implicitly[NoSI2712T2[OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int], OptionT, MonadPlus, Future, Int]]
+
+    // implicit val s = SingletonOf.mkSingletonOf[
+    //   OptionT,
+    //   Una[
+    //     OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int],
+    //     OptionT
+    //   ]
+    // ]
+    
+
   }
 
 
@@ -811,7 +925,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
     a should equal (1)
   }
 
-*/
+
 
   it should "not stack overflow" in {
     def pre(l: List[Int], i: Int) = P(tags(s"stack_$i"))((_: PST0[Unit]) => l.point[Future])
@@ -828,9 +942,6 @@ class PreSpec extends FlatSpec with ScalaFutures {
   }
 
 
-
-
-/*
   it should "mapStepState" in {
     import scalaz.~>
     def f1 = Precepte(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
