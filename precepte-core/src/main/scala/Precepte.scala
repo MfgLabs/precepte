@@ -120,28 +120,28 @@ trait LowPriorityManagedStatetances {
 
   object Precepte extends LowPriorityManagedStatetances {
 
-    trait PrecepteBuilder[Tags, ManagedState, UnmanagedState, F[_]] {
+    trait PrecepteBuilder[Tags] {
       val tags: Tags
 
-      type P[A] = Precepte[Tags, ManagedState, UnmanagedState, F, A]
+      type P[ManagedState, UnmanagedState, F[_], A] = Precepte[Tags, ManagedState, UnmanagedState, F, A]
 
       import scala.concurrent.Future
-      def future[A](λ: P[A]#S => Future[A])(implicit F: Functor[F], ec: scala.concurrent.ExecutionContext, ev: F[A] =:= Future[A]): P[Throwable \/ A] =
+      def future[M, U, A](λ: P[M, U, Future, A]#S => Future[A])(implicit F: Functor[Future], ec: scala.concurrent.ExecutionContext): P[M, U, Future, Throwable \/ A] =
         apply { pa =>
           λ(pa).map(\/-.apply _)
-            .recover{ case e => -\/(e) }.asInstanceOf[F[Throwable \/ A]]
+            .recover{ case e => -\/(e) }
         }
 
-      def apply[A](λ: P[A]#S => F[A])(implicit F: Functor[F]): P[A] =
-        Step[Tags, ManagedState, UnmanagedState, F, A](
-          IndexedStateT { (st: P[A]#S) =>
+      def apply[M, U, F[_], A](λ: P[M, U, F, A]#S => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
+        Step[Tags, M, U, F, A](
+          IndexedStateT { (st: P[M, U, F, A]#S) =>
             for (a <- λ(st))
             yield st -> Return(a)
           }, tags)
 
-      def applyS[A](λ: P[A]#S => F[(UnmanagedState, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): P[A] =
-        Step[Tags, ManagedState, UnmanagedState, F, A](
-          IndexedStateT { (st: P[A]#S) =>
+      def applyS[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, M, U]): P[M, U, F, A] =
+        Step[Tags, M, U, F, A](
+          IndexedStateT { (st: P[M, U, F, A]#S) =>
             for (ca <- λ(st))
             yield {
               val (unmanaged, a) = ca
@@ -149,14 +149,14 @@ trait LowPriorityManagedStatetances {
             }
           }, tags)
 
-      def apply[A](m: P[A])(implicit A: Applicative[F]): P[A] =
-        Step(IndexedStateT[F, P[A]#S, P[A]#S, P[A]]{ st =>
+      def apply[M, U, F[_], A](m: P[M, U, F, A])(implicit A: Applicative[F]): P[M, U, F, A] =
+        Step(IndexedStateT[F, P[M, U, F, A]#S, P[M, U, F, A]#S, P[M, U, F, A]]{ st =>
           (st -> m).point[F]
         }, tags)
     }
 
-    def apply[Tags, ManagedState, UnmanagedState, F[_]](_tags: Tags) =
-      new PrecepteBuilder[Tags, ManagedState, UnmanagedState, F] {
+    def apply[Tags](_tags: Tags) =
+      new PrecepteBuilder[Tags] {
         val tags = _tags
       }
 
