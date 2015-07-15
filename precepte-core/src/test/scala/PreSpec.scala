@@ -782,7 +782,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
   }
 */
   it should "not break type inference" in {
-    // import scalaz.syntax.monadPlus._
+    import scalaz.syntax.monadPlus._
     import scalaz.syntax.Ops
     import scalaz.OptionT._
     import scalaz._
@@ -831,7 +831,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
 
     // implicitly[Dummy1[P]]
     // implicitly[Dummy1[({ type λ[α] = Pre[Tags, PIS0, PES0[Unit], Future, α] })#λ]]
-    implicitly[Monad[({ type λ[α] = Pre[Tags, PIS0, PES0[Unit], Future, α] })#λ]]
+    // implicitly[Monad[({ type λ[α] = Pre[Tags, PIS0, PES0[Unit], Future, α] })#λ]]
 
     // Split1[({ type λ[t] = List[(t, t)] })#λ, Dummy1, Dummy1]
 
@@ -842,7 +842,6 @@ class PreSpec extends FlatSpec with ScalaFutures {
     // ) = nosi.mkTC
 
     // val a0 = f[Dummy1]
-    // implicitly[Monad[({ type λ[α] = Pre0[Future, Unit, α] })#λ]]
     // implicitly[Dummy1[({ type λ[α] = Pre0[Future, Unit, α] })#λ]]
 
     // implicitly[Una[OptionT[P, Int], OptionT]]
@@ -860,7 +859,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
     // import scalaz.Leibniz.===
     // val leibniz: OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int] === OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int] = scalaz.Leibniz.refl
 
-    import scalaz.syntax.ext.MonadPlusOpsExt._
+    // import scalaz.syntax.ext.MonadPlusOpsExt._
 
     // PreHackSI2712.materialize[
     //   OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int],
@@ -875,6 +874,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
 
     val a = optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
 
+    
     // implicit def f[TCA](tca: TCA)(implicit nosi: NoSI2712T[TCA, OptionT, MonadPlus]) =
     //   new MonadPlusOps[nosi.T, nosi.A](nosi.leibniz(tca))(nosi.MTC)
       /*new Unapply[M0, TCA] {

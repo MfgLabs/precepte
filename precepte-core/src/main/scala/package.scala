@@ -1,6 +1,11 @@
 package com.mfglabs
 
+import scalaz._
 import scala.language.higherKinds
+import scala.language.implicitConversions
+import shapeless.WrappedOrphan
+
+import com.mfglabs.precepte._
 
 
 package object precepte {
@@ -32,4 +37,18 @@ package object precepte {
   }
 
   type Pre0[F[_], C, A] = Pre[BaseTags, PIS0, PES0[C], F, A]
+
+  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A0](
+    implicit
+      una2: PreUnapply[TCA, TC, F, Tags, MS, UMS, A0],
+      nosi: PreHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A0]
+  ) = new Unapply[M, TCA] {
+    type M[x] = nosi.T[x]
+    type A = A0
+
+    def TC = nosi.MTC
+
+    def leibniz = nosi.leibniz
+  }
+
 }
