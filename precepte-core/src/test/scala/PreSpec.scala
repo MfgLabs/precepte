@@ -11,7 +11,7 @@ import org.scalatest.time.{Millis, Seconds, Span => TSpan}
 
 import scala.language.higherKinds
 
-class PreSpec extends FlatSpec with ScalaFutures {
+class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   implicit val defaultPatience =
     PatienceConfig(timeout =  TSpan(300, Seconds), interval = TSpan(5, Millis))
@@ -24,12 +24,12 @@ class PreSpec extends FlatSpec with ScalaFutures {
 
   // val taggingContext = new PCTX0[Future, Unit]
   // import taggingContext._
-  import Pre._
+  import Precepte._
 
-  type P[A] = Pre0[Future, Unit, A]
+  type P[A] = Precepte0[Future, Unit, A]
 
   object P {
-    def apply[A](tags: BaseTags) = Pre[BaseTags, PIS0, PES0[Unit], Future](tags)
+    def apply[A](tags: BaseTags) = Precepte[BaseTags, PIS0, PES0[Unit], Future](tags)
   }
 
   val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Test, Tags.Version("1.0"))
@@ -42,7 +42,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
 
   import Tags.Callee
 
-  "Pre" should "run/eval simple" in {
+  "Precepte" should "run/eval simple" in {
     def f1 = P(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}
     def f2(i: Int) = P(tags("simple.f2")){(_: PST0[Unit]) => s"foo $i".point[Future]}
 
@@ -122,7 +122,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
 
   }
 
-  
+
   it should "OptT" in {
     val f1 = P(tags("opt"))((_: PST0[Unit]) => Option("foo").point[Future])
     val f2 = P(tags("opt"))((_: PST0[Unit]) => Option(1).point[Future])
@@ -794,7 +794,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
     // implicitly[Monad[P]]
     // implicitly[Applicative[P]]
     // implicitly[MonadPlus[P]]
-    
+
     trait Dummy1[F[_]]
     object Dummy1 {
 
@@ -803,7 +803,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
       //   implicit nosi: NoSI2712[Dummy1]
       // ) = nosi.mkTC
 
-    }    
+    }
 
     // final class MonadPlusOps[F[_],A](val self: F[A])(implicit val F: MonadPlus[F]) extends Ops[F[A]] {
     //   ////
@@ -811,7 +811,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
 
     //   def filter(f: A => Boolean) =
     //     F.filter(self)(f)
-      
+
     //   def withFilter(f: A => Boolean) =
     //     filter(f)
 
@@ -849,13 +849,13 @@ class PreSpec extends FlatSpec with ScalaFutures {
     // implicit def koko[L[_], A](l: L[A])(implicit split1: Split1[L, Dummy1, Dummy1]): split1.O[split1.I[A]] = {
     //   split1.unpack(l)
     // }
-    
+
     // implicit def koko[TPA, TC[_[_], _], F[_[_]]](l: TPA)(implicit una: Una[TPA, TC, F]): TC[una.P, una.A] = una.unpack(l)
     // koko(List((5, 5)))
 
     // type T = OptionT[P, Int]
     // implicitly[Unapply[MonadPlus, OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int]]]
-    
+
     // import scalaz.Leibniz.===
     // val leibniz: OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int] === OptionT[({ type λ[α] = Pre0[Future, Unit, α] })#λ, Int] = scalaz.Leibniz.refl
 
@@ -874,7 +874,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
 
     val a = optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
 
-    
+
     // implicit def f[TCA](tca: TCA)(implicit nosi: NoSI2712T[TCA, OptionT, MonadPlus]) =
     //   new MonadPlusOps[nosi.T, nosi.A](nosi.leibniz(tca))(nosi.MTC)
       /*new Unapply[M0, TCA] {
@@ -904,7 +904,7 @@ class PreSpec extends FlatSpec with ScalaFutures {
     //     OptionT
     //   ]
     // ]
-    
+
 
   }
 

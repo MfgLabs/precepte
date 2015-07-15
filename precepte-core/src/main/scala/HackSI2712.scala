@@ -26,13 +26,13 @@ object SingletonOf {
 }
 
 
-trait PreUnapply[TCA, TC[_[_], _], F[_], Tags, MS, UMS, A]
+trait PrecepteUnapply[TCA, TC[_[_], _], F[_], Tags, MS, UMS, A]
 
-object PreUnapply {
-  implicit def preUnapply[TC[_[_], _], F[_], Tags, MS, UMS, C, A] = new PreUnapply[TC[({ type λ[α] = Pre[Tags, MS, UMS, F, α] })#λ, A], TC, F, Tags, MS, UMS, A] { }
+object PrecepteUnapply {
+  implicit def preUnapply[TC[_[_], _], F[_], Tags, MS, UMS, C, A] = new PrecepteUnapply[TC[({ type λ[α] = Precepte[Tags, MS, UMS, F, α] })#λ, A], TC, F, Tags, MS, UMS, A] { }
 }
 
-trait PreHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A] {
+trait PrecepteHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A] {
 
   type P[_]
 
@@ -46,10 +46,10 @@ trait PreHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A] {
 
 }
 
-object PreHackSI2712 {
+object PrecepteHackSI2712 {
   import scala.language.experimental.macros
 
-  implicit def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A]: PreHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A] = macro NoSI2712Macros.materialize[TCA, TC, M, F, Tags, MS, UMS, A]
+  implicit def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A]: PrecepteHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A] = macro NoSI2712Macros.materialize[TCA, TC, M, F, Tags, MS, UMS, A]
 
 }
 
@@ -59,7 +59,7 @@ class NoSI2712Macros(val c: whitebox.Context) {
 
   def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A]
     (implicit
-      tcaTag: WeakTypeTag[TCA], 
+      tcaTag: WeakTypeTag[TCA],
       tcTag: WeakTypeTag[TC[Id, Int]],
       mTag: WeakTypeTag[M[Id]],
       fTag: WeakTypeTag[F[Int]],
@@ -89,10 +89,10 @@ class NoSI2712Macros(val c: whitebox.Context) {
     val nme2 = TypeName(c.freshName)
 
     val p = q"""
-      new _root_.com.mfglabs.precepte.PreHackSI2712[$tcaTpe, $tcTpe, $mTpe, $fTpe, $tagsTpe, $msTpe, $umsTpe, $aTpe] {
+      new _root_.com.mfglabs.precepte.PrecepteHackSI2712[$tcaTpe, $tcTpe, $mTpe, $fTpe, $tagsTpe, $msTpe, $umsTpe, $aTpe] {
         self =>
 
-        type P[$nme] = _root_.com.mfglabs.precepte.Pre[$tagsTpe, $msTpe, $umsTpe, $fTpt, $nme]
+        type P[$nme] = _root_.com.mfglabs.precepte.Precepte[$tagsTpe, $msTpe, $umsTpe, $fTpt, $nme]
 
         type T[$nme2] = $tcTpt[P, $nme2]
 
@@ -101,16 +101,16 @@ class NoSI2712Macros(val c: whitebox.Context) {
         def leibniz: _root_.scalaz.Leibniz.===[$tcaTpe, T[$aTpe]] = _root_.scalaz.Leibniz.refl
       }
     """
-    println(s"PT2: $p")
-    p  
+    // println(s"PT2: $p")
+    p
   }
 }
 
 
 /*trait NoSI2712[TC[_[_]]] {
-  type P[a] = Pre[BaseTags, PIS0, PES0[Unit], Future, a]
+  type P[a] = Precepte[BaseTags, PIS0, PES0[Unit], Future, a]
 
-  def mkTC: TC[({ type λ[t] = Pre[BaseTags, PIS0, PES0[Unit], Future, t] })#λ]
+  def mkTC: TC[({ type λ[t] = Precepte[BaseTags, PIS0, PES0[Unit], Future, t] })#λ]
 }
 
 object NoSI2712 {
@@ -123,7 +123,7 @@ object NoSI2712 {
 
 trait Una[TCA, TC[_[_], _]] {
   type P[_]
-  
+
   type A
 
   type T[x]
@@ -139,8 +139,8 @@ object Una {
     type T[x] = T0[x]
   }
 
-  implicit def una[TC[_[_], _], A0] = new Una[TC[({ type λ[α] = Pre0[Future, Unit, α] })#λ, A0], TC] {
-    type P[x] = Pre0[Future, Unit, x]
+  implicit def una[TC[_[_], _], A0] = new Una[TC[({ type λ[α] = Precepte0[Future, Unit, α] })#λ, A0], TC] {
+    type P[x] = Precepte0[Future, Unit, x]
 
     type A = A0
 
@@ -154,7 +154,7 @@ object Una {
 
 
 trait MTCFromUna[TCA, M[_[_]]] {
-  
+
   type T[x]
 
   type A
@@ -204,10 +204,10 @@ object NoSI2712T {
 
     val p = q"""
       new _root_.com.mfglabs.precepte.NoSI2712[$lTpe] {
-        
-        def mkTC: $lTpt[({ type λ[t] = 
-          Pre[
-            _root_.com.mfglabs.precepte.BaseTags, _root_.com.mfglabs.precepte.PIS0, 
+
+        def mkTC: $lTpt[({ type λ[t] =
+          Precepte[
+            _root_.com.mfglabs.precepte.BaseTags, _root_.com.mfglabs.precepte.PIS0,
             _root_.com.mfglabs.precepte.PES0[_root_.scala.Unit], _root_.scala.concurrent.Future,
             t] })#λ
           ] = _root_.shapeless.lazily[$lTpt[this.P]]
@@ -221,7 +221,7 @@ object NoSI2712T {
 
   def materializeFromUna[TCA, TC[_[_], _], M[_[_]], P[_], T[_], A]
     (implicit
-      tcaTag: WeakTypeTag[TCA], 
+      tcaTag: WeakTypeTag[TCA],
       tcTag: WeakTypeTag[TC[Id, Int]],
       mTag: WeakTypeTag[M[Id]],
       pTag: WeakTypeTag[P[Int]],
@@ -258,7 +258,7 @@ object NoSI2712T {
 
   def materializeT[TCA, TC[_[_], _], M[_[_]]]
     (implicit
-      tcaTag: WeakTypeTag[TCA], 
+      tcaTag: WeakTypeTag[TCA],
       tcTag: WeakTypeTag[TC[Id, Int]],
       mTag: WeakTypeTag[M[Id]]
     ): Tree = {

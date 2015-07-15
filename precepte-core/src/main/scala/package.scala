@@ -25,8 +25,6 @@ package object precepte {
       )
   }
 
-  type PCTX0[F[_], C] = TaggingContext[BaseTags, PIS0, PES0[C], F]
-
   implicit def updater0[C] = new PStateUpdater[BaseTags, PIS0, PES0[C]] {
     def appendTags(s: PST0[C], tags: BaseTags) = {
       val (id, next) = s.managed.ids.run()
@@ -36,12 +34,12 @@ package object precepte {
     def updateUnmanaged(s: PST0[C], unmanaged: PES0[C]): PST0[C] = s.copy(unmanaged = unmanaged)
   }
 
-  type Pre0[F[_], C, A] = Pre[BaseTags, PIS0, PES0[C], F, A]
+  type Precepte0[F[_], C, A] = Precepte[BaseTags, PIS0, PES0[C], F, A]
 
   implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A0](
     implicit
-      una2: PreUnapply[TCA, TC, F, Tags, MS, UMS, A0],
-      nosi: PreHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A0]
+      una2: PrecepteUnapply[TCA, TC, F, Tags, MS, UMS, A0],
+      nosi: PrecepteHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A0]
   ) = new Unapply[M, TCA] {
     type M[x] = nosi.T[x]
     type A = A0
