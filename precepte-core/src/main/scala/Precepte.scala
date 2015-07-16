@@ -2,13 +2,10 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scalaz.{ Bind, Monad, MonadPlus, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, State, Traverse, ~> }
-import scalaz.Isomorphism.{<~>, <=>, isoRefl, isoNaturalRefl}
+import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT }
 import scalaz.syntax.monad._
 
 import scala.annotation.tailrec
-import scalaz.{TreeLoc, Tree}
-
 
 trait ResumeStep[Tags, ManagedState, UnmanagedState, F[_], A, T]
 case class FlatMapStep[Tags, ManagedState, UnmanagedState, F[_], A, T](v: F[(Precepte[Tags, ManagedState, UnmanagedState, F, A], Precepte[Tags, ManagedState, UnmanagedState, F, A]#S, T)]) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T]
