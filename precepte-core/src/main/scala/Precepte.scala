@@ -92,8 +92,6 @@ case class Flatmap[Tags, ManagedState, UnmanagedState, F[_], I, A](
   type _I = I
 }
 
-
-
 trait LowPriorityManagedStatetances {
   implicit def precepteMonadManagedStatetance[Tags, ManagedState, UnmanagedState, F[_]](implicit ApF: Applicative[F]) =
     new Monad[({ type λ[α] = Precepte[Tags, ManagedState, UnmanagedState, F, α] })#λ] {
@@ -105,12 +103,11 @@ trait LowPriorityManagedStatetances {
         m.flatMap(f)
 
       // override to support parallel execution
-      // override def ap[A, B](pa: => Precepte[Tags, ManagedState, UnmanagedState, F, A])(pab: => Precepte[Tags, ManagedState, UnmanagedState, F, A => B]) =
-      //   pa.flatMapK { fa =>
-      //     pab.mapK { fab =>
-      //       fa <*> fab.map { case (s, ab) => (s: (S, A)) => ab(s._2) }
-      //     }
-      //   }
+      override def ap[A, B](pa: => Precepte[Tags, ManagedState, UnmanagedState, F, A])(pab: => Precepte[Tags, ManagedState, UnmanagedState, F, A => B]): Precepte[Tags, ManagedState, UnmanagedState, F, B] =
+        for {
+          a <- pa
+          f <- pab
+        } yield f(a)
     }
 
 }
