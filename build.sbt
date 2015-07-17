@@ -113,7 +113,23 @@ lazy val play =
 			name := "precepte-play")
 		.dependsOn(core, influx)
 
+lazy val stream =
+	project.in(file("precepte-stream"))
+		.settings(commonSettings:_*)
+		.settings(strictScalac)
+		.settings(
+			publishTo := {
+			  val s3Repo = "s3://mfg-mvn-repo"
+			  if (isSnapshot.value)
+			    Some("snapshots" at s3Repo + "/snapshots")
+			  else
+			    Some("releases" at s3Repo + "/releases")
+			},
+			libraryDependencies += "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0",
+			name := "precepte-stream")
+		.dependsOn(core)
+
 lazy val root = project.in(file("."))
 	.settings(commonSettings:_*)
 	.settings(name := "precepte-root")
-	.aggregate(core, play, influx, sample)
+	.aggregate(core, play, influx, sample, stream)
