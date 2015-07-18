@@ -114,7 +114,7 @@ case class Apply[Tags, ManagedState, UnmanagedState, F[_], A, B](
 }
 
 trait LowPriorityManagedStatetances {
-  implicit def precepteMonadManagedStatetance[Tags, ManagedState, UnmanagedState, F[_]](implicit ApF: Applicative[F]) =
+  implicit def precepteMonadManagedStatetance[Tags, ManagedState, UnmanagedState, F[_]] =
     new Monad[({ type λ[α] = Precepte[Tags, ManagedState, UnmanagedState, F, α] })#λ] {
       override def point[A](a: => A): Precepte[Tags, ManagedState, UnmanagedState, F, A] =
         Return(a)
