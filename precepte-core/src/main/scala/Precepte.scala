@@ -2,7 +2,7 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT }
+import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, Semigroup }
 import scalaz.syntax.monad._
 
 import scala.annotation.tailrec
@@ -10,6 +10,11 @@ import scala.annotation.tailrec
 trait ResumeStep[Tags, ManagedState, UnmanagedState, F[_], A, T]
 case class FlatMapStep[Tags, ManagedState, UnmanagedState, F[_], A, T](v: F[(Precepte[Tags, ManagedState, UnmanagedState, F, A], Precepte[Tags, ManagedState, UnmanagedState, F, A]#S, T)]) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T]
 case class ReturnStep[Tags, ManagedState, UnmanagedState, F[_], A, T](v: (Precepte[Tags, ManagedState, UnmanagedState, F, A]#S, A, T)) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T]
+
+case class ApplyStep[Tags, ManagedState, UnmanagedState, F[_], A, B, T](
+  pa: Precepte[Tags, ManagedState, UnmanagedState, F, A],
+  pf: Precepte[Tags, ManagedState, UnmanagedState, F, A => B]
+) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, B, T]
 
 sealed trait Precepte[Tags, ManagedState, UnmanagedState, F[_], A] {
   self =>
@@ -38,6 +43,9 @@ sealed trait Precepte[Tags, ManagedState, UnmanagedState, F[_], A] {
         // append tags to managed state and propagate this new managed state to next step
         FlatMapStep(st.run(state0).map { case (s, p) => (p, s, z(s, t)) })
 
+      case Apply(pa, pf) =>
+        ApplyStep(pa, pf)
+
       case Flatmap(sub, next) =>
         sub() match {
           case Return(a) =>
@@ -58,21 +66,27 @@ sealed trait Precepte[Tags, ManagedState, UnmanagedState, F[_], A] {
         }
     }
 
-  final def scan[T](state: S, t: T, z: (S, T) => T)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[(S, A, T)] =
+  final def scan[T](state: S, t: T, z: (S, T) => T)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] =
     this.resume(state, t, z) match {
       case FlatMapStep(fsp) =>
         fsp.flatMap { case (p0, s0, t0) => p0.scan(s0, t0, z) }
       case ReturnStep(sat) =>
         sat.point[F]
+      case ApplyStep(pa, pf) =>
+        (pa.scan(state, t, z) |@| pf.scan(state, t, z)).tupled.map {
+          case ((s0, a, t0), (s1, f, t1)) =>
+            val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
+            (s, f(a), t0)
+        }
     }
 
-  final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[(S, A)] =
+  final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
     scan[Unit](state, (), (_, _) => ()).map{ case (s, a, t) => (s, a) }
 
-  final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[A] =
+  final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
     run(state).map(_._2)
 
-  final def observe(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): F[(S, A, Vector[S])] =
+  final def observe(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, Vector[S])] =
     scan(state, Vector.empty[S], (s, t) => t :+ s)
 
 }
@@ -92,10 +106,15 @@ case class Flatmap[Tags, ManagedState, UnmanagedState, F[_], I, A](
   type _I = I
 }
 
-
+case class Apply[Tags, ManagedState, UnmanagedState, F[_], A, B](
+  pa: Precepte[Tags, ManagedState, UnmanagedState, F, A],
+  pf: Precepte[Tags, ManagedState, UnmanagedState, F, A => B]
+) extends Precepte[Tags, ManagedState, UnmanagedState, F, B] {
+  type _A = A
+}
 
 trait LowPriorityManagedStatetances {
-  implicit def precepteMonadManagedStatetance[Tags, ManagedState, UnmanagedState, F[_]](implicit ApF: Applicative[F]) =
+  implicit def precepteMonadManagedStatetance[Tags, ManagedState, UnmanagedState, F[_]] =
     new Monad[({ type λ[α] = Precepte[Tags, ManagedState, UnmanagedState, F, α] })#λ] {
       override def point[A](a: => A): Precepte[Tags, ManagedState, UnmanagedState, F, A] =
         Return(a)
@@ -104,13 +123,8 @@ trait LowPriorityManagedStatetances {
       override def bind[A, B](m: Precepte[Tags, ManagedState, UnmanagedState, F, A])(f: A => Precepte[Tags, ManagedState, UnmanagedState, F, B]): Precepte[Tags, ManagedState, UnmanagedState, F, B] =
         m.flatMap(f)
 
-      // override to support parallel execution
-      // override def ap[A, B](pa: => Precepte[Tags, ManagedState, UnmanagedState, F, A])(pab: => Precepte[Tags, ManagedState, UnmanagedState, F, A => B]) =
-      //   pa.flatMapK { fa =>
-      //     pab.mapK { fab =>
-      //       fa <*> fab.map { case (s, ab) => (s: (S, A)) => ab(s._2) }
-      //     }
-      //   }
+      override def ap[A, B](pa: => Precepte[Tags, ManagedState, UnmanagedState, F, A])(pab: => Precepte[Tags, ManagedState, UnmanagedState, F, A => B]): Precepte[Tags, ManagedState, UnmanagedState, F, B] =
+        Apply(pa, pab)
     }
 
 }
