@@ -125,7 +125,10 @@ lazy val stream =
 			  else
 			    Some("releases" at s3Repo + "/releases")
 			},
-			libraryDependencies += "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0",
+			libraryDependencies ++= Seq(
+					"com.typesafe.akka" %% "akka-http-core-experimental" % "1.0"
+				, "org.scalatest" 		%%  "scalatest" 								 % "2.2.1" 	% "test"
+			),
 			name := "precepte-stream")
 		.dependsOn(core)
 
