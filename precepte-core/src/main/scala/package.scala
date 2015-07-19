@@ -47,4 +47,7 @@ package object precepte {
     def leibniz = nosi.leibniz
   }
 
+  implicit val unitSemiGroup = new scalaz.Semigroup[Unit] {
+    def append(a: Unit, b: => Unit): Unit = ()
+  }
 }
