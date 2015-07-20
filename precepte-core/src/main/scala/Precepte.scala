@@ -2,7 +2,7 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, Semigroup }
+import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, Semigroup, ~> }
 import scalaz.syntax.monad._
 
 import scala.annotation.tailrec
@@ -89,6 +89,20 @@ sealed trait Precepte[Tags, ManagedState, UnmanagedState, F[_], A] {
   final def observe(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, Vector[S])] =
     scan(state, Vector.empty[S], (s, t) => t :+ s)
 
+
+  def mapStep[G[_], Tags2, ManagedState2, UnmanagedState2](
+    f: F[(S, PX[A])] => G[(PState[Tags2, ManagedState2, UnmanagedState2], Precepte[Tags2, ManagedState2, UnmanagedState2, G, A])],
+    fTags: Tags => Tags2
+  ): Precepte[Tags2, ManagedState2, UnmanagedState2, G, A] = {
+    this match {
+      case Return(a) =>
+        Return(a)
+      case Step(st, tags) =>
+        Step(st.mapK(f), fTags(tags))
+      case fl@Flatmap(sub, next) =>
+        Flatmap(() => sub().mapStep(f), (n: fl._I) => next(n).mapStep(f))
+    }
+  }
 }
 
 
