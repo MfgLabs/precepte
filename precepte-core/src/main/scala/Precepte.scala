@@ -90,19 +90,19 @@ sealed trait Precepte[Tags, ManagedState, UnmanagedState, F[_], A] {
     scan(state, Vector.empty[S], (s, t) => t :+ s)
 
 
-  def mapStep[G[_], Tags2, ManagedState2, UnmanagedState2](
-    f: F[(S, PX[A])] => G[(PState[Tags2, ManagedState2, UnmanagedState2], Precepte[Tags2, ManagedState2, UnmanagedState2, G, A])],
-    fTags: Tags => Tags2
-  ): Precepte[Tags2, ManagedState2, UnmanagedState2, G, A] = {
-    this match {
-      case Return(a) =>
-        Return(a)
-      case Step(st, tags) =>
-        Step(st.mapK(f), fTags(tags))
-      case fl@Flatmap(sub, next) =>
-        Flatmap(() => sub().mapStep(f), (n: fl._I) => next(n).mapStep(f))
-    }
-  }
+  // def mapStep[G[_], Tags2, ManagedState2, UnmanagedState2](
+  //   f: F[(S, PX[A])] => G[(PState[Tags2, ManagedState2, UnmanagedState2], Precepte[Tags2, ManagedState2, UnmanagedState2, G, A])],
+  //   fTags: Tags => Tags2
+  // ): Precepte[Tags2, ManagedState2, UnmanagedState2, G, A] = {
+  //   this match {
+  //     case Return(a) =>
+  //       Return(a)
+  //     case Step(st, tags) =>
+  //       Step(st.mapK(f), fTags(tags))
+  //     case fl@Flatmap(sub, next) =>
+  //       Flatmap(() => sub().mapStep(f), (n: fl._I) => next(n).mapStep(f))
+  //   }
+  // }
 }
 
 
@@ -156,6 +156,13 @@ trait LowPriorityManagedStatetances {
           λ(pa).map(\/-.apply _)
             .recover{ case e => -\/(e) }
         }
+
+      def apply[M, U, F[_], A](λ: (M, U) => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
+        Step[Tags, M, U, F, A](
+          IndexedStateT { (st: P[M, U, F, A]#S) =>
+            for (a <- λ(st.managed, st.unmanaged))
+            yield st -> Return(a)
+          }, tags)
 
       def apply[M, U, F[_], A](λ: P[M, U, F, A]#S => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
         Step[Tags, M, U, F, A](

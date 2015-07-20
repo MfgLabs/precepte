@@ -29,7 +29,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   type P[A] = Precepte0[Future, Unit, A]
 
   object P {
-    def apply[A](tags: BaseTags) = Precepte[BaseTags, PIS0, PES0[Unit], Future](tags)
+    def apply[A](tags: BaseTags) = Precepte(tags)
   }
 
   val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Test, Tags.Version("1.0"))
@@ -55,7 +55,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     a should ===("foo 1")
 
     println(s"$s")
-    s.unmanaged.env should ===(env)
+    s.managed.env should ===(env)
     s.managed.path.size should ===(2)
     s.managed.path(0).tags should ===(tags("simple.f1"))
     s.managed.path(1).tags should ===(tags("simple.f2"))
