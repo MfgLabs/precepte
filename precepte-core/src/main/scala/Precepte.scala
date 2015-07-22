@@ -7,11 +7,11 @@ import scalaz.syntax.monad._
 
 import scala.annotation.tailrec
 
-trait ResumeStep[Tags, ManagedState, UnmanagedState, F[_], A, T]
-case class FlatMapStep[Tags, ManagedState, UnmanagedState, F[_], A, T](v: F[(Precepte[Tags, ManagedState, UnmanagedState, F, A], Precepte[Tags, ManagedState, UnmanagedState, F, A]#S, T)]) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T]
-case class ReturnStep[Tags, ManagedState, UnmanagedState, F[_], A, T](v: (Precepte[Tags, ManagedState, UnmanagedState, F, A]#S, A, T)) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T]
+private trait ResumeStep[Tags, ManagedState, UnmanagedState, F[_], A, T]
+private case class FlatMapStep[Tags, ManagedState, UnmanagedState, F[_], A, T](v: F[(Precepte[Tags, ManagedState, UnmanagedState, F, A], Precepte[Tags, ManagedState, UnmanagedState, F, A]#S, T)]) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T]
+private case class ReturnStep[Tags, ManagedState, UnmanagedState, F[_], A, T](v: (Precepte[Tags, ManagedState, UnmanagedState, F, A]#S, A, T)) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T]
 
-case class ApplyStep[Tags, ManagedState, UnmanagedState, F[_], A, B, T](
+private case class ApplyStep[Tags, ManagedState, UnmanagedState, F[_], A, B, T](
   pa: Precepte[Tags, ManagedState, UnmanagedState, F, A],
   pf: Precepte[Tags, ManagedState, UnmanagedState, F, A => B]
 ) extends ResumeStep[Tags, ManagedState, UnmanagedState, F, B, T]
@@ -63,6 +63,9 @@ sealed trait Precepte[Tags, ManagedState, UnmanagedState, F[_], A] {
           case f@Flatmap(sub2, next2) =>
             (Flatmap(sub2, (z:f._I) => next2(z).flatMap(next)):Precepte[Tags, ManagedState, UnmanagedState, F, A]).resume(state, t, z)
 
+          case ap@Apply(pa, pfa) =>
+            val pfa2 = pfa.map { f => (a: ap._A) => next(f(a)) }
+            Apply(pa, pfa2).flatMap(identity).resume(state, t, z)
         }
     }
 
