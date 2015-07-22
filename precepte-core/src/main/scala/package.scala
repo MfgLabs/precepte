@@ -12,16 +12,16 @@ package object precepte {
 
   case class ManagedState0[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = PIdStream())
 
-  type PIS0 = ManagedState0[BaseEnv, BaseTags]
-  type PST0[C] = PState[BaseTags, PIS0, C]
+  // type PIS0 = ManagedState0[BaseEnv, BaseTags]
+  // type PST0[C] = PState[BaseTags, PIS0, C]
 
-  object PST0 {
-    def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): PST0[C] =
-      PState[BaseTags, PIS0, C] (
-        ManagedState0(env, span, path),
-        value
-      )
-  }
+  // object PST0 {
+  //   def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): PST0[C] =
+  //     PState[BaseTags, PIS0, C] (
+  //       ManagedState0(env, span, path),
+  //       value
+  //     )
+  // }
 
   implicit def updater0[C] = new PStateUpdater[BaseTags, PIS0, C] {
     def appendTags(s: PST0[C], tags: BaseTags) = {
@@ -32,7 +32,7 @@ package object precepte {
     def updateUnmanaged(s: PST0[C], unmanaged: C): PST0[C] = s.copy(unmanaged = unmanaged)
   }
 
-  type Precepte0[F[_], C, A] = Precepte[BaseTags, PIS0, C, F, A]
+  // type Precepte0[F[_], C, A] = Precepte[BaseTags, PIS0, C, F, A]
 
   implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A0](
     implicit
