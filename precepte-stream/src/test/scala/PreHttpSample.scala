@@ -24,10 +24,13 @@ object Business {
   import scope._
 
   def logic(implicit exe: ExecutionContext) = for {
-    a <- Pre(tags("f1")){ case PState(s, ctx) => 
-      Future { s"Received ${ctx.content.value}" }
-    }
-  } yield (a)
+    a <-  Pre(tags("phase_1")){ (s, ctx) => 
+            Future { s"${ctx.content.value} - phase_1" }
+          }
+    b <-  Pre(tags("phase_2")){ (s, ctx) => 
+            Future { s"$a - phase_2" }
+          }
+  } yield (b)
 }
 
 object Main extends App {

@@ -14,7 +14,6 @@ object Default {
   type Env = BaseEnv
   type MS = ManagedState[Env, Tags]
 
-
   trait PreScope[F[_], C] {
 
     type MS = ManagedState[Env, Tags]
@@ -31,21 +30,21 @@ object Default {
 
         type P[M, U, F[_], A] = Precepte[Tags, M, U, F, A]
 
-        // def apply[A](λ: (M, U) => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
-        //   Step[Tags, M, U, F, A](
-        //     IndexedStateT { (st: P[M, U, F, A]#S) =>
-        //       for (a <- λ(st.managed, st.unmanaged))
-        //       yield st -> Return(a)
-        //     }, tags)
+        def apply[A](λ: (M, U) => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
+          Step[Tags, M, U, F, A](
+            IndexedStateT { (st: P[M, U, F, A]#S) =>
+              for (a <- λ(st.managed, st.unmanaged))
+              yield st -> Return(a)
+            }, tags)
 
-        def apply[A](λ: P[M, U, F, A]#S => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
+        def fromState[A](λ: P[M, U, F, A]#S => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
           Step[Tags, M, U, F, A](
             IndexedStateT { (st: P[M, U, F, A]#S) =>
               for (a <- λ(st))
               yield st -> Return(a)
             }, tags)
 
-        def applyS[A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, M, U]): P[M, U, F, A] =
+        def fromStateU[A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, M, U]): P[M, U, F, A] =
           Step[Tags, M, U, F, A](
             IndexedStateT { (st: P[M, U, F, A]#S) =>
               for (ca <- λ(st))
@@ -55,7 +54,7 @@ object Default {
               }
             }, tags)
 
-        def applyP[A](m: P[M, U, F, A])(implicit A: Applicative[F]): P[M, U, F, A] =
+        def wrap[A](m: P[M, U, F, A])(implicit A: Applicative[F]): P[M, U, F, A] =
           Step(IndexedStateT[F, P[M, U, F, A]#S, P[M, U, F, A]#S, P[M, U, F, A]]{ st =>
             (st -> m).point[F]
           }, tags)
@@ -72,9 +71,3 @@ object Default {
   }
 
 }
-
-// val r = for {
-//   i <- Future[Int]( new RuntimeException("toto") 4)
-//   if (i < 3)
-//   j <- Future(i+1)
-// } yield (j)

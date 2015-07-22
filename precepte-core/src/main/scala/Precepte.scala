@@ -152,7 +152,7 @@ trait LowPriorityManagedStatetances {
 
       import scala.concurrent.Future
       def future[M, U, A](λ: P[M, U, Future, A]#S => Future[A])(implicit F: Functor[Future], ec: scala.concurrent.ExecutionContext): P[M, U, Future, Throwable \/ A] =
-        apply { pa =>
+        fromState { pa =>
           λ(pa).map(\/-.apply _)
             .recover{ case e => -\/(e) }
         }
@@ -164,14 +164,14 @@ trait LowPriorityManagedStatetances {
             yield st -> Return(a)
           }, tags)
 
-      def apply[M, U, F[_], A](λ: P[M, U, F, A]#S => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
+      def fromState[M, U, F[_], A](λ: P[M, U, F, A]#S => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
         Step[Tags, M, U, F, A](
           IndexedStateT { (st: P[M, U, F, A]#S) =>
             for (a <- λ(st))
             yield st -> Return(a)
           }, tags)
 
-      def applyS[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, M, U]): P[M, U, F, A] =
+      def fromStateU[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Tags, M, U]): P[M, U, F, A] =
         Step[Tags, M, U, F, A](
           IndexedStateT { (st: P[M, U, F, A]#S) =>
             for (ca <- λ(st))
@@ -181,7 +181,7 @@ trait LowPriorityManagedStatetances {
             }
           }, tags)
 
-      def apply[M, U, F[_], A](m: P[M, U, F, A])(implicit A: Applicative[F]): P[M, U, F, A] =
+      def wrap[M, U, F[_], A](m: P[M, U, F, A])(implicit A: Applicative[F]): P[M, U, F, A] =
         Step(IndexedStateT[F, P[M, U, F, A]#S, P[M, U, F, A]#S, P[M, U, F, A]]{ st =>
           (st -> m).point[F]
         }, tags)
