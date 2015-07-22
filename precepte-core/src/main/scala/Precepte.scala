@@ -34,65 +34,64 @@ sealed trait Precepte[Tags, ManagedState, UnmanagedState, F[_], A] {
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[Tags, ManagedState, UnmanagedState, F, AP[A]] =
     this.map(a => ap.point(a))
 
-  @tailrec private final def resume[T](state: S, t: T, z: (S, T) => T)(implicit fu: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T] = this match {
-      case Return(a) =>
-        ReturnStep((state, a, t))
+  @tailrec private final def resume[T](node: S => T, append: (Vector[T], T) => T)(state: S, t: T)(implicit fu: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState]): ResumeStep[Tags, ManagedState, UnmanagedState, F, A, T] = {
+    def appendNode(s: S, t: T): T = append(Vector(node(s)), t)
+    this match {
+        case Return(a) =>
+          ReturnStep((state, a, t))
 
-      case Step(st, tags) =>
-        val state0 = upd.appendTags(state, tags)
-        // append tags to managed state and propagate this new managed state to next step
-        FlatMapStep(st.run(state0).map { case (s, p) => (p, s, z(s, t)) })
+        case Step(st, tags) =>
+          val state0 = upd.appendTags(state, tags)
+          // append tags to managed state and propagate this new managed state to next step
+          FlatMapStep(st.run(state0).map { case (s, p) => (p, s, appendNode(s, t)) })
 
-      case Apply(pa, pf) =>
-        ApplyStep(pa, pf)
+        case Apply(pa, pf) =>
+          ApplyStep(pa, pf)
 
-      case Flatmap(sub, next) =>
-        sub() match {
-          case Return(a) =>
-            next(a).resume(state, t, z)
+        case Flatmap(sub, next) =>
+          sub() match {
+            case Return(a) =>
+              next(a).resume(node, append)(state, t)
 
-          case Step(st, tags) =>
-            val state0 = upd.appendTags(state, tags)
-            // repass state as a Step in a Flatmap means the flatMap chain is finished
-            // Do not reuse appended segment but original state
-            FlatMapStep(st.run(state0).map { case (s, p) =>
-              // val s1 = upd.updateUnmanaged(state, s.unmanaged)
-              (p.flatMap(next), s, z(s, t))
-            })
+            case Step(st, tags) =>
+              val state0 = upd.appendTags(state, tags)
+              // repass state as a Step in a Flatmap means the flatMap chain is finished
+              // Do not reuse appended segment but original state
+              FlatMapStep(st.run(state0).map { case (s, p) =>
+                (p.flatMap(next), s, appendNode(s, t))
+              })
 
-          case f@Flatmap(sub2, next2) =>
-            (Flatmap(sub2, (z:f._I) => next2(z).flatMap(next)):Precepte[Tags, ManagedState, UnmanagedState, F, A]).resume(state, t, z)
+            case f@Flatmap(sub2, next2) =>
+              (Flatmap(sub2, (z: f._I) => next2(z).flatMap(next)):Precepte[Tags, ManagedState, UnmanagedState, F, A]).resume(node, append)(state, t)
 
-          case ap@Apply(pa, pfa) =>
-            val pfa2 = pfa.map { f => (a: ap._A) => next(f(a)) }
-            Apply(pa, pfa2).flatMap(identity).resume(state, t, z)
-        }
+            case ap@Apply(pa, pfa) =>
+              val pfa2 = pfa.map { f => (a: ap._A) => next(f(a)) }
+              Apply(pa, pfa2).flatMap(identity).resume(node, append)(state, t)
+          }
+      }
     }
 
-  final def scan[T](state: S, t: T, z: (S, T) => T)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] =
-    this.resume(state, t, z) match {
-      case FlatMapStep(fsp) =>
-        fsp.flatMap { case (p0, s0, t0) => p0.scan(s0, t0, z) }
-      case ReturnStep(sat) =>
-        sat.point[F]
-      case ApplyStep(pa, pf) =>
-        (pa.scan(state, t, z) |@| pf.scan(state, t, z)).tupled.map {
-          case ((s0, a, t0), (s1, f, t1)) =>
-            val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
-            (s, f(a), t0)
-        }
+    final def scan[T](node: S => T, append: (Vector[T], T) => T)(state: S, t: T)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
+      this.resume(node, append)(state, t) match {
+        case FlatMapStep(fsp) =>
+          fsp.flatMap { case (p0, s0, t0) => p0.scan(node, append)(s0, t0) }
+        case ReturnStep(sat) =>
+          sat.point[F]
+        case ApplyStep(pa, pf) =>
+          (pa.scan(node, append)(state, t) |@| pf.scan(node, append)(state, t)).tupled.map {
+            case ((s0, a, t0), (s1, f, t1)) =>
+              val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
+              (s, f(a), append(Vector(t0, t1), t))
+          }
+      }
     }
 
-  final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
-    scan[Unit](state, (), (_, _) => ()).map{ case (s, a, t) => (s, a) }
+    final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
+      scan[Unit](_ => (), (_, _) => ())(state, ()).map{ case (s, a, t) => (s, a) }
 
-  final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
-    run(state).map(_._2)
-
-  final def observe(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, Vector[S])] =
-    scan(state, Vector.empty[S], (s, t) => t :+ s)
-
-}
+    final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Tags, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
+      run(state).map(_._2)
+  }
 
 
 case class Return[Tags, ManagedState, UnmanagedState, F[_], A](a: A) extends Precepte[Tags, ManagedState, UnmanagedState, F, A]
