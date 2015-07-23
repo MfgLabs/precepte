@@ -70,7 +70,7 @@ object Tags {
 }
 
 /** The state gathering all data concerning current execution context */
-case class PState[Tags, ManagedState, UnmanagedState](
+case class PState[Ta, ManagedState, UnmanagedState](
   managed: ManagedState,
   unmanaged: UnmanagedState)
 
@@ -78,9 +78,9 @@ trait PIdSeries {
   def run(): (PId, PIdSeries)
 }
 
-trait PStateUpdater[Tags, MS, FS] {
-  type S = PState[Tags, MS, FS]
-  def appendTags(s: S, t: Tags): S
+trait PStateUpdater[Ta, MS, FS] {
+  type S = PState[Ta, MS, FS]
+  def appendTags(s: S, t: Ta): S
   def updateUnmanaged(s: S, ext: FS): S
 }
 

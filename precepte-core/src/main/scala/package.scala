@@ -7,10 +7,11 @@ import shapeless.WrappedOrphan
 
 import com.mfglabs.precepte._
 
+package precepte {
+  case class ManagedState0[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = PIdStream())
+}
 
 package object precepte {
-
-  case class ManagedState0[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = PIdStream())
 
   type PIS0 = ManagedState0[BaseEnv, BaseTags]
   type PST0[C] = PState[BaseTags, PIS0, C]
@@ -34,10 +35,10 @@ package object precepte {
 
   type Precepte0[F[_], C, A] = Precepte[BaseTags, PIS0, C, F, A]
 
-  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A0](
+  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
     implicit
-      una2: PrecepteUnapply[TCA, TC, F, Tags, MS, UMS, A0],
-      nosi: PrecepteHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A0]
+      una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],
+      nosi: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A0]
   ) = new Unapply[M, TCA] {
     type M[x] = nosi.T[x]
     type A = A0

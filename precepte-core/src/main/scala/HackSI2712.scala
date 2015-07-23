@@ -26,13 +26,13 @@ object SingletonOf {
 }
 
 
-trait PrecepteUnapply[TCA, TC[_[_], _], F[_], Tags, MS, UMS, A]
+trait PrecepteUnapply[TCA, TC[_[_], _], F[_], Ta, MS, UMS, A]
 
 object PrecepteUnapply {
-  implicit def preUnapply[TC[_[_], _], F[_], Tags, MS, UMS, C, A] = new PrecepteUnapply[TC[({ type λ[α] = Precepte[Tags, MS, UMS, F, α] })#λ, A], TC, F, Tags, MS, UMS, A] { }
+  implicit def preUnapply[TC[_[_], _], F[_], Ta, MS, UMS, C, A] = new PrecepteUnapply[TC[({ type λ[α] = Precepte[Ta, MS, UMS, F, α] })#λ, A], TC, F, Ta, MS, UMS, A] { }
 }
 
-trait PrecepteHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A] {
+trait PrecepteHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A] {
 
   type P[_]
 
@@ -49,7 +49,7 @@ trait PrecepteHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A] {
 object PrecepteHackSI2712 {
   import scala.language.experimental.macros
 
-  implicit def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A]: PrecepteHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A] = macro NoSI2712Macros.materialize[TCA, TC, M, F, Tags, MS, UMS, A]
+  implicit def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A]: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A] = macro NoSI2712Macros.materialize[TCA, TC, M, F, Ta, MS, UMS, A]
 
 }
 
@@ -57,13 +57,13 @@ class NoSI2712Macros(val c: whitebox.Context) {
   import c.universe._
   import shapeless.Id
 
-  def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A]
+  def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A]
     (implicit
       tcaTag: WeakTypeTag[TCA],
       tcTag: WeakTypeTag[TC[Id, Int]],
       mTag: WeakTypeTag[M[Id]],
       fTag: WeakTypeTag[F[Int]],
-      tagsTag: WeakTypeTag[Tags],
+      tagsTag: WeakTypeTag[Ta],
       msTag: WeakTypeTag[MS],
       umsTag: WeakTypeTag[UMS],
       aTag: WeakTypeTag[A]
