@@ -80,7 +80,7 @@ trait PIdSeries {
 
 trait PStateUpdater[Ta, MS, FS] {
   type S = PState[Ta, MS, FS]
-  def appendTags(s: S, t: Ta): S
+  def appendTags(s: S, t: Ta, idx: Int): S
   def updateUnmanaged(s: S, ext: FS): S
 }
 
