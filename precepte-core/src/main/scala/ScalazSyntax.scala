@@ -17,10 +17,10 @@ object MonadPlusOpsExt {
   //     nosi: PrecepteHackSI2712[TCA, TC, MonadPlus, F, Tags, MS, UMS, A]
   // ) = new MonadPlusOps[nosi.T, A](nosi.leibniz(tca))(nosi.MTC)
 
-  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A0](
+  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
     implicit
-      una2: PrecepteUnapply[TCA, TC, F, Tags, MS, UMS, A0],
-      nosi: PrecepteHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A0]
+      una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],
+      nosi: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A0]
   ) = new Unapply[M, TCA] {
     type M[x] = nosi.T[x]
     type A = A0

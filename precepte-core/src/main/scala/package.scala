@@ -7,10 +7,11 @@ import shapeless.WrappedOrphan
 
 import com.mfglabs.precepte._
 
+package precepte {
+  case class ManagedState0[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = PIdStream())
+}
 
 package object precepte {
-
-  case class ManagedState0[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = PIdStream())
 
   type PIS0 = ManagedState0[BaseEnv, BaseTags]
   type PST0[C] = PState[BaseTags, PIS0, C]
@@ -24,9 +25,10 @@ package object precepte {
   }
 
   implicit def updater0[C] = new PStateUpdater[BaseTags, PIS0, C] {
-    def appendTags(s: PST0[C], tags: BaseTags) = {
+    def appendTags(s: PST0[C], tags: BaseTags, idx: Int) = {
       val (id, next) = s.managed.ids.run()
-      val is0 = ManagedState0(s.managed.env, s.managed.span, s.managed.path :+ Call(id, tags), next)
+      val newId = PId(s"${id.value}[${idx}]")
+      val is0 = ManagedState0(s.managed.env, s.managed.span, s.managed.path :+ Call(newId, tags), next)
       s.copy(managed = is0)
     }
     def updateUnmanaged(s: PST0[C], unmanaged: C): PST0[C] = s.copy(unmanaged = unmanaged)
@@ -34,10 +36,10 @@ package object precepte {
 
   type Precepte0[F[_], C, A] = Precepte[BaseTags, PIS0, C, F, A]
 
-  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Tags, MS, UMS, A0](
+  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
     implicit
-      una2: PrecepteUnapply[TCA, TC, F, Tags, MS, UMS, A0],
-      nosi: PrecepteHackSI2712[TCA, TC, M, F, Tags, MS, UMS, A0]
+      una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],
+      nosi: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A0]
   ) = new Unapply[M, TCA] {
     type M[x] = nosi.T[x]
     type A = A0
