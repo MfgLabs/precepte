@@ -11,6 +11,8 @@ import org.scalatest.time.{Millis, Seconds, Span => TSpan}
 
 import scala.language.higherKinds
 
+import default._
+
 class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   implicit val defaultPatience =
@@ -32,15 +34,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     def apply[A](tags: BaseTags) = Precepte[BaseTags, PIS0, PES0[Unit], Future](tags)
   }
 
-  val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Test, Tags.Version("1.0"))
+  val env = BaseEnv(Host("localhost"), Environment.Test, Version("1.0"))
 
-  private def tags(n: String) = BaseTags(Tags.Callee(n), Tags.Category.Database)
+  private def tags(n: String) = BaseTags(Callee(n), Category.Database)
 
   def nostate = PST0[Unit](Span.gen, env, Vector.empty, ())
 
   val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
-
-  import Tags.Callee
 
   "Precepte" should "run/eval simple" in {
     def f1 = P(tags("simple.f1")){(_: PST0[Unit]) => 1.point[Future]}

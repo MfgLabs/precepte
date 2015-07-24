@@ -48,7 +48,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case Apply(pa, pf) =>
           ApplyStep(pa, pf)
 
-        case Flatmap(sub, next) =>
+        case f@Flatmap(sub, next) =>
           sub() match {
             case Return(a) =>
               next(a).resume(node, append, idx)(state, t)
