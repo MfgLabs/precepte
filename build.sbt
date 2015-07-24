@@ -44,7 +44,7 @@ lazy val core =
         , "com.chuusai"     %% "shapeless"        % "2.2.4"
         , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
         ))
-    // .dependsOn(ProjectRef(uri("file:///Users/jto/Documents/quiver"), "core"))
+    .dependsOn(ProjectRef(uri("file:///Users/jto/Documents/quiver"), "core"))
 
 lazy val sample =
   project.in(file("precepte-sample"))

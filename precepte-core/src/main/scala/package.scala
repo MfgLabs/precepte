@@ -27,7 +27,7 @@ package object precepte {
   implicit def updater0[C] = new PStateUpdater[BaseTags, PIS0, C] {
     def appendTags(s: PST0[C], tags: BaseTags, idx: Int) = {
       val (id, next) = s.managed.ids.run()
-      val newId = PId(s"${id.value}[${idx}]")
+      val newId = PId(s"${id.value}_${idx}")
       val is0 = ManagedState0(s.managed.env, s.managed.span, s.managed.path :+ Call(newId, tags), next)
       s.copy(managed = is0)
     }
