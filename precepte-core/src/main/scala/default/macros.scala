@@ -7,6 +7,7 @@ import scala.reflect.macros.blackbox.Context
 
 import scala.language.implicitConversions
 
+
 object Macros {
   implicit def callee: Callee = macro Macros.calleeMacro
 

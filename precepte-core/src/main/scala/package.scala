@@ -6,6 +6,7 @@ import scala.language.implicitConversions
 
 import com.mfglabs.precepte._
 
+
 package object precepte {
 
   implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](

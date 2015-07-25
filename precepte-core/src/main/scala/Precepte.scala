@@ -11,10 +11,11 @@ private trait ResumeStep[Ta, ManagedState, UnmanagedState, F[_], A, T]
 private case class FlatMapStep[Ta, ManagedState, UnmanagedState, F[_], A, T](v: F[(Precepte[Ta, ManagedState, UnmanagedState, F, A], Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, T)]) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T]
 private case class ReturnStep[Ta, ManagedState, UnmanagedState, F[_], A, T](v: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A, T)) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T]
 
-private case class ApplyStep[Ta, ManagedState, UnmanagedState, F[_], A, B, T](
+private case class ApplyStep[Ta, ManagedState, UnmanagedState, F[_], A, B, C, T](
   pa: Precepte[Ta, ManagedState, UnmanagedState, F, A],
-  pf: Precepte[Ta, ManagedState, UnmanagedState, F, A => B]
-) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, B, T]
+  pf: Precepte[Ta, ManagedState, UnmanagedState, F, A => B],
+  next: B => Precepte[Ta, ManagedState, UnmanagedState, F, C]
+) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, C, T]
 
 sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
   self =>
@@ -46,7 +47,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           FlatMapStep(st.run(state0).map { case (s, p) => (p, s, appendNode(s, t)) })
 
         case Apply(pa, pf) =>
-          ApplyStep(pa, pf)
+          ApplyStep(pa, pf, (a: A) => Return(a))
 
         case f@Flatmap(sub, next) =>
           sub() match {
@@ -64,9 +65,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             case f@Flatmap(sub2, next2) =>
               (Flatmap(sub2, (z: f._I) => next2(z).flatMap(next)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(node, append, idx)(state, t)
 
-            case ap@Apply(pa, pfa) =>
-              val pfa2 = pfa.map { f => (a: ap._A) => next(f(a)) }
-              Apply(pa, pfa2).flatMap(identity).resume(node, append, idx)(state, t)
+            case Apply(pa, pfa) =>
+              ApplyStep(pa, pfa, next)
           }
       }
     }
@@ -77,11 +77,13 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           fsp.flatMap { case (p0, s0, t0) => p0.scan(node, append)(s0, t0) }
         case ReturnStep(sat) =>
           sat.point[F]
-        case ApplyStep(pa, pf) =>
+        case ApplyStep(pa, pf, next) =>
           (pa.scan(node, append)(state, t, idx + 1) |@| pf.scan(node, append)(state, t, idx + 2)).tupled.map {
             case ((s0, a, t0), (s1, f, t1)) =>
               val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
               (s, f(a), append(Vector(t0, t1), t))
+          }.flatMap { case (s0, b, t0) =>
+            next(b).scan(node, append)(s0, t0, idx)
           }
       }
     }
@@ -152,7 +154,7 @@ trait LowPriorityManagedStatetances {
             yield st -> Return(a)
           }, tags)
 
-      def applyS[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Ta, M, U]): P[M, U, F, A] =
+      def applyU[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Ta, M, U]): P[M, U, F, A] =
         Step[Ta, M, U, F, A](
           IndexedStateT { (st: P[M, U, F, A]#S) =>
             for (ca <- λ(st))
