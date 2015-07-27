@@ -73,11 +73,11 @@ case class Sub(id: String, value: String, graph: Graph) extends Node {
     graph.nodes.map(_.viz).mkString("\n")
 
   def viz = s"""
-    subgraph $id {
-      label = "$value"
-      $nodesG
-    }
-  """
+    |subgraph $id {
+    |  label = "$value"
+    |  $nodesG
+    |}
+  """.stripMargin
 }
 case class Edge(from: String, to: String) {
   def viz = s"$from -> $to"
@@ -89,15 +89,15 @@ case class Graph(nodes: Set[Node], edges: Set[Edge]) {
       case _ => Seq.empty
     }
 
-  private def allEdgesG = allEdges.map(_.viz).mkString("\n")
-  private def allNodesG = nodes.map(_.viz).mkString("\n")
+  private def allEdgesG = allEdges.map(_.viz).mkString("\n  ")
+  private def allNodesG = nodes.map(_.viz).mkString("\n  ")
 
   def viz = s"""
-    digraph G {
-      $allNodesG
-      $allEdgesG
-    }
-  """
+    |digraph G {
+    |  $allNodesG
+    |  $allEdgesG
+    |}
+  """.stripMargin
 }
 
 trait ToNode[S] {
