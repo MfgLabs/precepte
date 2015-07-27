@@ -91,9 +91,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     a should ===("foo 4.1.2 finito")
     s.managed.path(0).tags.callee should ===(Callee("root"))
     s.managed.path(0).tags.category should ===(Category.Database)
-    
+
     s.managed.path(1).tags.callee should ===(Callee("simple.f1"))
-    
+
     s.managed.path.map(_.tags.callee.value) should equal (
       Vector("root", "simple.f1", "simple.f1.1", "simple.f1.2", "simple.f1.3", "simple.f2", "simple.f2.1", "simple.f2.2", "simple.f3")
     )
@@ -396,16 +396,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       _ <- p0
       _ <- (p1 |@| p2).tupled
       _ <- p3
+      _ <- P(tags("sub"))(p0)
     } yield ()
 
     val (_, _, graph) = p4.observe(nostate).futureValue
 
-    val nil = quiver.empty[String, String, Unit]
-    val nodes = graph.nodes.toSeq.map { case Node(v, l) => LNode(v, l) }
-    val edges = graph.edges.toSeq.map { case Edge(f, t) => LEdge(f, t, ()) }
-    val vizGraph = nil.addNodes(nodes).addEdges(edges)
-    println(quiver.viz.graphviz(vizGraph))
-    
+    println(graph.viz)
+
     1 should ===(1)
   }
 

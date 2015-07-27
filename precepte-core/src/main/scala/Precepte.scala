@@ -35,7 +35,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[Ta, ManagedState, UnmanagedState, F, AP[A]] =
     this.map(a => ap.point(a))
 
-  @tailrec private final def resume[T](append: (S, T) => T, idx: Int)(state: S, t: T)(implicit fu: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState]): ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T] = {
+  @tailrec private final def resume[T](append: (S, T) => T, idx: Int, subG: (S, T) => T)(state: S, t: T)(implicit fu: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState]): ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T] = {
     this match {
         case Return(a) =>
           ReturnStep((state, a, t))
@@ -51,7 +51,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case f@Flatmap(sub, next) =>
           sub() match {
             case Return(a) =>
-              next(a).resume(append, idx)(state, t)
+              next(a).resume(append, idx, subG)(state, t)
 
             case Step(st, tags) =>
               val state0 = upd.appendTags(state, tags, idx)
@@ -62,7 +62,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               })
 
             case f@Flatmap(sub2, next2) =>
-              (Flatmap(sub2, (z: f._I) => next2(z).flatMap(next)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(append, idx)(state, t)
+              (Flatmap(sub2, (z: f._I) => next2(z).flatMap(next)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(append, idx, subG)(state, t)
 
             case Apply(pa, pfa) =>
               ApplyStep(pa, pfa, next)
@@ -70,25 +70,25 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       }
     }
 
-    final def scan[T](append: (S, T) => T, merge: (T, T) => T)(state: S, t: T, idx: Int = 0)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
-      this.resume(append, idx)(state, t) match {
+    final def scan[T](append: (S, T) => T, merge: (T, T) => T, subG: (S, T) => T)(state: S, t: T, idx: Int = 0)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
+      this.resume(append, idx, subG)(state, t) match {
         case FlatMapStep(fsp) =>
-          fsp.flatMap { case (p0, s0, t0) => p0.scan(append, merge)(s0, t0) }
+          fsp.flatMap { case (p0, s0, t0) => p0.scan(append, merge, subG)(s0, t0) }
         case ReturnStep(sat) =>
           sat.point[F]
         case ApplyStep(pa, pf, next) =>
-          (pa.scan(append, merge)(state, t, idx + 1) |@| pf.scan(append, merge)(state, t, idx + 2)).tupled.map {
+          (pa.scan(append, merge, subG)(state, t, idx + 1) |@| pf.scan(append, merge, subG)(state, t, idx + 2)).tupled.map {
             case ((s0, a, t0), (s1, f, t1)) =>
               val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
               (s, f(a), merge(t0, t1))
           }.flatMap { case (s0, b, t0) =>
-            next(b).scan(append, merge)(s0, t0, idx)
+            next(b).scan(append, merge, subG)(s0, t0, idx)
           }
       }
     }
 
     final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
-      scan[Unit]((_, _) => (), (_, _) => ())(state, ()).map{ case (s, a, t) => (s, a) }
+      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => ())(state, ()).map{ case (s, a, t) => (s, a) }
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
@@ -117,13 +117,19 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         val nodes = g0._1.nodes ++ g1._1.nodes
         val edges = g0._1.edges ++ g1._1.edges
         val m = edges.map(e => e.from -> e.to).toMap
-        val children = nodes.collect { case Node(id, _) if !m.contains(id) =>
-          id
+        val children = nodes.collect {
+          case Leaf(id, _) if !m.contains(id) => id
+          case Sub(id, _, _) if !m.contains(id) => id
         }
         Graph(nodes, edges) -> children
       }
 
-      scan[G](append _, merge _)(state, Graph(Set(), Set()) -> Set()).map { case (s, a, g) => (s, a, g._1) }
+      def sub(s: S, g: G): G = {
+        val node = nod.toNode(s)
+        Graph(Set(Sub("cluster_" + node.id, node.value, g._1)), Set.empty) -> Set(node.id)
+      }
+
+      scan[G](append _, merge _, sub _)(state, Graph(Set(), Set()) -> Set()).map { case (s, a, g) => (s, a, g._1) }
     }
 
   }

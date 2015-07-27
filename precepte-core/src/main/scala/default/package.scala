@@ -37,7 +37,7 @@ package object default {
   implicit def toNode[C]  = new ToNode[ST[C]] {
     def toNode(s: ST[C]): Node = {
       val id = s.managed.path.last.tags.callee.value + "_" + s.managed.path.last.id.value
-      Node(id, s.managed.path.last.tags.callee.value)
+      Leaf(id, s.managed.path.last.tags.callee.value)
     }
   }
 }

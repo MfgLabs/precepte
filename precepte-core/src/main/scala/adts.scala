@@ -60,9 +60,45 @@ case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PId
   def run() = ids.head -> PIdStream(ids.tail)
 }
 
-case class Node(id: String, value: String)
-case class Edge(from: String, to: String)
-case class Graph(nodes: Set[Node], edges: Set[Edge])
+trait Node {
+  val id: String
+  val value: String
+  def viz: String
+}
+case class Leaf(id: String, value: String) extends Node {
+  def viz = s"""$id [label = "$value"]"""
+}
+case class Sub(id: String, value: String, graph: Graph) extends Node {
+  private def nodesG =
+    graph.nodes.map(_.viz).mkString("\n")
+
+  def viz = s"""
+    subgraph $id {
+      label = "$value"
+      $nodesG
+    }
+  """
+}
+case class Edge(from: String, to: String) {
+  def viz = s"$from -> $to"
+}
+case class Graph(nodes: Set[Node], edges: Set[Edge]) {
+  private def allEdges: Seq[Edge] =
+    edges.toSeq ++ nodes.flatMap {
+      case Sub(_, _, g) => g.allEdges
+      case _ => Seq.empty
+    }
+
+  private def allEdgesG = allEdges.map(_.viz).mkString("\n")
+  private def allNodesG = nodes.map(_.viz).mkString("\n")
+
+  def viz = s"""
+    digraph G {
+      $allNodesG
+      $allEdgesG
+    }
+  """
+}
 
 trait ToNode[S] {
   def toNode(s: S): Node
