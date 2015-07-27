@@ -2,7 +2,6 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import quiver._
 import scalaz.{Monad, Semigroup}
 import scalaz.syntax.monad._
 
@@ -23,6 +22,8 @@ package object default {
       )
   }
 
+  def tags(callee: String) = BaseTags(Callee(callee), Category.Database)
+
   implicit def pstateUpdater[C] = new PStateUpdater[BaseTags, MS, C] {
     def appendTags(s: ST[C], tags: BaseTags, idx: Int) = {
       val (id, next) = s.managed.ids.run()
@@ -33,4 +34,10 @@ package object default {
     def updateUnmanaged(s: ST[C], unmanaged: C): ST[C] = s.copy(unmanaged = unmanaged)
   }
 
+  implicit def toNode[C]  = new ToNode[ST[C]] {
+    def toNode(s: ST[C]): Node = {
+      val id = s.managed.path.last.tags.callee.value + "_" + s.managed.path.last.id.value
+      Node(id, s.managed.path.last.tags.callee.value)
+    }
+  }
 }

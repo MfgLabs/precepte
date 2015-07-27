@@ -92,6 +92,40 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
+
+    final def observe[T](state: S)(
+      implicit
+        mo: Monad[F],
+        upd: PStateUpdater[Ta, ManagedState, UnmanagedState],
+        nod: ToNode[S],
+        S: Semigroup[UnmanagedState]
+    ): F[(S, A, Graph)] = {
+      // graph + leaves
+      type G = (Graph, Set[String])
+
+      def append(s: S, g: G): G = {
+        val node = nod.toNode(s)
+        // val id = s.managed.path.last.tags.callee.value + "_" + s.managed.path.last.id.value
+        // val node = (id, s.managed.path.last.tags.callee.value)
+        val nodes = g._1.nodes + node
+        val es = for { c <- g._2 } yield Edge(c, node.id)
+        val edges = g._1.edges ++ es
+        Graph(nodes, edges) -> Set(node.id)
+      }
+
+      def merge(g0: G, g1: G): G = {
+        val nodes = g0._1.nodes ++ g1._1.nodes
+        val edges = g0._1.edges ++ g1._1.edges
+        val m = edges.map(e => e.from -> e.to).toMap
+        val children = nodes.collect { case Node(id, _) if !m.contains(id) =>
+          id
+        }
+        Graph(nodes, edges) -> children
+      }
+
+      scan[G](append _, merge _)(state, Graph(Set(), Set()) -> Set()).map { case (s, a, g) => (s, a, g._1) }
+    }
+
   }
 
 
@@ -173,23 +207,5 @@ trait LowPriorityManagedStatetances {
       new PrecepteBuilder[Ta] {
         val tags = _tags
       }
-
-    trait *->*[F0[_]] {}
-    trait *->*->*[F0[_, _]] {}
-
-    implicit def fKindEv[F0[_]] = new *->*[F0] {}
-    implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
-
-    def trans[Ta, ManagedState, UnmanagedState, F[_], G[_]: *->*, A](
-      m: Precepte[Ta, ManagedState, UnmanagedState, F, G[A]]
-    )(implicit hh: HasHoist[G]): hh.T[({ type λ[α] = Precepte[Ta, ManagedState, UnmanagedState, F, α] })#λ, A] =
-      hh.lift[({ type λ[α] = Precepte[Ta, ManagedState, UnmanagedState, F, α] })#λ, A](m)
-
-    def trans[Ta, ManagedState, UnmanagedState, F[_], G[_, _]: *->*->*, A, B](
-      m: Precepte[Ta, ManagedState, UnmanagedState, F, G[A, B]]
-    )(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): hh.T[({ type λ[α] = Precepte[Ta, ManagedState, UnmanagedState, F, α] })#λ, B] = {
-      type λ[α] = G[A, α]
-      trans[Ta, ManagedState, UnmanagedState, F, λ, B](m)(new *->*[λ] {}, hh)
-    }
 
   }

@@ -1,6 +1,7 @@
 package com.mfglabs
 package precepte
 
+import scala.language.higherKinds
 
 /** Span uniquely identifies a macro-event managed by Precepte
  * and potentially constituted of multiple micro-events.
@@ -57,4 +58,23 @@ trait PStateUpdater[Ta, MS, FS] {
 
 case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PIdSeries {
   def run() = ids.head -> PIdStream(ids.tail)
+}
+
+case class Node(id: String, value: String)
+case class Edge(from: String, to: String)
+case class Graph(nodes: Set[Node], edges: Set[Edge])
+
+trait ToNode[S] {
+  def toNode(s: S): Node
+}
+
+trait *->*[F0[_]] {}
+
+object *->* {
+  implicit def fKindEv[F0[_]] = new *->*[F0] {}
+}
+
+trait *->*->*[F0[_, _]] {}
+object *->*->* {
+  implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 }
