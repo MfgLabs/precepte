@@ -39,35 +39,6 @@ object Call {
 /** A typed group of tags */
 trait Tags
 object NoTags extends Tags
-case class BaseTags(callee: Tags.Callee, category: Tags.Category) extends Tags  {
-  override def toString = s"($callee, $category)"
-}
-
-object Tags {
-  case class Callee(override val value: String) extends Tag("callee", value) {
-    override def toString = s"callee($value)"
-  }
-
-  abstract class Category(value: String) extends Tag("category", value) {
-    override def toString = s"category($value)"
-  }
-  object Category {
-    def unapply(c: Category) = Some(c.value)
-    object Api extends Category("api")
-    object Database extends Category("database")
-  }
-
-  abstract class Environment(value: String) extends Tag("environment", value)
-  object Environment {
-    object Test extends Environment("test")
-    object Dev extends Environment("dev")
-    object Staging extends Environment("staging")
-    object Production extends Environment("production")
-  }
-
-  case class Host(override val value: String) extends Tag("host", value)
-  case class Version(override val value: String) extends Tag("version", value)
-}
 
 /** The state gathering all data concerning current execution context */
 case class PState[Ta, ManagedState, UnmanagedState](
@@ -83,11 +54,6 @@ trait PStateUpdater[Ta, MS, FS] {
   def appendTags(s: S, t: Ta, idx: Int): S
   def updateUnmanaged(s: S, ext: FS): S
 }
-
-
-/** The typed environment in which an event happens */
-trait Env
-case class BaseEnv(host: Tags.Host, environment: Tags.Environment, version: Tags.Version) extends Env
 
 case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PIdSeries {
   def run() = ids.head -> PIdStream(ids.tail)

@@ -48,7 +48,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case Apply(pa, pf) =>
           ApplyStep(pa, pf, (a: A) => Return(a))
 
-        case Flatmap(sub, next) =>
+        case f@Flatmap(sub, next) =>
           sub() match {
             case Return(a) =>
               next(a).resume(append, idx)(state, t)
@@ -153,7 +153,7 @@ trait LowPriorityManagedStatetances {
             yield st -> Return(a)
           }, tags)
 
-      def applyS[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Ta, M, U]): P[M, U, F, A] =
+      def applyU[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Ta, M, U]): P[M, U, F, A] =
         Step[Ta, M, U, F, A](
           IndexedStateT { (st: P[M, U, F, A]#S) =>
             for (ca <- λ(st))
