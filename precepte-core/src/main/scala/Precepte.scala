@@ -8,6 +8,7 @@ import scalaz.syntax.monad._
 import scala.annotation.tailrec
 
 private trait ResumeStep[Ta, ManagedState, UnmanagedState, F[_], A, T]
+private case class SimpleStep[Ta, ManagedState, UnmanagedState, F[_], A, T](v: F[(Precepte[Ta, ManagedState, UnmanagedState, F, A], Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, T)]) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T]
 private case class FlatMapStep[Ta, ManagedState, UnmanagedState, F[_], A, T](v: F[(Precepte[Ta, ManagedState, UnmanagedState, F, A], Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, T)]) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T]
 private case class ReturnStep[Ta, ManagedState, UnmanagedState, F[_], A, T](v: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A, T)) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T]
 
@@ -43,7 +44,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case Step(st, tags) =>
           val state0 = upd.appendTags(state, tags, idx)
           // append tags to managed state and propagate this new managed state to next step
-          FlatMapStep(st.run(state0).map { case (s, p) => (p, s, append(s, t)) })
+          SimpleStep(st.run(state0).map { case (s, p) => (p, s, t) })
 
         case Apply(pa, pf) =>
           ApplyStep(pa, pf, (a: A) => Return(a))
@@ -58,7 +59,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               // repass state as a Step in a Flatmap means the flatMap chain is finished
               // Do not reuse appended segment but original state
               FlatMapStep(st.run(state0).map { case (s, p) =>
-                (p.flatMap(next), s, append(s, t))
+                (p.flatMap(next), s, t)
               })
 
             case f@Flatmap(sub2, next2) =>
@@ -70,25 +71,56 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       }
     }
 
-    final def scan[T](append: (S, T) => T, merge: (T, T) => T, subG: (S, T) => T)(state: S, t: T, idx: Int = 0)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
+    final def scan[T](append: (S, T) => T, merge: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean)(state: S, t: T, idx: Int = 0)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
       this.resume(append, idx, subG)(state, t) match {
+
+        case SimpleStep(fsp) =>
+          fsp.flatMap { case (p0, s0, t0) =>
+            p0.scan(append, merge, subG, isEmpty)(s0, t0).map { case (s1, a1, t1) =>
+              println(s"SS s0: $s0 s1:$s1 a1:$a1 t1:$t1")
+              val t2 = if(isEmpty(t1)) {
+                println("SS empty")
+                append(s1, t1)
+              } else {
+                println("SS not empty")
+                subG(s0, t1)
+              }
+              (s1, a1, t2)
+            }
+          }
+
         case FlatMapStep(fsp) =>
-          fsp.flatMap { case (p0, s0, t0) => p0.scan(append, merge, subG)(s0, t0) }
+          fsp.flatMap { case (p0, s0, t0) =>
+            val t00 = append(s0, t0)
+            p0.scan(append, merge, subG, isEmpty)(s0, t0).map { case (s1, a1, t1) =>
+              println(s"s0: $s0 s1:$s1 a1:$a1 t1:$t1")
+              val t2 = if(isEmpty(t1)) {
+                println("empty")
+                append(s0, append(s1, t1))
+              } else {
+                println("not empty")
+                append(s0, subG(s1, t1))
+              }
+              (s1, a1, t2)
+            }
+          }
+
         case ReturnStep(sat) =>
           sat.point[F]
+
         case ApplyStep(pa, pf, next) =>
-          (pa.scan(append, merge, subG)(state, t, idx + 1) |@| pf.scan(append, merge, subG)(state, t, idx + 2)).tupled.map {
+          (pa.scan(append, merge, subG, isEmpty)(state, t, idx + 1) |@| pf.scan(append, merge, subG, isEmpty)(state, t, idx + 2)).tupled.map {
             case ((s0, a, t0), (s1, f, t1)) =>
               val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
               (s, f(a), merge(t0, t1))
           }.flatMap { case (s0, b, t0) =>
-            next(b).scan(append, merge, subG)(s0, t0, idx)
+            next(b).scan(append, merge, subG, isEmpty)(s0, t0, idx)
           }
       }
     }
 
     final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
-      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => ())(state, ()).map{ case (s, a, t) => (s, a) }
+      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), _ => true)(state, ()).map{ case (s, a, t) => (s, a) }
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
@@ -129,7 +161,14 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         Graph(Set(Sub("cluster_" + node.id, node.value, g._1)), Set.empty) -> Set(node.id)
       }
 
-      scan[G](append _, merge _, sub _)(state, Graph(Set(), Set()) -> Set()).map { case (s, a, g) => (s, a, g._1) }
+      val empty: G = Graph(Set(), Set()) -> Set()
+
+      def isEmpty(g: G) = g match {
+        case `empty` => true
+        case _ => false
+      }
+
+      scan[G](append _, merge _, sub _, isEmpty _)(state, empty).map { case (s, a, g) => (s, a, g._1) }
     }
 
   }

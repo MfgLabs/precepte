@@ -42,7 +42,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
-
+/*
   "Precepte" should "run/eval simple" in {
     def f1 = P(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
     def f2(i: Int) = P(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
@@ -376,7 +376,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     pf.eval(nostate).futureValue should equal (l.reverse)
   }
 
-
+*/
   it should "observe" in {
     import quiver.{ LNode, LEdge }
 
@@ -392,11 +392,12 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val p2: P[Int] = P(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
     val p3: P[Int] = P(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
 
-    val p4 = for {
+    val p4 = 
+      for {
       _ <- p0
-      _ <- (p1 |@| p2).tupled
+      // _ <- (p1 |@| p2).tupled
       _ <- p3
-      _ <- P(tags("sub"))(p0)
+      // _ <- P(tags("sub"))(p3)
     } yield ()
 
     val (_, _, graph) = p4.observe(nostate).futureValue
