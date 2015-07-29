@@ -71,12 +71,12 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       }
     }
 
-    final def scan[T](append: (S, T) => T, merge: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean)(state: S, t: T, idx: Int = 0)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
+    final def scan[T](append: (S, T) => T, merge: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean, empty: T)(state: S, t: T, idx: Int = 0)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
       this.resume(append, idx, subG)(state, t) match {
 
         case SimpleStep(fsp) =>
           fsp.flatMap { case (p0, s0, t0) =>
-            p0.scan(append, merge, subG, isEmpty)(s0, t0).map { case (s1, a1, t1) =>
+            p0.scan(append, merge, subG, isEmpty, empty)(s0, t0).map { case (s1, a1, t1) =>
               println(s"SS s0: $s0 s1:$s1 a1:$a1 t1:$t1")
               val t2 = if(isEmpty(t1)) {
                 println("SS empty")
@@ -91,8 +91,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
         case FlatMapStep(fsp) =>
           fsp.flatMap { case (p0, s0, t0) =>
-            val t00 = append(s0, t0)
-            p0.scan(append, merge, subG, isEmpty)(s0, t0).map { case (s1, a1, t1) =>
+            // val t00 = append(s0, t0)
+            p0.scan(append, merge, subG, isEmpty, empty)(s0, empty).map { case (s1, a1, t1) =>
               println(s"s0: $s0 s1:$s1 a1:$a1 t1:$t1")
               val t2 = if(isEmpty(t1)) {
                 println("empty")
@@ -109,18 +109,18 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           sat.point[F]
 
         case ApplyStep(pa, pf, next) =>
-          (pa.scan(append, merge, subG, isEmpty)(state, t, idx + 1) |@| pf.scan(append, merge, subG, isEmpty)(state, t, idx + 2)).tupled.map {
+          (pa.scan(append, merge, subG, isEmpty, empty)(state, t, idx + 1) |@| pf.scan(append, merge, subG, isEmpty, empty)(state, t, idx + 2)).tupled.map {
             case ((s0, a, t0), (s1, f, t1)) =>
               val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
               (s, f(a), merge(t0, t1))
           }.flatMap { case (s0, b, t0) =>
-            next(b).scan(append, merge, subG, isEmpty)(s0, t0, idx)
+            next(b).scan(append, merge, subG, isEmpty, empty)(s0, t0, idx)
           }
       }
     }
 
     final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
-      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), _ => true)(state, ()).map{ case (s, a, t) => (s, a) }
+      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), _ => true, empty)(state, ()).map{ case (s, a, t) => (s, a) }
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
@@ -168,7 +168,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case _ => false
       }
 
-      scan[G](append _, merge _, sub _, isEmpty _)(state, empty).map { case (s, a, g) => (s, a, g._1) }
+      scan[G](append _, merge _, sub _, isEmpty _, empty)(state, empty).map { case (s, a, g) => (s, a, g._1) }
     }
 
   }
