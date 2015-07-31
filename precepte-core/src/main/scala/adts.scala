@@ -92,6 +92,30 @@ case class Graph(nodes: Set[Node], edges: Set[Edge]) {
   private def allEdgesG = allEdges.map(_.viz).mkString("\n  ")
   private def allNodesG = nodes.map(_.viz).mkString("\n  ")
 
+  lazy val children: Set[Node] = {
+    val m = edges.map(e => e.from -> e.to).toMap
+    def step(nodes: Set[Node], m: Map[String, String]): Set[Node] = {
+      nodes.flatMap { n => n match {
+        case Leaf(id, _) if !m.contains(id) => Seq(n)
+        case Sub(_, _, sub) => step(sub.children, m)
+        case _ => Seq()
+      } }
+    }
+    step(nodes, m)
+  }
+
+  lazy val parents: Set[Node] = {
+    val m = edges.map(e => e.to -> e.from).toMap
+    def step(nodes: Set[Node], m: Map[String, String]): Set[Node] = {
+      nodes.flatMap { n => n match {
+        case Leaf(id, _) if !m.contains(id) => Seq(n)
+        case Sub(_, _, sub) => step(sub.parents, m)
+        case _ => Seq()
+      } }
+    }
+    step(nodes, m)
+  }
+
   def viz = s"""
     |digraph G {
     |  $allNodesG
