@@ -36,7 +36,11 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[Ta, ManagedState, UnmanagedState, F, AP[A]] =
     this.map(a => ap.point(a))
 
-  @tailrec private final def resume[T](append: (S, T) => T, idx: Int, subG: (S, T) => T)(state: S, t: T)(implicit fu: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState]): ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T] = {
+  @tailrec private final def resume[T]
+    (append: (S, T) => T, idx: Int, subG: (S, T) => T)
+    (state: S, t: T)
+    (implicit fu: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState])
+    : ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T] = {      
     this match {
         case Return(a) =>
           ReturnStep((state, a, t))
@@ -71,56 +75,70 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       }
     }
 
-    final def scan[T](append: (S, T) => T, merge: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean, empty: T)(state: S, t: T, idx: Int = 0)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A, T)] = {
-      this.resume(append, idx, subG)(state, t) match {
+    final def scan[T]
+      (append: (S, T) => T, merge: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean, empty: T)
+      (state: S, t: T, idx: Int = 0)
+      (implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState])
+      : F[(S, A, T)] = {
+      def stepScan(p: PX[A], state: S, t: T, idx: Int = 0): F[(S, S, A, T)] = {
+        this.resume(append, idx, subG)(state, t) match {
 
-        case SimpleStep(fsp) =>
-          fsp.flatMap { case (p0, s0, t0) =>
-            p0.scan(append, merge, subG, isEmpty, empty)(s0, t0).map { case (s1, a1, t1) =>
-              println(s"SS s0: $s0 s1:$s1 a1:$a1 t1:$t1")
-              val t2 = if(isEmpty(t1)) {
-                println("SS empty")
-                append(s1, t1)
-              } else {
-                println("SS not empty")
-                subG(s0, t1)
+          case SimpleStep(fsp) =>
+            fsp.flatMap { case (p0, s0, t0) =>
+              stepScan(p0, s0, empty).map { case (_, s1, a1, t1) =>
+                println(s"SS s0: $s0 s1:$s1 a1:$a1 t1:$t1")
+                val t2 = if(isEmpty(t1)) {
+                  println("SS empty")
+                  append(s1, t1)
+                } else {
+                  println("SS not empty")
+                  subG(s0, t1)
+                }
+                (s0, s1, a1, t2)
               }
-              (s1, a1, t2)
             }
-          }
 
-        case FlatMapStep(fsp) =>
-          fsp.flatMap { case (p0, s0, t0) =>
-            // val t00 = append(s0, t0)
-            p0.scan(append, merge, subG, isEmpty, empty)(s0, empty).map { case (s1, a1, t1) =>
-              println(s"s0: $s0 s1:$s1 a1:$a1 t1:$t1")
-              val t2 = if(isEmpty(t1)) {
-                println("empty")
-                append(s0, append(s1, t1))
-              } else {
-                println("not empty")
-                append(s0, subG(s1, t1))
+          case FlatMapStep(fsp) =>
+            fsp.flatMap { case (p0, s0, t0) =>
+              // val t00 = append(s0, t0)
+              stepScan(p0, s0, empty).map { case (_, s1, a1, t1) =>
+                println(s"""
+  t:$t
+  s0:$s0
+  s1:$s1
+  a1:$a1
+  t1:$t1
+                """)
+                val t2 = if(isEmpty(t1)) {
+                  println("empty")
+                  append(s0, append(s1, t1))
+                } else {
+                  println("not empty")
+                  append(s0, subG(s1, t1))
+                }
+                (Some(s0), s1, a1, t2)
               }
-              (s1, a1, t2)
             }
-          }
 
-        case ReturnStep(sat) =>
-          sat.point[F]
+          case ReturnStep(sat) =>
+            sat.point[F].map{ case (s, a, t) => (None, s, a, t) }
 
-        case ApplyStep(pa, pf, next) =>
-          (pa.scan(append, merge, subG, isEmpty, empty)(state, t, idx + 1) |@| pf.scan(append, merge, subG, isEmpty, empty)(state, t, idx + 2)).tupled.map {
-            case ((s0, a, t0), (s1, f, t1)) =>
-              val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
-              (s, f(a), merge(t0, t1))
-          }.flatMap { case (s0, b, t0) =>
-            next(b).scan(append, merge, subG, isEmpty, empty)(s0, t0, idx)
-          }
+          case ApplyStep(pa, pf, next) =>
+            (stepScan(pa, state, t, idx + 1) |@| stepScan(pf, state, t, idx + 2)).tupled.map {
+              case ((s0, a, t0), (s1, f, t1)) =>
+                val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
+                (s, f(a), merge(t0, t1))
+            }.flatMap { case (s0, b, t0) =>
+              next(b).scan(append, merge, subG, isEmpty, empty)(s0, t0, idx)
+            }
+        }
       }
+
+      stepScan(this, s, t)
     }
 
     final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
-      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), _ => true, empty)(state, ()).map{ case (s, a, t) => (s, a) }
+      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), _ => true, ())(state, ()).map{ case (s, a, t) => (s, a) }
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
