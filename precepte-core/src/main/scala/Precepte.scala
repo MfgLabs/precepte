@@ -37,10 +37,10 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     this.map(a => ap.point(a))
 
   @tailrec private final def resume[T]
-    (append: (S, T) => T, idx: Int, subG: (S, T) => T)
+    (idx: Int)
     (state: S, t: T)
     (implicit fu: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState])
-    : ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T] = {      
+    : ResumeStep[Ta, ManagedState, UnmanagedState, F, A, T] = {
     this match {
         case Return(a) =>
           ReturnStep((state, a, t))
@@ -56,7 +56,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case f@Flatmap(sub, next) =>
           sub() match {
             case Return(a) =>
-              next(a).resume(append, idx, subG)(state, t)
+              next(a).resume(idx)(state, t)
 
             case Step(st, tags) =>
               val state0 = upd.appendTags(state, tags, idx)
@@ -67,7 +67,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               })
 
             case f@Flatmap(sub2, next2) =>
-              (Flatmap(sub2, (z: f._I) => next2(z).flatMap(next)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(append, idx, subG)(state, t)
+              (Flatmap(sub2, (z: f._I) => next2(z).flatMap(next)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(idx)(state, t)
 
             case Apply(pa, pfa) =>
               ApplyStep(pa, pfa, next)
@@ -81,7 +81,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       (implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState])
       : F[(S, A, T)] = {
       def stepScan[B](p: PX[B], state: S, t: T, idx: Int = 0, isRoot: Boolean = false): F[(S, B, T)] = {
-        p.resume(append, idx, subG)(state, t) match {
+        p.resume(idx)(state, t) match {
 
           case FlatMapStep(fsp) =>
             fsp.flatMap { case (p0, s0, t0) =>
