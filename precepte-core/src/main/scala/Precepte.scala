@@ -76,7 +76,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     }
 
     final def scan[T]
-      (prepend: (S, T) => T, append: (S, T) => T, merge: (T, T) => T, appendT: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean, empty: T)
+      (append: (S, T) => T, merge: (T, T) => T, appendT: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean)
       (state: S, t: T, idx: Int = 0)
       (implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState])
       : F[(S, A, T)] = {
@@ -134,7 +134,7 @@ println(s"""APPLY
     }
 
     final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
-      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), (_, _) => (), (_, _) => (), _ => true, ())(state, ()).map{ case (s, a, t) => (s, a) }
+      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), (_, _) => (), _ => true)(state, ()).map{ case (s, a, t) => (s, a) }
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
@@ -148,16 +148,6 @@ println(s"""APPLY
     ): F[(S, A, Graph)] = {
       // graph + leaves
       type G = (Graph, Set[String])
-
-      def prepend(s: S, g: G): G = {
-        val node = nod.toNode(s)
-        // val id = s.managed.path.last.tags.callee.value + "_" + s.managed.path.last.id.value
-        // val node = (id, s.managed.path.last.tags.callee.value)
-        val nodes = g._1.nodes + node
-        val es = for { c <- g._1.parents } yield Edge(node.id, c.id)
-        val edges = g._1.edges ++ es
-        Graph(nodes, edges) -> g._2
-      }
 
       def append(s: S, g: G): G = {
         val node = nod.toNode(s)
@@ -204,7 +194,7 @@ println(s"""APPLY
         case _ => false
       }
 
-      scan[G](prepend _, append _, merge _, appendT _, sub _, isEmpty _, empty)(state, empty).map { case (s, a, g) => (s, a, g._1) }
+      scan[G](append _, merge _, appendT _, sub _, isEmpty _)(state, empty).map { case (s, a, g) => (s, a, g._1) }
     }
 
   }
