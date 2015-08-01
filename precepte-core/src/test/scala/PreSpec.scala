@@ -392,16 +392,25 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val p2: P[Int] = P(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
     val p3: P[Int] = P(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
     val p4: P[Int] = P(tags("p4")).applyU((s: ST[Int]) => Future(4 -> 4))
+    val p5: P[Int] = P(tags("p5")).applyU((s: ST[Int]) => Future(5 -> 5))
+    val p6: P[Int] = P(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
+    val p7: P[Int] = P(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
 
-    val p5 = 
+    val p8 = 
       for {
       _ <- p0
-      // _ <- (p1 |@| p2).tupled
+      _ <- (p1 |@| p2 |@| p3).tupled
       _ <- P(tags("sub"))(p4)
-      _ <- p3
+      _ <- p5
+      _ <- P(tags("sub2"))(for {
+          _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
+          _ <- p6
+          _ <- (p4 |@| p5 |@| P(tags("sub3"))(p6)).tupled
+          _ <- p7
+        } yield ())
     } yield ()
 
-    val (_, _, graph) = p5.observe(nostate).futureValue
+    val (_, _, graph) = p8.observe(nostate).futureValue
 
     println(graph.viz)
 
