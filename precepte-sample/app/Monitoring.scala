@@ -1,6 +1,7 @@
 package commons
 
 import com.mfglabs.precepte._
+import default._
 
 object Monitoring {
 	import scala.concurrent.Future
@@ -13,13 +14,15 @@ object Monitoring {
 
 	import play.api.libs.json._
 
-  object PreContext extends TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags, Unit], Future]
-  type ST = PStateBase[BaseEnv, BaseTags, Unit]
+
+  implicit val unitSG = new scalaz.Semigroup[Unit] {
+    def append(f1: Unit, f2: => Unit) = ()
+  }
 
 	val env = BaseEnv(
-		Tags.Host(java.net.InetAddress.getLocalHost().getHostName()),
-		Tags.Environment.Dev,
-		Tags.Version(com.mfglabs.BuildInfo.version)
+		Host(java.net.InetAddress.getLocalHost().getHostName()),
+		Environment.Dev,
+		Version(com.mfglabs.BuildInfo.version)
 	)
 	
 	// lazy val influx = Influx(
@@ -31,19 +34,18 @@ object Monitoring {
 	lazy val logback = Logback(env)
 
 	lazy val TimedAction = com.mfglabs.precepte.InfluxTimedAction(())(
-		PreContext,
 		new java.net.URL("http://localhost:8086/db/precepte-sample/series?u=root&p=root"),
 		env,
 		play.api.libs.concurrent.Akka.system
 	)
 
-	case class MonitoringContext(span: Span, path: com.mfglabs.precepte.Call.Path[BaseTags]) {
+	case class MonitoringContext(span: Span, path: default.Call.Path[BaseTags]) {
 		val logger = logback.Logger(span, path)
 		val timer = TimedAction.influx.Timer(span, path)
 	}
 
 	object MonitoringContext {
-		def apply[C](st: PStateBase[BaseEnv, BaseTags, C]): MonitoringContext = MonitoringContext(st.span, st.path)
+		def apply[C](st: ST[Unit]): MonitoringContext = MonitoringContext(st.managed.span, st.managed.path)
 	}
 }
 

@@ -24,19 +24,6 @@ object PId {
   def gen = PId(scala.util.Random.alphanumeric.take(7).mkString)
 }
 
-/** Abstract Name/Value Tag used to classify your Call */
-abstract class Tag(val name: String, val value: String)
-
-/** A call representing a micro-event in the scope of a macro-event.
- * A micro-event happens (generally) locally to a system and is not distributed
- * It is identified by a local Id and enhanced with a few tags
- */
-case class Call[T <: Tags](id: PId, tags: T)
-
-object Call {
-  type Path[T <: Tags] = Vector[Call[T]]
-}
-
 /** A typed group of tags */
 trait Tags
 object NoTags extends Tags

@@ -9,6 +9,7 @@ import play.api.test.Helpers._
 class ModelSpec extends PlaySpecification {
 
   import models._
+  import commons.Monitoring._
 
   // -- Date helpers
 
@@ -16,12 +17,13 @@ class ModelSpec extends PlaySpecification {
 
   // --
   import com.mfglabs.precepte._
+  import default._
   import scala.concurrent.ExecutionContext.Implicits.global
   import scalaz.std.scalaFuture._
 
-  val env = BaseEnv(Tags.Host("localhost"), Tags.Environment.Dev, Tags.Version("1.0"))
-  private def tags(n: String) = BaseTags(Tags.Callee(n), Tags.Category.Database)
-  def nostate = PST0(Span.gen, env, Vector.empty, ())
+  val env = BaseEnv(Host("localhost"), Environment.Dev, Version("1.0"))
+  private def tags(n: String) = BaseTags(Callee(n), Category.Database)
+  def nostate = ST(Span.gen, env, Vector.empty, ())
 
   "Computer model" should {
 

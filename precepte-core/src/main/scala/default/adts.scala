@@ -3,9 +3,9 @@ package precepte
 package default
 
 
-case class BaseTags(callee: Callee, category: Category) extends Tags  {
-  override def toString = s"($callee, $category)"
-}
+
+/** Abstract Name/Value Tag used to classify your Call */
+abstract class Tag(val name: String, val value: String)
 
 case class Callee(override val value: String) extends Tag("callee", value) {
   override def toString = s"callee($value)"
@@ -35,6 +35,10 @@ case class Version(override val value: String) extends Tag("version", value)
 /** The typed environment in which an event happens */
 trait Env
 case class BaseEnv(host: Host, environment: Environment, version: Version) extends Env
+
+case class BaseTags(callee: Callee, category: Category) extends Tags  {
+  override def toString = s"($callee, $category)"
+}
 
 /** A call representing a micro-event in the scope of a macro-event.
  * A micro-event happens (generally) locally to a system and is not distributed

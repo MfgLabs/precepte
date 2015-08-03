@@ -12,6 +12,9 @@ import anorm._
 import views._
 import models._
 
+import com.mfglabs.precepte._
+import com.mfglabs.precepte.default._
+
 import commons.Monitoring
 import Monitoring.TimedAction
 
@@ -23,8 +26,6 @@ import scalaz.std.option._
  * Manage a database of computers
  */
 object Application extends Controller {
-  import Monitoring.PreContext._
-  import Precepte._
 
   /**
    * This result directly redirect to the application home.

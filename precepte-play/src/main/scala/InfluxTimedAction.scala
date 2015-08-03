@@ -7,28 +7,24 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import akka.actor.ActorSystem
 
-object InfluxTimedAction {
-  // def apply[TC <: TaggingContext[BaseEnv, BaseTags, C, Future], C](initialC: C)(
-  //   ctx: TC,
-  //   influx: Influx[TC, C]
-  // )(implicit ex: ExecutionContext) =
-  //   new TimedAction(initialC)(ctx, influx)
+import default._
 
-  def apply[C, TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags, C], Future]](initialC: C)(
-    ctx: TC,
+object InfluxTimedAction {
+
+  def apply[C : scalaz.Semigroup](initialC: C)(
     influxdbURL: java.net.URL,
     env: BaseEnv,
     system: ActorSystem
   )(implicit ex: ExecutionContext) =
-    new InfluxTimedAction(initialC, ctx, Influx[C, TC](ctx, influxdbURL, env, system))
+    new InfluxTimedAction(initialC, Influx[C](influxdbURL, env, system))
+
 }
 
-class InfluxTimedAction[TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags, C], Future], C](
-  val initialC: C, val ctx: TC, val influx: Influx[C, TC]
+class InfluxTimedAction[C : scalaz.Semigroup](
+  val initialC: C, val influx: Influx[C]
 )(implicit ex: ExecutionContext) {
-  import ctx._
 
-  private def tagged[A](bodyParser: BodyParser[A])(f: (Tags.Category, Tags.Callee, Request[A]) => TC#Precepte[Result])(implicit fu: scalaz.Monad[Future]) =
+  private def tagged[A](bodyParser: BodyParser[A])(f: (Category, Callee, Request[A]) => Pre[Future, C, Result])(implicit fu: scalaz.Monad[Future]) =
     Action.async(bodyParser) { request =>
       import play.api.Routes.{ ROUTE_ACTION_METHOD, ROUTE_CONTROLLER }
       val ts = request.tags
@@ -38,17 +34,17 @@ class InfluxTimedAction[TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseT
         a <- ts.get(ROUTE_ACTION_METHOD)
       } yield s"$c.$a").getOrElse(request.toString)
 
-      val initialState = PStateBase[BaseEnv, BaseTags, C](Span.gen, influx.env, Vector.empty, initialC)
-      f(Tags.Category.Api, Tags.Callee(name), request).eval(initialState)
+      val initialState = ST(Span.gen, influx.env, Vector.empty, initialC)
+      f(Category.Api, Callee(name), request).eval(initialState)
     }
 
   // private def cast[A](p: Precepte[A]) = p.asInstanceOf[influx.ctx.Precepte[A]]
   // private def uncast[A](p: influx.ctx.Precepte[A]) = p.asInstanceOf[Precepte[A]]
 
-  def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Precepte[Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
+  def apply[A](bodyParser: BodyParser[A])(block: Request[A] => Pre[Future, C, Result])(implicit fu: scalaz.Monad[Future]): Action[A] =
     tagged(bodyParser)((c, t, r) => influx.TimedM(c)(t)(block(r)))
 
-  def apply(block: Request[AnyContent] => Precepte[Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
+  def apply(block: Request[AnyContent] => Pre[Future, C, Result])(implicit fu: scalaz.Monad[Future]): Action[AnyContent] =
     apply(BodyParsers.parse.anyContent)(block)
 
   def action[A](bodyParser: BodyParser[A])(block: Request[A] => Future[Result])(implicit fu: scalaz.Monad[Future]): Action[A] =

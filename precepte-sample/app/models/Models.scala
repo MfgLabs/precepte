@@ -12,13 +12,15 @@ import scala.language.postfixOps
 import scala.concurrent.Future
 
 import com.mfglabs.precepte._
-import macros.Macros
-import Macros.callee
+import default._
 import commons.Monitoring
 import Monitoring._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scalaz.std.scalaFuture._
+
+import Macros._
+
 
 case class Company(id: Pk[Long] = NotAssigned, name: String)
 case class Computer(id: Pk[Long] = NotAssigned, name: String, introduced: Option[Date], discontinued: Option[Date], companyId: Option[Long])
@@ -32,10 +34,9 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
 }
 
 object Models {
-  import PreContext._
 
-  def Timed[A](f: ST => Future[A])(implicit fu: scalaz.Functor[Future], callee: Tags.Callee): Precepte[A] =
-    Monitoring.TimedAction.influx.Timed(Tags.Category.Database)(callee)(f)(fu)
+  def Timed[A](f: ST[Unit] => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): Pre[Future, Unit, A] =
+    Monitoring.TimedAction.influx.Timed(Category.Database)(callee)(f)(fu)
 }
 
 object Computer {
@@ -68,7 +69,7 @@ object Computer {
    * Retrieve a computer from the id.
    */
   def findById(id: Long) =
-    Models.Timed { (st: ST) =>
+    Models.Timed { (st: ST[Unit]) =>
       val ctx = MonitoringContext(st)
       import ctx._
       logger.debug(s"Finding computer with id", Macros.param(id))
@@ -88,7 +89,7 @@ object Computer {
    * @param filter Filter applied on the name column
    */
   def list(page: Int = 0, pageSize: Int = 10, orderBy: Int = 1, filter: String = "%") =
-    Models.Timed { (st: ST) =>
+    Models.Timed { (st: ST[Unit]) =>
       val ctx = MonitoringContext(st)
       import ctx._
       logger.debug(s"Listing all computers", Macros.params(page, pageSize, orderBy, filter):_*)
@@ -134,7 +135,7 @@ object Computer {
    * @param id The computer id
    * @param computer The computer values.
    */
-  def update(id: Long, computer: Computer) = Models.Timed { (st: ST) =>
+  def update(id: Long, computer: Computer) = Models.Timed { (st: ST[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"updating computer with id", Macros.params(id, computer):_*)
@@ -162,7 +163,7 @@ object Computer {
    *
    * @param computer The computer values.
    */
-  def insert(computer: Computer) = Models.Timed { (st: ST) =>
+  def insert(computer: Computer) = Models.Timed { (st: ST[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"inserting computer", Macros.param(computer))
@@ -190,7 +191,7 @@ object Computer {
    *
    * @param id Id of the computer to delete.
    */
-  def delete(id: Long) = Models.Timed { (st: ST) =>
+  def delete(id: Long) = Models.Timed { (st: ST[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.info(s"deleting computer", Macros.param(id))
@@ -218,7 +219,7 @@ object Company {
   /**
    * Construct the Map[String,String] needed to fill a select options set.
    */
-  def options = Models.Timed { (st: ST) =>
+  def options = Models.Timed { (st: ST[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
     logger.debug("Listing options")

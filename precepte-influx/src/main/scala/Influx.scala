@@ -9,15 +9,18 @@ import scala.concurrent.Future
 import scala.language.postfixOps
 
 import akka.actor.{ Actor, Props, ActorSystem }
-import Call._
 
-case class Influx[C, TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags, C], Future]](ctx: TC, influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit ex: ExecutionContext) {
+import default._
+
+case class Influx[C : scalaz.Semigroup](influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit ex: ExecutionContext) {
+
+  type P[A] = Pre[Future, C, A]
 
   private val builder = new com.ning.http.client.AsyncHttpClientConfig.Builder()
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
 
   private case object Publish
-  private case class Metric(time: Long, span: Span, path: Path[BaseTags], duration: Duration)
+  private case class Metric(time: Long, span: Span, path: Call.Path[BaseTags], duration: Duration)
 
   private class InfluxClient extends Actor {
     val metrics = scala.collection.mutable.ArrayBuffer[Metric]()
@@ -60,7 +63,7 @@ case class Influx[C, TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags
 
   system.scheduler.schedule(10 seconds, 10 seconds, client, Publish)
 
-  case class Timer(span: Span, path: Path[BaseTags]) {
+  case class Timer(span: Span, path: Call.Path[BaseTags]) {
     def timed[A](f: scala.concurrent.Future[A]) = {
       val t0 = System.nanoTime()
       f.map { x =>
@@ -71,14 +74,14 @@ case class Influx[C, TC <: TaggingContext[BaseTags, PStateBase[BaseEnv, BaseTags
     }
   }
 
-  def Timed[A](category: Tags.Category)(callee: Tags.Callee)(f: PStateBase[BaseEnv, BaseTags, C] => Future[A])(implicit fu: scalaz.Functor[Future]): TC#Precepte[A] =
-    ctx.Precepte(BaseTags(callee, category)){ (c: PStateBase[BaseEnv, BaseTags, C]) =>
-      Timer(c.span, c.path).timed(f(c))
+  def Timed[A](category: Category)(callee: Callee)(f: ST[C] => Future[A])(implicit fu: scalaz.Functor[Future]): P[A] =
+    Precepte(BaseTags(callee, category)){ (c: ST[C]) =>
+      Timer(c.managed.span, c.managed.path).timed(f(c))
     }
 
-  def TimedM[A](category: Tags.Category)(callee: Tags.Callee)(f: TC#Precepte[A])(implicit mo: scalaz.Monad[Future]): TC#Precepte[A] =
-    ctx.Precepte(BaseTags(callee, category)){ (c: PStateBase[BaseEnv, BaseTags, C]) =>
-      Timer(c.span, c.path).timed(f.eval(c))
+  def TimedM[A](category: Category)(callee: Callee)(f: P[A])(implicit mo: scalaz.Monad[Future]): P[A] =
+    Precepte(BaseTags(callee, category)){ (c: ST[C]) =>
+      Timer(c.managed.span, c.managed.path).timed(f.eval(c))
     }
 
 }

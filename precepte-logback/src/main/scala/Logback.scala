@@ -2,7 +2,8 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import Call._
+
+import default._
 
 case class Logback(env: BaseEnv) {
 
@@ -13,7 +14,7 @@ case class Logback(env: BaseEnv) {
 
   val sep = "/"
 
-  case class Logger(span: Span, path: Path[BaseTags]) {
+  case class Logger(span: Span, path: Call.Path[BaseTags]) {
     def p(params: Seq[(String, String)]) = {
       import collection.JavaConverters._
       val callees =
