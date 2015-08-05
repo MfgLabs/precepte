@@ -16,9 +16,15 @@ package object default {
 
   object ST {
     def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): ST[C] =
-      PState[BaseTags, MS, C] (
+      apply[C] (
         ManagedState(env, span, path),
         value
+      )
+
+    def apply[C](managed: MS, unmanaged: C): ST[C] = 
+      PState[BaseTags, MS, C] (
+        managed,
+        unmanaged
       )
   }
 
