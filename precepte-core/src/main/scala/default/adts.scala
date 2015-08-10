@@ -50,5 +50,36 @@ object Call {
   type Path[T <: Tags] = Vector[Call[T]]
 }
 
+
+/** Span uniquely identifies a macro-event managed by Precepte
+ * and potentially constituted of multiple micro-events.
+ * A macro-event doesn't need to be local to a system, can be distributed in space & time...
+ */
+case class Span(value: String) extends AnyVal {
+  override def toString = s"span($value)"
+}
+
+object Span {
+  def gen = Span(java.util.UUID.randomUUID.toString)
+}
+
+/** Id uniquely identifies a micro-event in the scope of a macro-event managed by Precepte */
+case class PId(value: String) extends AnyVal {
+  override def toString = s"pid($value)"
+}
+
+object PId {
+  def gen = PId(scala.util.Random.alphanumeric.take(7).mkString)
+}
+
+
+trait PIdSeries {
+  def run(): (PId, PIdSeries)
+}
+
+case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PIdSeries {
+  def run() = ids.head -> PIdStream(ids.tail)
+}
+
 case class ManagedState[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = PIdStream())
 
