@@ -50,6 +50,27 @@ lazy val core =
       )
     )
 
+lazy val coreCats =
+  project.in(file("precepte-core-cats"))
+    .settings(commonSettings:_*)
+    .settings(strictScalac)
+    .settings(
+      name := "precepte-core-cats",
+      publishTo := {
+        val s3Repo = "s3://mfg-mvn-repo"
+        if (isSnapshot.value)
+          Some("snapshots" at s3Repo + "/snapshots")
+        else
+          Some("releases" at s3Repo + "/releases")
+      },
+      libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
+      libraryDependencies ++= Seq(
+          "org.spire-math"  %% "cats-core"        % "0.1.0-SNAPSHOT"
+        , "com.chuusai"     %% "shapeless"        % "2.2.4"
+        , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
+      )
+    )
+
 lazy val sample =
   project.in(file("precepte-sample"))
     .enablePlugins(PlayScala)
@@ -121,4 +142,4 @@ lazy val play =
 lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
   .settings(name := "precepte-root")
-  .aggregate(core, play, influx, logback, sample)
+  .aggregate(core, play, influx, logback, sample, coreCats)
