@@ -69,7 +69,8 @@ case class PId(value: String) extends AnyVal {
 }
 
 object PId {
-  def gen = PId(scala.util.Random.alphanumeric.take(7).mkString)
+  val i = new java.util.concurrent.atomic.AtomicInteger(1)
+  def gen = PId("1") //i.getAndIncrement().toString) //scala.util.Random.alphanumeric.take(7).mkString)
 }
 
 

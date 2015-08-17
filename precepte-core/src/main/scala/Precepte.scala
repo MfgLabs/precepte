@@ -82,6 +82,41 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       }
     }
 
+
+    final def run0
+      (state: S, idx: Int = 0)
+      (implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState])
+      : F[(S, A)] = {
+      def stepRun0[B](p: PX[B], state: S, idx: Int = 0): F[(S, B)] = {
+        p.resume(idx)(state) match {
+
+          case SimpleStep(fsp) => fsp.flatMap { case (p0, s0) =>
+            stepRun0(p0, s0)
+          }
+
+          case FlatMapStep(fsp) =>
+            fsp.flatMap { case (p0, next0, s0) =>
+              stepRun0(p0, s0).flatMap { case (s1, a1) =>
+                stepRun0(next0(a1), s1)
+              }
+            }
+
+          case ReturnStep(sat) => mo.point(sat)
+
+          case ApplyStep(pa, pf, next) =>
+            (stepRun0(pa, state, idx + 1) |@| stepRun0(pf, state, idx + 2)).tupled.map {
+              case ((s0, a), (s1, f)) =>
+                val s = upd.updateUnmanaged(s0, S.append(s0.unmanaged, s1.unmanaged))
+                (s, f(a))
+            }.flatMap { case (s0, b) =>
+              stepRun0(next(b), s0, idx)
+            }
+        }
+      }
+
+      stepRun0(this, state, idx)
+    }
+
     final def scan[T]
       (append: (S, T) => T, merge: (T, T) => T, appendT: (T, T) => T, subG: (S, T) => T, isEmpty: T => Boolean, empty: T)
       (state: S, t: T, idx: Int = 0)
@@ -125,7 +160,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             }
 
           case ReturnStep(sat) =>
-            sat.point[F].map { case (s, a) => (s, a, t) }
+            mo.point(sat).map { case (s, a) => (s, a, t) }
 
           case ApplyStep(pa, pf, next) =>
             (stepScan(pa, state, empty, idx + 1) |@| stepScan(pf, state, empty, idx + 2)).tupled.map {
@@ -145,6 +180,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
     final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
       scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), (_, _) => (), _ => true, ())(state, ()).map{ case (s, a, t) => (s, a) }
+      // run0(state)
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
@@ -252,32 +288,30 @@ trait LowPriorityManagedStatetances {
       type P[ManagedState, UnmanagedState, F[_], A] = Precepte[Ta, ManagedState, UnmanagedState, F, A]
 
       import scala.concurrent.Future
-      def future[M, U, A](λ: P[M, U, Future, A]#S => Future[A])(implicit F: Functor[Future], ec: scala.concurrent.ExecutionContext): P[M, U, Future, Throwable \/ A] =
+      def future[M, U, A](λ: P[M, U, Future, A]#S => Future[A])(implicit func: Functor[Future], ec: scala.concurrent.ExecutionContext): P[M, U, Future, Throwable \/ A] =
         apply { pa =>
-          λ(pa).map(\/-.apply _)
+          func.map(λ(pa))(\/-.apply _)
             .recover{ case e => -\/(e) }
         }
 
-      def apply[M, U, F[_], A](λ: P[M, U, F, A]#S => F[A])(implicit F: Functor[F]): P[M, U, F, A] =
+      def apply[M, U, F[_], A](λ: P[M, U, F, A]#S => F[A])(implicit func: Functor[F]): P[M, U, F, A] =
         Step[Ta, M, U, F, A](
           IndexedStateT { (st: P[M, U, F, A]#S) =>
-            for (a <- λ(st))
-            yield st -> Return(a)
+            func.map(λ(st)) { a => st -> Return(a) }
           }, tags)
 
-      def applyU[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit F: Functor[F], upd: PStateUpdater[Ta, M, U]): P[M, U, F, A] =
+      def applyU[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(U, A)])(implicit func: Functor[F], upd: PStateUpdater[Ta, M, U]): P[M, U, F, A] =
         Step[Ta, M, U, F, A](
           IndexedStateT { (st: P[M, U, F, A]#S) =>
-            for (ca <- λ(st))
-            yield {
+            func.map(λ(st)) { ca =>
               val (unmanaged, a) = ca
               upd.updateUnmanaged(st, unmanaged) -> Return(a)
             }
           }, tags)
 
-      def apply[M, U, F[_], A](m: P[M, U, F, A])(implicit A: Applicative[F]): P[M, U, F, A] =
-        Step(IndexedStateT[F, P[M, U, F, A]#S, P[M, U, F, A]#S, P[M, U, F, A]]{ st =>
-          (st -> m).point[F]
+      def apply[M, U, F[_], A](m: P[M, U, F, A])(implicit ap: Applicative[F]): P[M, U, F, A] =
+        Step(IndexedStateT{ st =>
+          ap.point(st -> m)
         }, tags)
     }
 
