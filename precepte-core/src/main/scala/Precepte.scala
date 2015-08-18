@@ -13,6 +13,14 @@ private case class SimpleStep[Ta, ManagedState, UnmanagedState, F[_], A](
   v: F[(Precepte[Ta, ManagedState, UnmanagedState, F, A], Precepte[Ta, ManagedState, UnmanagedState, F, A]#S)]
 ) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A]
 
+private case class MapStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
+  v: F[(Precepte[Ta, ManagedState, UnmanagedState, F, I], I => A, Precepte[Ta, ManagedState, UnmanagedState, F, A]#S)]
+) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A]
+
+private case class MapFusionStep[Ta, ManagedState, UnmanagedState, F[_], A, I, B](
+  v: (Precepte[Ta, ManagedState, UnmanagedState, F, A], A => I, I => B, Precepte[Ta, ManagedState, UnmanagedState, F, B]#S)
+) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, B]
+
 private case class FlatMapStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
   v: F[(Precepte[Ta, ManagedState, UnmanagedState, F, I], I => Precepte[Ta, ManagedState, UnmanagedState, F, A], Precepte[Ta, ManagedState, UnmanagedState, F, A]#S)]
 ) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A]
@@ -40,10 +48,10 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     Flatmap[Ta, ManagedState, UnmanagedState, F, A, B](() => self, f)
 
   final def map[B](f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-    flatMap(a => Return(f(a)))
+    Map[Ta, ManagedState, UnmanagedState, F, A, B](() => self, f)
 
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[Ta, ManagedState, UnmanagedState, F, AP[A]] =
-    this.map(a => ap.point(a))
+    map(a => ap.point(a))
 
   @tailrec private final def resume(idx: Int)(state: S)
     (implicit fu: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState])
@@ -60,6 +68,26 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case Apply(pa, pf) =>
           ApplyStep(pa, pf, (a: A) => Return(a))
 
+        case mf@Map(sub, pf) =>
+          sub() match {
+            case Return(a) =>
+              ReturnStep((state, pf(a)))
+
+            case Step(st, tags) =>
+              val state0 = upd.appendTags(state, tags, idx)
+              MapStep(st.run(state0).map { case (s, p) => (p, pf, s) })
+
+            case mf2@Map(sub2, pf2) =>
+              // (Map(sub2, pf.compose(pf2)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(idx)(state)
+              MapFusionStep((sub2(), pf2, pf, state))
+
+            case f@Flatmap(sub2, next2) =>
+              (Flatmap(sub2, (i: f._I) => next2(i).map(pf)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(idx)(state)
+
+            case Apply(pa, pfa) =>
+              ApplyStep(pa, pfa, (i: mf._I) => Return(pf(i)))
+          }
+
         case f@Flatmap(sub, next) =>
           sub() match {
             case Return(a) =>
@@ -73,8 +101,11 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
                 (p, next, s)
               })
 
+            case Map(sub2, pf2) =>
+              (Flatmap(sub2, (i: f._I) => next(pf2(i))):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(idx)(state)
+
             case f@Flatmap(sub2, next2) =>
-              (Flatmap(sub2, (z: f._I) => next2(z).flatMap(next)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(idx)(state)
+              (Flatmap(sub2, (i: f._I) => next2(i).flatMap(next)):Precepte[Ta, ManagedState, UnmanagedState, F, A]).resume(idx)(state)
 
             case Apply(pa, pfa) =>
               ApplyStep(pa, pfa, next)
@@ -84,7 +115,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
 
     final def run0
-      (state: S, idx: Int = 0)
+      (state: S, idx: Int = 0, maxDepth: Int = 500)
       (implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState])
       : F[(S, A)] = {
       def stepRun0[B](p: PX[B], state: S, idx: Int = 0): F[(S, B)] = {
@@ -93,6 +124,54 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           case SimpleStep(fsp) => fsp.flatMap { case (p0, s0) =>
             stepRun0(p0, s0)
           }
+
+          case MapStep(fsp) =>
+            fsp.flatMap { case (p0, f0, s0) =>
+              stepRun0(p0, s0).map { case (s1, a1) => (s1, f0(a1)) }
+            }
+
+          case mfs@MapFusionStep((p0, f0, f1, s0)) =>
+            @tailrec def inStep[C, I, D](p: PX[C], f0: C => I, f1: I => D, s: S, depth: Int): F[(S, D)] = {
+              p.resume(0)(s) match {
+                case MapFusionStep((p1, f2, f3, s1)) =>
+                  if(depth >= maxDepth) {
+                    stepRun0(p1, s1).map { case (s1, a1) =>
+                      (s1, f1(f0(f3(f2(a1)))))
+                    }
+                  } else {
+                    inStep(Map(() => p1, f3.compose(f2)), f0, f1, s1, depth + 1)
+                  }
+
+                case SimpleStep(fsp) => fsp.flatMap { case (p2, s2) =>
+                  stepRun0(p2, s2).map { case (s3, a3) => (s3, f1(f0(a3))) }
+                }
+
+                case MapStep(fsp) => fsp.flatMap { case (p2, f2, s2) =>
+                  stepRun0(p2, s2).map { case (s3, a3) => (s3, f1(f0(f2(a3)))) }
+                }
+
+                case FlatMapStep(fsp) =>
+                  fsp.flatMap { case (p2, next2, s2) =>
+                    stepRun0(p2, s2).flatMap { case (s3, a3) =>
+                      // inStep(next2(a3), f0, f1, s3)
+                      stepRun0(next2(a3), s3).map { case (s4, a4) => (s4, f1(f0(a4))) }
+                    }
+                  }
+
+                case ReturnStep(sat) => mo.point(sat).map { case (s2, a2) => (s2, f1(f0(a2))) }
+
+                case ApplyStep(pa, pf, next) =>
+                  (stepRun0(pa, state, idx + 1) |@| stepRun0(pf, state, idx + 2)).tupled.map {
+                    case ((s1, a), (s2, f)) =>
+                      val s = upd.updateUnmanaged(s0, S.append(s1.unmanaged, s2.unmanaged))
+                      (s, f(a))
+                  }.flatMap { case (s3, b) =>
+                    stepRun0(next(b), s3, idx).map { case (s4, a4) => (s4, f1(f0(a4))) }
+                  }
+              }
+            }
+            // depth is already 1 as we are in a mapfusionstep
+            inStep(p0, f0, f1, s0, 1)
 
           case FlatMapStep(fsp) =>
             fsp.flatMap { case (p0, next0, s0) =>
@@ -143,6 +222,36 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               }
             }
 
+          case MapStep(fsp) =>
+            fsp.flatMap { case (p0, f0, s0) =>
+              stepScan(p0, s0, empty).map { case (s1, a1, t1) =>
+                val t2 = if(isEmpty(t1)) {
+                  append(s0, t)
+                } else {
+                  if(!isRoot) {
+                    appendT(t, subG(s0, t1))
+                  } else {
+                    appendT(append(s0, t), t1)
+                  }
+                }
+                (s1, f0(a1), t2)
+              }
+            }
+
+          case MapFusionStep((p0, f0, f1, s0)) =>
+            stepScan(p0, s0, empty).map { case (s1, a1, t1) =>
+              val t2 = if(isEmpty(t1)) {
+                append(s0, t)
+              } else {
+                if(!isRoot) {
+                  appendT(t, subG(s0, t1))
+                } else {
+                  appendT(append(s0, t), t1)
+                }
+              }
+              (s1, f1(f0(a1)), t2)
+            }
+
           case FlatMapStep(fsp) =>
             fsp.flatMap { case (p0, next0, s0) =>
               stepScan(p0, s0, empty).flatMap { case (s1, a1, t1) =>
@@ -179,8 +288,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     }
 
     final def run(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[(S, A)] =
-      scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), (_, _) => (), _ => true, ())(state, ()).map{ case (s, a, t) => (s, a) }
-      // run0(state)
+      // scan[Unit]((_, _) => (), (_, _) => (), (_, _) => (), (_, _) => (), _ => true, ())(state, ()).map{ case (s, a, t) => (s, a) }
+      run0(state)
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
@@ -248,6 +357,13 @@ case class Step[Ta, ManagedState, UnmanagedState, F[_], A](
   st: Precepte[Ta, ManagedState, UnmanagedState, F, A]#StepState[A],
   tags: Ta
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
+
+case class Map[Ta, ManagedState, UnmanagedState, F[_], I, A](
+  sub: () => Precepte[Ta, ManagedState, UnmanagedState, F, I],
+  next: I => A
+) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
+  type _I = I
+}
 
 case class Flatmap[Ta, ManagedState, UnmanagedState, F[_], I, A](
   sub: () => Precepte[Ta, ManagedState, UnmanagedState, F, I],

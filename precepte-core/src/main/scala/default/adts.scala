@@ -70,7 +70,7 @@ case class PId(value: String) extends AnyVal {
 
 object PId {
   val i = new java.util.concurrent.atomic.AtomicInteger(1)
-  def gen = PId("1") //i.getAndIncrement().toString) //scala.util.Random.alphanumeric.take(7).mkString)
+  def gen = PId(i.getAndIncrement().toString) //scala.util.Random.alphanumeric.take(7).mkString)
 }
 
 
@@ -78,9 +78,13 @@ trait PIdSeries {
   def run(): (PId, PIdSeries)
 }
 
+case object DefaultPIdSeries extends PIdSeries {
+  def run() = PId.gen -> DefaultPIdSeries
+}
+
 case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PIdSeries {
   def run() = ids.head -> PIdStream(ids.tail)
 }
 
-case class ManagedState[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = PIdStream())
+case class ManagedState[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = DefaultPIdSeries)
 
