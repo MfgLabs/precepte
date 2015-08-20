@@ -398,15 +398,15 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val p8 = 
       for {
       _ <- p0
-      _ <- (p1 |@| p2 |@| p3).tupled
+      // _ <- (p1 |@| p2 |@| p3).tupled
       _ <- P(tags("sub"))(p4)
       _ <- p5
-      _ <- P(tags("sub2"))(for {
-          _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
-          _ <- p6
-          _ <- (p4 |@| p5 |@| P(tags("sub3"))(p6)).tupled
-          _ <- p7
-        } yield ())
+      // _ <- P(tags("sub2"))(for {
+      //     _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
+      //     _ <- p6
+      //     _ <- (p4 |@| p5 |@| P(tags("sub3"))(p6)).tupled
+      //     _ <- p7
+      //   } yield ())
     } yield ()
 
     val (_, _, graph) = p8.observe(nostate).futureValue
