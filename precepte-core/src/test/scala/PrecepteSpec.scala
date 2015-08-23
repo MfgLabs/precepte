@@ -409,9 +409,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       //   } yield ())
     } yield ()
 
-    val (_, _, graph) = p8.observe(nostate).futureValue
+    // val (_, _, graph) = p8.observe(nostate).futureValue
 
-    println(graph.viz)
+    // println(graph.viz)
 
     1 should ===(1)
   }

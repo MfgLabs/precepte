@@ -51,7 +51,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
     
     (aft - bef) / 1000000.0
   }
-/*
+
   "Precepte" should "run/eval simple" in {
 
     def res(i: Int): Future[Int] = for {
@@ -69,7 +69,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
     println(s"Future(1000000) -> duration: $ms3 ms")
 
   }
-*/
+
   "Precepte" should "run/eval pre" in {
 
     def res(i: Int): P[Int] = for {
@@ -77,13 +77,13 @@ class CostSpec extends FlatSpec with ScalaFutures {
       r <- if(i>0) res(i-1) else i.point[P]
     } yield r
 
-    val ms = timeMs(res(10).eval(nostate))    
+    val ms = timeMs(res(10000).eval(nostate))    
     println(s"Pre(10000) -> duration: $ms ms")
 
-    // val ms2 = timeMs(res(100000).eval(nostate))
-    // println(s"Pre(100000) -> duration: $ms2 ms")
+    val ms2 = timeMs(res(100000).eval(nostate))
+    println(s"Pre(100000) -> duration: $ms2 ms")
 
-    // val ms3 = timeMs(res(1000000).eval(nostate))
-    // println(s"Pre(1000000) -> duration: $ms3 ms")
+    val ms3 = timeMs(res(1000000).eval(nostate))
+    println(s"Pre(1000000) -> duration: $ms3 ms")
   }
 }
