@@ -89,7 +89,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
     // val ms2 = timeMs(res(100000).eval(nostate))
     // println(s"Pre(100000) -> duration: $ms2 ms")
 
-    val ms3 = timeMs(res(10000000).eval(nostate))
+    val ms3 = timeMs(res(5000000).eval(nostate))
     println(s"Pre(1000000) -> duration: $ms3 ms")
   }
 }

@@ -52,7 +52,7 @@ case class Graph(nodes: Set[Node], edges: Set[Edge]) {
 
   lazy val children: Set[Node] = {
     val m = edges.map(e => e.from -> e.to).toMap
-    def step(nodes: Set[Node], m: Map[String, String]): Set[Node] = {
+    def step(nodes: Set[Node], m: collection.Map[String, String]): Set[Node] = {
       nodes.flatMap { n => n match {
         case Leaf(id, _) if !m.contains(id) => Seq(n)
         case Sub(_, _, sub) => step(sub.children, m)
@@ -64,7 +64,7 @@ case class Graph(nodes: Set[Node], edges: Set[Edge]) {
 
   lazy val parents: Set[Node] = {
     val m = edges.map(e => e.to -> e.from).toMap
-    def step(nodes: Set[Node], m: Map[String, String]): Set[Node] = {
+    def step(nodes: Set[Node], m: collection.Map[String, String]): Set[Node] = {
       nodes.flatMap { n => n match {
         case Leaf(id, _) if !m.contains(id) => Seq(n)
         case Sub(_, _, sub) => step(sub.parents, m)

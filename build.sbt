@@ -47,7 +47,8 @@ lazy val core =
         , "com.chuusai"     %% "shapeless"        % "2.2.4"
         , "oncue.quiver"    %% "core"             % "3.2.0"   % "test"
         , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
-      )
+      ),
+      javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
     )
 
 lazy val sample =
