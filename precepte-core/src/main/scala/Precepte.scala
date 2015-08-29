@@ -275,6 +275,16 @@ trait LowPriorityManagedStatetances {
             }
           }, tags)
 
+      def applyS[M, U, F[_], A](λ: P[M, U, F, A]#S => F[(P[M, U, F, A]#S, A)])(implicit F: Functor[F]): P[M, U, F, A] =
+        Step[Ta, M, U, F, A](
+          IndexedStateT { (st: P[M, U, F, A]#S) =>
+            for (ca <- λ(st))
+            yield {
+              val (s, a) = ca
+              s -> Return(a)
+            }
+          }, tags)
+
       def apply[M, U, F[_], A](m: P[M, U, F, A])(implicit A: Applicative[F]): P[M, U, F, A] =
         Step(IndexedStateT[F, P[M, U, F, A]#S, P[M, U, F, A]#S, P[M, U, F, A]]{ st =>
           (st -> m).point[F]
