@@ -423,7 +423,11 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     // Making the graph a part of the unmanaged state let's you pass it around.
     implicit def semiSGraph[U](implicit S: scalaz.Semigroup[U]) =
       new scalaz.Semigroup[(U, SGraph)] {
-        def append(f1: (U, SGraph), f2: => (U, SGraph)) = ???
+        def append(f1: (U, SGraph), f2: => (U, SGraph)) = {
+          val u = S.append(f1._1, f2._1)
+          val g = SGraph.Zero >> SGraph.Branch(f1._2, f2._2)
+          (u, g)
+        }
       }
 
     def nostate2 = ST(Span.gen, env, Vector.empty, (0, SGraph.Zero))
@@ -438,6 +442,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       }.run(nostate2).futureValue
 
     println(s.unmanaged._2)
+
+    val (s1, _) = (p1 |@| p2).tupled.graph.run(nostate2).futureValue
+    println(s1.unmanaged._2)
 
     1 should ===(1)
   }

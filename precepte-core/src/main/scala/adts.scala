@@ -12,11 +12,16 @@ object SGraph {
   sealed trait Step
   case class Sub(id: String, value: String) extends Step
   case class Simple(id: String, value: String) extends Step
-  object Up extends Step
+  case class Branch(g1: SGraph, g2: SGraph) extends Step
+  object Up extends Step {
+    override def toString = "Up"
+  }
 }
 case class SGraph(ss: Vector[SGraph.Step]) {
   def >>(s: SGraph.Step) = SGraph(ss :+ s)
   def >>>(g: SGraph) = SGraph(ss ++ g.ss)
+  def >>>:(s: SGraph.Step) = SGraph(s +: ss)
+  override def toString = s"Graph(${ss.mkString(" >> ")})"
 }
 
 /** The state gathering all data concerning current execution context */

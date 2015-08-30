@@ -192,8 +192,10 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               }
             }
           Step(st2, tags)
-        case Apply(pa, pf) => ???
-        case f@Flatmap(sub, next) => ???
+        case Apply(pa, pf) =>
+          Apply(pa.graph, pf.graph)
+        case f@Flatmap(sub, next) =>
+          Flatmap(() => sub().graph, (x: f._I) => next(x).graph)
       }
 
     final def observe[T](state: S)(
