@@ -11,6 +11,7 @@ object SGraph {
   val Zero = SGraph(Vector.empty)
   sealed trait Step
   case class Sub(id: String, value: String) extends Step
+  case class Simple(id: String, value: String) extends Step
   object Up extends Step
 }
 case class SGraph(ss: Vector[SGraph.Step]) {

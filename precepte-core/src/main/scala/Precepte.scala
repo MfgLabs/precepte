@@ -178,7 +178,12 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
                 (u1, pre) = _up
               } yield {
                 val node = nod.toNode(p0)
-                val g = g0 >> SGraph.Sub(node.id, node.value)
+                val g = pre match {
+                  case Return(_) =>
+                    g0 >> SGraph.Simple(node.id, node.value)
+                  case _ =>
+                    g0 >> SGraph.Sub(node.id, node.value)
+                }
                 val pre1 =
                   pre.graph.umap { case (u1, g1) =>
                     (u1, g0 >>> g1 >> SGraph.Up)
