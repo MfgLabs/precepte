@@ -418,14 +418,25 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val (_, _, graph) = p9.observe(nostate).futureValue
     println(graph.viz)
 
+    // the following demonstrates a situation where you'd be screwed with observe.
+    // The introduction of an intermediate function would loose the underlying graph.
+    // Making the graph a part of the unmanaged state let's you pass it around.
     implicit def semiSGraph[U](implicit S: scalaz.Semigroup[U]) =
       new scalaz.Semigroup[(U, SGraph)] {
         def append(f1: (U, SGraph), f2: => (U, SGraph)) = ???
       }
 
     def nostate2 = ST(Span.gen, env, Vector.empty, (0, SGraph.Zero))
-    val (s, _) = P(tags("sub"))(p4).graph.run(nostate2).futureValue
-    println("foo")
+    val (s, _) =
+      P(tags("subzero")).applyU { (s: ST[(Int, SGraph)]) =>
+        p4.graph.run(s).map { case (PState(managed, (u, g)), a) =>
+          val value = s.managed.path.last.tags.callee.value
+          val id = value + "_" + s.managed.path.last.id.value
+          val g1 = SGraph(Vector(SGraph.Sub(id, value))) >>> g
+          ((u, g1), a)
+        }
+      }.run(nostate2).futureValue
+
     println(s.unmanaged._2)
 
     1 should ===(1)
