@@ -395,7 +395,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val p6: P[Int] = P(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
     val p7: P[Int] = P(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
 
-    val p8 = 
+
+    val p8 =
       for {
       _ <- p0
       _ <- (p1 |@| p2 |@| p3).tupled
@@ -409,9 +410,23 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         } yield ())
     } yield ()
 
-    val (_, _, graph) = p8.observe(nostate).futureValue
+    val p9 = P(tags("sub")).applyS { (c: ST[Int]) =>
+      val fsa = p8.run(c)
+      fsa
+    }
 
+    val (_, _, graph) = p9.observe(nostate).futureValue
     println(graph.viz)
+
+    implicit def semiSGraph[U](implicit S: scalaz.Semigroup[U]) =
+      new scalaz.Semigroup[(U, SGraph)] {
+        def append(f1: (U, SGraph), f2: => (U, SGraph)) = ???
+      }
+
+    def nostate2 = ST(Span.gen, env, Vector.empty, (0, SGraph.Zero))
+    val (s, _) = P(tags("sub"))(p4).graph.run(nostate2).futureValue
+    println("foo")
+    println(s.unmanaged._2)
 
     1 should ===(1)
   }

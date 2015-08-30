@@ -7,6 +7,17 @@ import scala.language.higherKinds
 trait Tags
 object NoTags extends Tags
 
+object SGraph {
+  val Zero = SGraph(Vector.empty)
+  sealed trait Step
+  case class Sub(id: String, value: String) extends Step
+  object Up extends Step
+}
+case class SGraph(ss: Vector[SGraph.Step]) {
+  def >>(s: SGraph.Step) = SGraph(ss :+ s)
+  def >>>(g: SGraph) = SGraph(ss ++ g.ss)
+}
+
 /** The state gathering all data concerning current execution context */
 case class PState[Ta, ManagedState, UnmanagedState](
   managed: ManagedState,

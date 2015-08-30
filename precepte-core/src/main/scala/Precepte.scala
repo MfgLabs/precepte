@@ -149,6 +149,48 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
 
+
+    private def umap(f: UnmanagedState => UnmanagedState)(implicit F: Functor[F]): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
+      this match {
+        case Return(a) =>
+          Return(a)
+        case Step(st0, tags) =>
+          val st = st0.imap { case PState(m, u) =>
+            PState[Ta, ManagedState, UnmanagedState](m, f(u))
+          }
+          Step(st, tags)
+        case Apply(pa, pf) => ???
+        case f@Flatmap(sub, next) => ???
+      }
+
+
+    final def graph(implicit F: Functor[F], nod: ToNode[S]): Precepte[Ta, ManagedState, (UnmanagedState, SGraph), F, A] =
+      this match {
+        case Return(a) =>
+          Return(a)
+        case Step(st0, tags) =>
+          val st2 =
+            IndexedStateT { (p: PState[Ta, ManagedState, (UnmanagedState, SGraph)]) =>
+              val PState(m0, (u0, g0)) = p
+              val p0 = PState[Ta, ManagedState, UnmanagedState](m0, u0)
+              for {
+                _up <- st0.run(p0)
+                (u1, pre) = _up
+              } yield {
+                val node = nod.toNode(p0)
+                val g = g0 >> SGraph.Sub(node.id, node.value)
+                val pre1 =
+                  pre.graph.umap { case (u1, g1) =>
+                    (u1, g0 >>> g1 >> SGraph.Up)
+                  }
+                PState[Ta, ManagedState, (UnmanagedState, SGraph)](m0, (u0, g)) -> pre1
+              }
+            }
+          Step(st2, tags)
+        case Apply(pa, pf) => ???
+        case f@Flatmap(sub, next) => ???
+      }
+
     final def observe[T](state: S)(
       implicit
         mo: Monad[F],
