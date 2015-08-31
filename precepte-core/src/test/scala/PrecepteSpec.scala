@@ -436,7 +436,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         p4.sgraph.run(s).map { case (PState(managed, (u, g)), a) =>
           val value = s.managed.path.last.tags.callee.value
           val id = value + "_" + s.managed.path.last.id.value
-          val g1 = SGraph(Vector(SGraph.Sub(id, value))) >>> g
+          val g1 = SGraph(Vector(SGraph.Sub(id, value))) >>> g >> SGraph.Up
           ((u, g1), a)
         }
       }.run(nostate2).futureValue
