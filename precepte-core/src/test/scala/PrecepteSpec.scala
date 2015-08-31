@@ -433,7 +433,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     def nostate2 = ST(Span.gen, env, Vector.empty, (0, SGraph.Zero))
     val (s, _) =
       P(tags("subzero")).applyU { (s: ST[(Int, SGraph)]) =>
-        p4.graph.run(s).map { case (PState(managed, (u, g)), a) =>
+        p4.sgraph.run(s).map { case (PState(managed, (u, g)), a) =>
           val value = s.managed.path.last.tags.callee.value
           val id = value + "_" + s.managed.path.last.id.value
           val g1 = SGraph(Vector(SGraph.Sub(id, value))) >>> g
@@ -443,8 +443,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     println(s.unmanaged._2)
 
-    val (s1, _) = (p1 |@| p2).tupled.graph.run(nostate2).futureValue
-    println(s1.unmanaged._2)
+    println("====")
+    val (s1, _) = (p1 |@| p2).tupled.sgraph.run(nostate2).futureValue
+    println(s1.unmanaged._2.toGraph.viz)
+
+    println("====")
+    val (s2, _) = P(tags("sub"))(p4).flatMap(_ => p1).sgraph.run(nostate2).futureValue
+    println(s2.unmanaged._2)
+    println(s2.unmanaged._2.toGraph.viz)
 
     1 should ===(1)
   }

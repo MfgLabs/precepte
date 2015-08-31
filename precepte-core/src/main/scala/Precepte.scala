@@ -164,7 +164,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       }
 
 
-    final def graph(implicit F: Functor[F], nod: ToNode[S]): Precepte[Ta, ManagedState, (UnmanagedState, SGraph), F, A] =
+    final def sgraph(implicit F: Functor[F], nod: ToNode[S]): Precepte[Ta, ManagedState, (UnmanagedState, SGraph), F, A] =
       this match {
         case Return(a) =>
           Return(a)
@@ -185,7 +185,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
                     g0 >> SGraph.Sub(node.id, node.value)
                 }
                 val pre1 =
-                  pre.graph.umap { case (u1, g1) =>
+                  pre.sgraph.umap { case (u1, g1) =>
                     (u1, g0 >>> g1 >> SGraph.Up)
                   }
                 PState[Ta, ManagedState, (UnmanagedState, SGraph)](m0, (u0, g)) -> pre1
@@ -193,9 +193,9 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             }
           Step(st2, tags)
         case Apply(pa, pf) =>
-          Apply(pa.graph, pf.graph)
+          Apply(pa.sgraph, pf.sgraph)
         case f@Flatmap(sub, next) =>
-          Flatmap(() => sub().graph, (x: f._I) => next(x).graph)
+          Flatmap(() => sub().sgraph, (x: f._I) => next(x).sgraph)
       }
 
     final def observe[T](state: S)(
