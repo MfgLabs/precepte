@@ -42,7 +42,7 @@ object SGraph {
       case e => throw new IllegalArgumentException(e.toString)
     }
 
-  def toGraph(sgraph: SGraph): (Graph, Option[precepte.Sub]) =
+  private def toGraph(sgraph: SGraph): (Graph, Option[precepte.Sub]) =
     sgraph.ss.foldLeft[(Graph, Option[precepte.Sub])](Graph(Set.empty, Set.empty) -> None) {
       case ((g, None), s@Simple(id, value)) =>
         append(g, s) -> None
@@ -70,7 +70,7 @@ case class SGraph(ss: Vector[SGraph.Step]) {
   def >>>:(s: SGraph.Step) = SGraph(s +: ss)
   override def toString = s"Graph(${ss.mkString(" >> ")})"
 
-  final def toGraph = SGraph.toGraph(this)._1
+  final def graph = SGraph.toGraph(this)._1
 }
 
 /** The state gathering all data concerning current execution context */
@@ -90,21 +90,21 @@ trait Node {
   def viz: String
 }
 case class Leaf(id: String, value: String) extends Node {
-  def viz = s"""$id [label = "$value"]"""
+  def viz = s""""$id" [label = "$value"]"""
 }
 case class Sub(id: String, value: String, graph: Graph) extends Node {
   private def nodesG =
     graph.nodes.map(_.viz).mkString("\n")
 
   def viz = s"""
-    |subgraph $id {
+    |subgraph cluster_$id {
     |  label = "$value"
     |  $nodesG
     |}
   """.stripMargin
 }
 case class Edge(from: String, to: String) {
-  def viz = s"$from -> $to"
+  def viz = s""""$from" -> "$to"""" // "
 }
 case class Graph(nodes: Set[Node], edges: Set[Edge]) {
   private def allEdges: Seq[Edge] =

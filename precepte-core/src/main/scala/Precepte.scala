@@ -159,8 +159,10 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             PState[Ta, ManagedState, UnmanagedState](m, f(u))
           }
           Step(st, tags)
-        case Apply(pa, pf) => ???
-        case f@Flatmap(sub, next) => ???
+        case Apply(pa, pf) =>
+          Apply(pa.umap(f), pf.umap(f))
+        case fl@Flatmap(sub, next) =>
+          Flatmap(sub, (x: fl._I) => next(x).umap(f))
       }
 
 
@@ -186,8 +188,9 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
                 }
                 val pre1 =
                   pre.sgraph.umap { case (u1, g1) =>
-                    (u1, g0 >>> g1 >> SGraph.Up)
+                    (u1, g1 >> SGraph.Up)
                   }
+
                 PState[Ta, ManagedState, (UnmanagedState, SGraph)](m0, (u0, g)) -> pre1
               }
             }
