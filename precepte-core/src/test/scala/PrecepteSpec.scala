@@ -481,9 +481,21 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val (sx, _) = px.sgraph.run(nostate2).futureValue
     println(sx.unmanaged._2.graph.viz)
 
-    val psubap = P(tags("sub"))((p1 |@| p2 |@| p3).tupled)
+    println("=== psubap ===")
+    // val psubap = P(tags("sub"))((p1 |@| p2).tupled)
+    val psubap = P(tags("sub"))(p1.map(identity))
     val (ssubap, _) = psubap.sgraph.run(nostate2).futureValue
+    println(ssubap.unmanaged._2)
     println(ssubap.unmanaged._2.graph.viz)
+
+    println("=== psubap2 ===")
+    val (ssubap2, _) =
+      p8
+        .sgraph2(SGraph.Zero)
+        .eval(nostate)
+        .futureValue
+    println(ssubap2)
+    println(ssubap2.graph.viz)
 
     1 should ===(1)
   }
