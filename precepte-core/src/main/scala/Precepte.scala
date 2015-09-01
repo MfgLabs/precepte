@@ -165,34 +165,33 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           Flatmap(sub, (x: fl._I) => next(x).umap(f))
       }
 
-    final def sgraph2(g0: SGraph)(
+    final def graph(g0: Graph)(
       implicit
         M: Monad[F],
         upd: PStateUpdater[Ta, ManagedState, UnmanagedState],
         nod: ToNode[S],
         S: Semigroup[UnmanagedState]
-    ): Precepte[Ta, ManagedState, UnmanagedState, F, (SGraph, A)] =
+    ): Precepte[Ta, ManagedState, UnmanagedState, F, (Graph, A)] =
       this match {
         case Return(a) =>
           Return(g0 -> a)
         case Step(st0, tags) =>
-          val st2: IndexedStateT[F, PState[Ta,ManagedState,UnmanagedState], PState[Ta,ManagedState,UnmanagedState], Precepte[Ta,ManagedState, UnmanagedState,F, (SGraph, A)]] =
+          val st2: IndexedStateT[F, PState[Ta,ManagedState,UnmanagedState], PState[Ta,ManagedState,UnmanagedState], Precepte[Ta,ManagedState, UnmanagedState,F, (Graph, A)]] =
             IndexedStateT { (p: PState[Ta, ManagedState, UnmanagedState]) =>
               for {
                 _pag <- st0.run(p)
                 (s2, pre) = _pag
               } yield {
                 val node = nod.toNode(p)
-                val p2: Precepte[Ta, ManagedState, UnmanagedState, F, (SGraph, A)] =
+                val p2: Precepte[Ta, ManagedState, UnmanagedState, F, (Graph, A)] =
                   pre match {
                     case Return(a) =>
-                      val n = g0 >> SGraph.Simple(node.id, node.value)
+                      val n = g0 + Leaf(node.id, node.value)
                       Return(n -> a)
                     case _ =>
-                      val parent = g0 >> SGraph.Sub(node.id, node.value)
-                      pre.sgraph2(parent)
+                      pre.graph(Graph.empty)
                         .map { case (g1, a) =>
-                          val g = g1 >> SGraph.Up
+                          val g = g0 + Sub(node.id, node.value, g1)
                           g -> a
                         }
                   }
@@ -201,55 +200,17 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             }
           Step(st2, tags)
         case ap@Apply(pa, pf) =>
-          Apply(pa.sgraph2(SGraph.Zero), pf.sgraph2(SGraph.Zero).map { case (g2, fab) =>
-            def f(bg: (SGraph, ap._A)) = {
+          Apply(pa.graph(Graph.empty), pf.graph(Graph.empty).map { case (g2, fab) =>
+            def f(bg: (Graph, ap._A)) = {
               val g1 = bg._1
               val a = bg._2
-              (g0 >> SGraph.Branch(g1, g2)) -> fab(a)
+              g0.addBranches(g1, g2) -> fab(a)
             }
             f _
           })
         case f@Flatmap(sub, next) =>
-          def next2(gi: (SGraph, f._I)) = next(gi._2).sgraph2(gi._1)
-          Flatmap(() => sub().sgraph2(g0), next2)
-      }
-
-    final def sgraph(implicit F: Functor[F], nod: ToNode[S]): Precepte[Ta, ManagedState, (UnmanagedState, SGraph), F, A] =
-      this match {
-        case Return(a) =>
-          Return(a)
-        case Step(st0, tags) =>
-          val st2 =
-            IndexedStateT { (p: PState[Ta, ManagedState, (UnmanagedState, SGraph)]) =>
-              val PState(m0, (u0, g0)) = p
-              val p0 = PState[Ta, ManagedState, UnmanagedState](m0, u0)
-              for {
-                _up <- st0.run(p0)
-                (u1, pre) = _up
-              } yield {
-                val node = nod.toNode(p0)
-                println("pre: " + pre)
-                val g = pre match {
-                  case Return(_) =>
-                    g0 >> SGraph.Simple(node.id, node.value)
-                  case ggg =>
-                    println("ggg: " + ggg)
-                    g0 >> SGraph.Sub(node.id, node.value)
-                }
-
-                val pre1 =
-                  pre.sgraph.umap { case (u1, g1) =>
-                    (u1, g1 >> SGraph.Up)
-                  }
-
-                PState[Ta, ManagedState, (UnmanagedState, SGraph)](m0, (u0, g)) -> pre1
-              }
-            }
-          Step(st2, tags)
-        case Apply(pa, pf) =>
-          Apply(pa.sgraph, pf.sgraph)
-        case f@Flatmap(sub, next) =>
-          Flatmap(() => sub().sgraph, (x: f._I) => next(x).sgraph)
+          def next2(gi: (Graph, f._I)) = next(gi._2).graph(gi._1)
+          Flatmap(() => sub().graph(g0), next2)
       }
 
     final def observe[T](state: S)(

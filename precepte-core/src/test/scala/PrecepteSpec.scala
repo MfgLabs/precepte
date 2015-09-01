@@ -418,41 +418,28 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val (_, _, graph) = p9.observe(nostate).futureValue
     println(graph.viz)
 
-    // the following demonstrates a situation where you'd be screwed with observe.
-    // The introduction of an intermediate function would loose the underlying graph.
-    // Making the graph a part of the unmanaged state let's you pass it around.
-    implicit def semiSGraph[U](implicit S: scalaz.Semigroup[U]) =
-      new scalaz.Semigroup[(U, SGraph)] {
-        def append(f1: (U, SGraph), f2: => (U, SGraph)) = {
-          val u = S.append(f1._1, f2._1)
-          val g = SGraph.Zero >> SGraph.Branch(f1._2, f2._2)
-          (u, g)
-        }
-      }
-
-    def nostate2 = ST(Span.gen, env, Vector.empty, (0, SGraph.Zero))
     val (s, _) =
-      P(tags("subzero")).applyU { (s: ST[(Int, SGraph)]) =>
-        p4.sgraph.run(s).map { case (PState(managed, (u, g)), a) =>
+      P(tags("subzero")) { (s: ST[Int]) =>
+        p4.graph(Graph.empty).eval(s).map { case (g, a) =>
           val value = s.managed.path.last.tags.callee.value
           val id = value + "_" + s.managed.path.last.id.value
-          val g1 = SGraph(Vector(SGraph.Sub(id, value))) >>> g >> SGraph.Up
-          ((u, g1), a)
+          val g1 = Graph.empty + Sub(id, value, g)
+          (g1, a)
         }
-      }.run(nostate2).futureValue
+      }.eval(nostate).futureValue
 
     println("=== s ===")
-    println(s.unmanaged._2)
-    println(s.unmanaged._2.graph.viz)
+    println(s)
+    println(s.viz)
 
     println("=== (p1 |@| p2) ===")
-    val (s1, _) = (p1 |@| p2).tupled.sgraph.run(nostate2).futureValue
-    println(s1.unmanaged._2.graph.viz)
+    val (s1, _) = (p1 |@| p2).tupled.graph(Graph.empty).eval(nostate).futureValue
+    println(s1.viz)
 
     println("=== s2 ===")
-    val (s2, _) = P(tags("sub"))(p4.flatMap(_ => p1)).sgraph.run(nostate2).futureValue
-    println(s2.unmanaged._2)
-    println(s2.unmanaged._2.graph.viz)
+    val (s2, _) = P(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
+    println(s2)
+    println(s2.viz)
 
     println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
     val ptest =
@@ -460,8 +447,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         _ <- (p1 |@| p2 |@| p3).tupled
         _ <- p4
       } yield ()
-    val (s3, _) = ptest.sgraph.run(nostate2).futureValue
-    println(s3.unmanaged._2.graph.viz)
+    val (s3, _) = ptest.graph(Graph.empty).eval(nostate).futureValue
+    println(s3.viz)
 
     println("=== pX ===")
    val px =
@@ -470,32 +457,26 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       _ <- (p1 |@| p2 |@| p3).tupled
       _ <- P(tags("sub"))(p4)
       _ <- p5
-      // _ <- P(tags("sub2"))(for {
-      //     _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
-      //     _ <- p6
-      //     _ <- (p4 |@| p5 |@| P(tags("sub3"))(p6)).tupled
-      //     _ <- p7
-      //   } yield ())
     } yield ()
 
-    val (sx, _) = px.sgraph.run(nostate2).futureValue
-    println(sx.unmanaged._2.graph.viz)
+    val (sx, _) = px.graph(Graph.empty).eval(nostate).futureValue
+    println(sx.viz)
 
     println("=== psubap ===")
     // val psubap = P(tags("sub"))((p1 |@| p2).tupled)
     val psubap = P(tags("sub"))(p1.map(identity))
-    val (ssubap, _) = psubap.sgraph.run(nostate2).futureValue
-    println(ssubap.unmanaged._2)
-    println(ssubap.unmanaged._2.graph.viz)
+    val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
+    println(ssubap)
+    println(ssubap.viz)
 
     println("=== psubap2 ===")
     val (ssubap2, _) =
       p8
-        .sgraph2(SGraph.Zero)
+        .graph(Graph.empty)
         .eval(nostate)
         .futureValue
     println(ssubap2)
-    println(ssubap2.graph.viz)
+    println(ssubap2.viz)
 
     1 should ===(1)
   }
