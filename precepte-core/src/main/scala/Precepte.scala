@@ -149,22 +149,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
 
-
-    private def umap(f: UnmanagedState => UnmanagedState)(implicit F: Functor[F]): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
-      this match {
-        case Return(a) =>
-          Return(a)
-        case Step(st0, tags) =>
-          val st = st0.imap { case PState(m, u) =>
-            PState[Ta, ManagedState, UnmanagedState](m, f(u))
-          }
-          Step(st, tags)
-        case Apply(pa, pf) =>
-          Apply(pa.umap(f), pf.umap(f))
-        case fl@Flatmap(sub, next) =>
-          Flatmap(sub, (x: fl._I) => next(x).umap(f))
-      }
-
     final def graph(g0: Graph)(
       implicit
         M: Monad[F],
