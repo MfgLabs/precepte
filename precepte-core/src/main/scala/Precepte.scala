@@ -267,47 +267,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             }
             f _
           })
-
-        /*
-        case Return(a) =>
-          Return(g0 -> a)
-        case Step(st0, tags) =>
-          val st2: IndexedStateT[F, PState[Ta,ManagedState,UnmanagedState], PState[Ta,ManagedState,UnmanagedState], Precepte[Ta,ManagedState, UnmanagedState,F, (Graph, A)]] =
-            IndexedStateT { (p: PState[Ta, ManagedState, UnmanagedState]) =>
-              for {
-                _pag <- st0.run(p)
-                (s2, pre) = _pag
-              } yield {
-                val node = nod.toNode(p)
-                val p2: Precepte[Ta, ManagedState, UnmanagedState, F, (Graph, A)] =
-                  pre match {
-                    case Return(a) =>
-                      val n = g0 + Leaf(node.id, node.value)
-                      Return(n -> a)
-                    case _ =>
-                      pre.graph(Graph.empty)
-                        .map { case (g1, a) =>
-                          val g = g0 + Sub(node.id, node.value, g1)
-                          g -> a
-                        }
-                  }
-                s2 -> p2
-              }
-            }
-          Step(st2, tags)
-        case ap@Apply(pa, pf) =>
-          Apply(pa.graph(Graph.empty), pf.graph(Graph.empty).map { case (g2, fab) =>
-            def f(bg: (Graph, ap._A)) = {
-              val g1 = bg._1
-              val a = bg._2
-              g0.addBranches(g1, g2) -> fab(a)
-            }
-            f _
-          })
-        case f@Flatmap(sub, next) =>
-          def next2(gi: (Graph, f._I)) = next(gi._2).graph(gi._1)
-          Flatmap(() => sub().graph(g0), next2)
-        */
       }
 
   }
