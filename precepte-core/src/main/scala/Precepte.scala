@@ -74,13 +74,15 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case Apply(pa, pf) =>
         ApplyStep(pa, pf, (a: A) => Return(a))
 
-      case SubStep(p, _) =>
-        p.resume(idx)(state)
+      case SubStep(p, tags) =>
+        val state0 = upd.appendTags(state, tags, idx)
+        p.resume(idx)(state0)
 
       case mf@Map(sub, pf) =>
         sub match {
-          case SubStep(sub, _) =>
-            sub.map(pf).resume(idx)(state)
+          case SubStep(sub, tags) =>
+            val state0 = upd.appendTags(state, tags, idx)
+            sub.map(pf).resume(idx)(state0)
 
           case Return(a) =>
             ReturnStep(pf(a), state)
@@ -110,8 +112,9 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           case Return(a) =>
             next(a).resume(idx)(state)
 
-          case SubStep(sub0, _) =>
-            sub0.flatMap(next).resume(idx)(state)
+          case SubStep(sub0, tags) =>
+            val state0 = upd.appendTags(state, tags, idx)
+            sub0.flatMap(next).resume(idx)(state0)
 
           case Suspend(fa) =>
             FMStep(fa.map(a => state -> a), next)
