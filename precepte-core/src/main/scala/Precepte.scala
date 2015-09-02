@@ -74,12 +74,12 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case Apply(pa, pf) =>
         ApplyStep(pa, pf, (a: A) => Return(a))
 
-      case SubStep(p, st) =>
+      case SubStep(p, _) =>
         p.resume(idx)(state)
 
       case mf@Map(sub, pf) =>
         sub match {
-          case SubStep(sub, st) =>
+          case SubStep(sub, _) =>
             sub.map(pf).resume(idx)(state)
 
           case Return(a) =>
@@ -110,7 +110,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           case Return(a) =>
             next(a).resume(idx)(state)
 
-          case SubStep(sub0, st) =>
+          case SubStep(sub0, _) =>
             sub0.flatMap(next).resume(idx)(state)
 
           case Suspend(fa) =>
@@ -226,10 +226,15 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case Suspend(fa) =>
           Suspend(fa.map(g0 -> _))
 
-        case SubStep(sub, st) =>
-          val node = nod.toNode(st)
-          sub.graph(Graph.empty).map { case (g, a) =>
-            (g0 + Sub(node.id, node.value, g)) -> a
+        case SubStep(sub, tags) =>
+          Precepte(tags){(s0: S) =>
+            for {
+              _ga <- sub.graph(Graph.empty).eval(s0)
+              (g, a) = _ga
+            } yield {
+              val node = nod.toNode(s0)
+              (g0 + Sub(node.id, node.value, g), a)
+            }
           }
 
         case sm@StepMap(fst, fmap, tags)  =>
@@ -318,7 +323,7 @@ private [precepte] case class Map[Ta, ManagedState, UnmanagedState, F[_], I, A](
 
 private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
   sub: Precepte[Ta, ManagedState, UnmanagedState, F, A],
-  st: Precepte[Ta, ManagedState, UnmanagedState, F, A]#S
+  tags: Ta
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 
 /* A Step followed by a Map (mixes Step + Coyoneda) */
@@ -396,10 +401,8 @@ trait LowPriorityManagedStatetances {
 
       // Suspends a Precepte in the concept of a Step
       // The other coyoneda trick
-      def apply[M, U, F[_], A](m: => Precepte[Ta, M, U, F, A])(implicit ap: Applicative[F]): Precepte[Ta, M, U, F, A] =
-        apply { (st: Precepte[Ta, M, U, F, A]#S) =>
-          ap.point(m)
-        }.flatMap(identity)
+      def apply[M, U, F[_], A](m: => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
+        SubStep(m, tags)
 
       def liftF[M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
         Suspend(fa)
