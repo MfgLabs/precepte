@@ -24,9 +24,10 @@ trait Node {
   def viz: String
 }
 case class Leaf(id: String, value: String) extends Node {
-  def viz = s"""$id [label = "$value"]"""
+  def viz = s""""$id" [label = "$value"]"""
 }
-case class Sub(id: String, value: String, graph: Graph) extends Node {
+
+class Sub private (val id: String, val value: String, val graph: Graph) extends Node {
   private def nodesG =
     graph.nodes.map(_.viz).mkString("\n")
 
@@ -36,16 +37,62 @@ case class Sub(id: String, value: String, graph: Graph) extends Node {
     |  $nodesG
     |}
   """.stripMargin
+
+  override def toString = s"Sub($id, $value, $graph)"
 }
+
+object Sub {
+  def apply(id: String, value: String, graph: Graph) =
+    new Sub("cluster_" + id, value, graph)
+  def unapply(g: Sub) = Option((g.id, g.value, g.graph))
+}
+
 case class Edge(from: String, to: String) {
-  def viz = s"$from -> $to"
+  def viz = s""""$from" -> "$to"""" // "
 }
+
+object Graph {
+  val empty = Graph(Set.empty, Set.empty)
+}
+
 case class Graph(nodes: Set[Node], edges: Set[Edge]) {
   private def allEdges: Seq[Edge] =
     edges.toSeq ++ nodes.flatMap {
       case Sub(_, _, g) => g.allEdges
       case _ => Seq.empty
     }
+
+  def +(n: Node) = n match {
+    case Sub(id, value, g) =>
+      val ns = nodes + n
+      val es = edges ++
+        (for {
+          c <- children
+          p <- g.parents
+        } yield Edge(c.id, p.id))
+      Graph(ns, es)
+    case _ =>
+      val ns = nodes + n
+      val es = edges ++ (for { c <- children } yield Edge(c.id, n.id))
+      Graph(ns, es)
+  }
+
+  def addBranches(gs: Graph*) = {
+    val es =
+      edges ++
+        (for {
+          c <- children
+          g <- gs
+          p <- g.parents
+        } yield Edge(c.id, p.id))
+    val ns =
+      nodes ++
+        (for {
+          g <- gs
+          n <- g.nodes
+        } yield n)
+    Graph(ns, es)
+  }
 
   private def allEdgesG = allEdges.map(_.viz).mkString("\n  ")
   private def allNodesG = nodes.map(_.viz).mkString("\n  ")

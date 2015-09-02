@@ -395,23 +395,88 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     val p6: P[Int] = P(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
     val p7: P[Int] = P(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
 
-    val p8 = 
+
+    val p8 =
       for {
       _ <- p0
-      // _ <- (p1 |@| p2 |@| p3).tupled
+      _ <- (p1 |@| p2 |@| p3).tupled
       _ <- P(tags("sub"))(p4)
       _ <- p5
-      // _ <- P(tags("sub2"))(for {
-      //     _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
-      //     _ <- p6
-      //     _ <- (p4 |@| p5 |@| P(tags("sub3"))(p6)).tupled
-      //     _ <- p7
-      //   } yield ())
+      _ <- P(tags("sub2"))(for {
+          _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
+          _ <- p6
+          _ <- (p4 |@| p5 |@| P(tags("sub3"))(p6)).tupled
+          _ <- p7
+        } yield ())
     } yield ()
 
-    // val (_, _, graph) = p8.observe(nostate).futureValue
+    val (s, _) =
+      P(tags("subzero")) { (s: ST[Int]) =>
+        p4.graph(Graph.empty).eval(s).map { case (g, a) =>
+          val value = s.managed.path.last.tags.callee.value
+          val id = value + "_" + s.managed.path.last.id.value
+          val g1 = Graph.empty + Sub(id, value, g)
+          (g1, a)
+        }
+      }.eval(nostate).futureValue
 
-    // println(graph.viz)
+    println("=== s ===")
+    println(s)
+    println(s.viz)
+
+    println("=== (p1 |@| p2) ===")
+    val (s1, _) = (p1 |@| p2).tupled.graph(Graph.empty).eval(nostate).futureValue
+    println(s1.viz)
+
+    println("=== s2 ===")
+    val (s2, _) = P(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
+    println(s2)
+    println(s2.viz)
+
+    println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
+    val ptest =
+      for {
+        _ <- (p1 |@| p2 |@| p3).tupled
+        _ <- p4
+      } yield ()
+    val (s3, _) = ptest.graph(Graph.empty).eval(nostate).futureValue
+    println(s3.viz)
+
+    println("=== pX ===")
+   val px =
+      for {
+      _ <- p0
+      _ <- (p1 |@| p2 |@| p3).tupled
+      _ <- P(tags("sub"))(p4)
+      _ <- p5
+    } yield ()
+
+    val (sx, _) = px.graph(Graph.empty).eval(nostate).futureValue
+    println(sx.viz)
+
+    println("=== psubap ===")
+    // val psubap = P(tags("sub"))((p1 |@| p2).tupled)
+    val psubap = P(tags("sub"))(p1.map(identity))
+    val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
+    println(ssubap)
+    println(ssubap.viz)
+
+    println("=== psubap2 ===")
+    val (ssubap2, _) =
+      p8
+        .graph(Graph.empty)
+        .eval(nostate)
+        .futureValue
+    println(ssubap2)
+    println(ssubap2.viz)
+
+    println("=== simple ===")
+    println(p1)
+    println(P(tags("sub"))(p1))
+    val (sp1, _) =
+      p1.graph(Graph.empty).eval(nostate).futureValue
+    println(sp1)
+    println(sp1.viz)
 
     1 should ===(1)
   }

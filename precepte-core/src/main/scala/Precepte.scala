@@ -202,6 +202,91 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
     final def eval(state: S)(implicit mo: Monad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: Semigroup[UnmanagedState]): F[A] =
       run(state).map(_._2)
+
+    final def graph(g0: Graph)(
+      implicit
+        M: Monad[F],
+        upd: PStateUpdater[Ta, ManagedState, UnmanagedState],
+        nod: ToNode[S],
+        S: Semigroup[UnmanagedState]
+    ): Precepte[Ta, ManagedState, UnmanagedState, F, (Graph, A)] =
+      this match {
+        case Return(a) =>
+          Return(g0 -> a)
+
+        case Suspend(fa) =>
+          Suspend(fa.map(g0 -> _))
+
+        case sm@StepMap(fst, fmap, tags) =>
+          // ???
+          val fmap2 = (s: S, i: sm._I) => {
+            val node = nod.toNode(s)
+            val g = g0 + Leaf(node.id, node.value)
+            val (s2, a) = fmap(s, i)
+            (s2, (g, a))
+          }
+          StepMap(fst, fmap2, tags)
+
+        case m@Map(sub2, f2) =>
+          def f3(gi: (Graph, m._I)) = (gi._1, f2(gi._2))
+          Map(sub2.graph(g0), f3 _)
+
+        case f@Flatmap(sub, next) =>
+          def next2(gi: (Graph, f._I)) = next(gi._2).graph(gi._1)
+          Flatmap(sub.graph(g0), next2)
+
+        case ap@Apply(pa, pfa) =>
+          Apply(pa.graph(Graph.empty), pfa.graph(Graph.empty).map { case (g2, fab) =>
+            def f(bg: (Graph, ap._A)) = {
+              val g1 = bg._1
+              val a = bg._2
+              g0.addBranches(g1, g2) -> fab(a)
+            }
+            f _
+          })
+
+        /*
+        case Return(a) =>
+          Return(g0 -> a)
+        case Step(st0, tags) =>
+          val st2: IndexedStateT[F, PState[Ta,ManagedState,UnmanagedState], PState[Ta,ManagedState,UnmanagedState], Precepte[Ta,ManagedState, UnmanagedState,F, (Graph, A)]] =
+            IndexedStateT { (p: PState[Ta, ManagedState, UnmanagedState]) =>
+              for {
+                _pag <- st0.run(p)
+                (s2, pre) = _pag
+              } yield {
+                val node = nod.toNode(p)
+                val p2: Precepte[Ta, ManagedState, UnmanagedState, F, (Graph, A)] =
+                  pre match {
+                    case Return(a) =>
+                      val n = g0 + Leaf(node.id, node.value)
+                      Return(n -> a)
+                    case _ =>
+                      pre.graph(Graph.empty)
+                        .map { case (g1, a) =>
+                          val g = g0 + Sub(node.id, node.value, g1)
+                          g -> a
+                        }
+                  }
+                s2 -> p2
+              }
+            }
+          Step(st2, tags)
+        case ap@Apply(pa, pf) =>
+          Apply(pa.graph(Graph.empty), pf.graph(Graph.empty).map { case (g2, fab) =>
+            def f(bg: (Graph, ap._A)) = {
+              val g1 = bg._1
+              val a = bg._2
+              g0.addBranches(g1, g2) -> fab(a)
+            }
+            f _
+          })
+        case f@Flatmap(sub, next) =>
+          def next2(gi: (Graph, f._I)) = next(gi._2).graph(gi._1)
+          Flatmap(() => sub().graph(g0), next2)
+        */
+      }
+
   }
 
 
@@ -221,7 +306,9 @@ private [precepte] case class StepMap[Ta, ManagedState, UnmanagedState, F[_], I,
   st: Precepte[Ta, ManagedState, UnmanagedState, F, A]#S => F[I]
 , map: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, I) => (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)
 , tags: Ta
-) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
+) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
+  type _I = I
+}
 
 private [precepte] case class Flatmap[Ta, ManagedState, UnmanagedState, F[_], I, A](
   sub: Precepte[Ta, ManagedState, UnmanagedState, F, I]
@@ -294,7 +381,6 @@ trait LowPriorityManagedStatetances {
 
       def liftF[M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
         Suspend(fa)
-
     }
 
     def apply[Ta](_tags: Ta) =
