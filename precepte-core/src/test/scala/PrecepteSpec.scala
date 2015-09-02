@@ -471,10 +471,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     println(ssubap2.viz)
 
     println("=== simple ===")
-    println(p1)
-    println(P(tags("sub"))(p1))
     val (sp1, _) =
-      p1.graph(Graph.empty).eval(nostate).futureValue
+      P(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
     println(sp1)
     println(sp1.viz)
 
