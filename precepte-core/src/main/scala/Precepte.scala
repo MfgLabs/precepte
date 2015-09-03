@@ -18,8 +18,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     Flatmap[Ta, ManagedState, UnmanagedState, F, A, B](self, f)
 
   final def map[B](f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-    Map(this, f)
-    // flatMap(a => Return(f(a)))
+    SMap(this, f)
 
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[Ta, ManagedState, UnmanagedState, F, AP[A]] =
     map(a => ap.point(a))
@@ -36,7 +35,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     ): Precepte[Ta, ManagedState, UnmanagedState, F, D] = p match {
       case Return(a) => f(a)
 
-      case fm@Map(sub, pf) =>
+      case fm@SMap(sub, pf) =>
         if(d < maxDepth) {
           step(sub, (a: fm._I) => f(pf(a)), d + 1)
         } else {
@@ -79,7 +78,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         val state0 = upd.appendTags(state, tags, idx)
         p.resume(idx)(state0)
 
-      case mf@Map(sub, pf) =>
+      case mf@SMap(sub, pf) =>
         sub match {
           case SubStep(sub, tags) =>
             val state0 = upd.appendTags(state, tags, idx)
@@ -98,7 +97,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               s1 -> pf(a1)
             })
 
-          case Map(sub2, pf2) =>
+          case SMap(sub2, pf2) =>
             MapFusionStep(sub2, pf2, pf, state)
 
           case f@Flatmap(sub2, next2) =>
@@ -128,7 +127,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               s1 -> a1
             }, next)
 
-          case Map(sub2, f2) =>
+          case SMap(sub2, f2) =>
             sub2.fastFlatMap(z => next(f2(z))).resume(idx)(state)
 
           case f@Flatmap(sub2, next2) =>
@@ -250,9 +249,9 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           }
           StepMap(fst, fmap2, tags)
 
-        case m@Map(sub2, f2) =>
+        case m@SMap(sub2, f2) =>
           def f3(gi: (Graph, m._I)) = (gi._1, f2(gi._2))
-          Map(sub2.graph(g0), f3 _)
+          SMap(sub2.graph(g0), f3 _)
 
         case f@Flatmap(sub, next) =>
           def next2(gi: (Graph, f._I)) = next(gi._2).graph(gi._1)
@@ -277,7 +276,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 private [precepte] case class Return[Ta, ManagedState, UnmanagedState, F[_], A](a: A) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 private [precepte] case class Suspend[Ta, ManagedState, UnmanagedState, F[_], A](a: F[A]) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 
-private [precepte] case class Map[Ta, ManagedState, UnmanagedState, F[_], I, A](
+// a map. Renamed to SMap to avoid conflicts with collection.Map
+private [precepte] case class SMap[Ta, ManagedState, UnmanagedState, F[_], I, A](
   sub: Precepte[Ta, ManagedState, UnmanagedState, F, I]
 , next: I => A
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
