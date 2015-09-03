@@ -18,7 +18,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     Flatmap[Ta, ManagedState, UnmanagedState, F, A, B](self, f)
 
   final def map[B](f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-    flatMap(a => Return(f(a)))
+    Map(this, f)
+    // flatMap(a => Return(f(a)))
 
   def lift[AP[_]](implicit ap: Applicative[AP], fu: Functor[F]): Precepte[Ta, ManagedState, UnmanagedState, F, AP[A]] =
     map(a => ap.point(a))
