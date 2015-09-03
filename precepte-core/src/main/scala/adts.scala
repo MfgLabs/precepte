@@ -32,7 +32,7 @@ class Sub private (val id: String, val value: String, val graph: Graph) extends 
     graph.nodes.map(_.viz).mkString("\n")
 
   def viz = s"""
-    |subgraph $id {
+    |subgraph "$id" {
     |  label = "$value"
     |  $nodesG
     |}
