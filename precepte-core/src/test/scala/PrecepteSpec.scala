@@ -421,7 +421,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       }.eval(nostate).futureValue
 
     println("=== s ===")
-    println(s)
     println(s.viz)
 
     println("=== (p1 |@| p2) ===")
@@ -430,7 +429,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     println("=== s2 ===")
     val (s2, _) = P(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
-    println(s2)
     println(s2.viz)
 
     println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
@@ -458,7 +456,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     // val psubap = P(tags("sub"))((p1 |@| p2).tupled)
     val psubap = P(tags("sub"))(p1.map(identity))
     val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
-    println(ssubap)
     println(ssubap.viz)
 
     println("=== psubap2 ===")
@@ -467,13 +464,11 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         .graph(Graph.empty)
         .eval(nostate)
         .futureValue
-    println(ssubap2)
     println(ssubap2.viz)
 
     println("=== simple ===")
     val (sp1, _) =
       P(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
-    println(sp1)
     println(sp1.viz)
 
     1 should ===(1)
