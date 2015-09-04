@@ -282,7 +282,7 @@ private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I,
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
   type _I = I
 
-  private[precepte] def toStepMap
+  @inline private[precepte] def toStepMap
     (implicit
       fu: Monad[F],
       upd: PStateUpdater[Ta, ManagedState, UnmanagedState],
