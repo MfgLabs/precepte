@@ -1,3 +1,19 @@
+/*
+Copyright 2015 Mfg labs.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package com.mfglabs
 package precepte
 
@@ -52,7 +68,6 @@ class CostSpec extends FlatSpec with ScalaFutures {
     (aft - bef) / 1000000.0
   }
 
-/*
   "Precepte" should "run/eval simple" in {
 
     def res(i: Int): Future[Int] = for {
@@ -66,12 +81,11 @@ class CostSpec extends FlatSpec with ScalaFutures {
     val ms2 = timeMs(res(100000))
     println(s"Future(100000) -> duration: $ms2 ms")
 
-    val ms3 = timeMs(res(10000000))
-    println(s"Future(1000000) -> duration: $ms3 ms")
+    val ms3 = timeMs(res(1000000))
+    println(s"Future(100000) -> duration: $ms3 ms")
 
   }
 
-*/
 
   "Precepte" should "run/eval pre" in {
 
@@ -86,10 +100,10 @@ class CostSpec extends FlatSpec with ScalaFutures {
     val ms = timeMs(res(10000).eval(nostate))    
     println(s"Pre(10000) -> duration: $ms ms")
 
-    // val ms2 = timeMs(res(100000).eval(nostate))
-    // println(s"Pre(100000) -> duration: $ms2 ms")
+    val ms2 = timeMs(res(100000).eval(nostate))
+    println(s"Pre(100000) -> duration: $ms2 ms")
 
-    val ms3 = timeMs(res(5000000).eval(nostate))
+    val ms3 = timeMs(res(1000000).eval(nostate))
     println(s"Pre(1000000) -> duration: $ms3 ms")
   }
 }
