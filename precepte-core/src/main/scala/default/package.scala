@@ -28,7 +28,7 @@ package object default {
 
   type ST[C] = PState[BaseTags, MS, C]
 
-  type Pre[F[_], C, A] = Precepte[BaseTags, MS, C, F, A]
+  type DefaultPre[F[_], C, A] = Precepte[BaseTags, MS, C, F, A]
 
   object ST {
     def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): ST[C] =
@@ -62,4 +62,5 @@ package object default {
       Leaf(id, s.managed.path.last.tags.callee.value)
     }
   }
+
 }

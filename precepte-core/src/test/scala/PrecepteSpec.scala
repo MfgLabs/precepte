@@ -41,11 +41,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   import default._
 
-  type P[A] = Pre[Future, Unit, A]
+  type Pre[A] = DefaultPre[Future, Unit, A]
 
-  object P {
-    def apply[A](tags: BaseTags) = Precepte[BaseTags](tags)
-  }
+  // object P {
+  //   def apply[A](tags: BaseTags) = Precepte[BaseTags](tags)
+  // }
+
+  object Pre extends DefaultPreBuilder[Future, Unit, Pre]
 
   val env = BaseEnv(Host("localhost"), Environment.Test, Version("1.0"))
 
@@ -60,8 +62,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
 
   "Precepte" should "run/eval simple" in {
-    def f1 = P(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
-    def f2(i: Int) = P(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
+    def f1 = Pre(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
+    def f2(i: Int) = Pre(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
 
     val res = for {
       i <- f1
@@ -84,18 +86,18 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   it should "observe simple" in {
     def f1 =
-      P(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
-        .flatMap(a => P(tags("simple.f1.1")){(_: ST[Unit]) => (a+1).point[Future]})
-        .flatMap(a => P(tags("simple.f1.2")){(_: ST[Unit]) => (a+1).point[Future]})
-        .flatMap(a => P(tags("simple.f1.3")){(_: ST[Unit]) => (a+1).point[Future]})
+      Pre(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
+        .flatMap(a => Pre(tags("simple.f1.1")){(_: ST[Unit]) => (a+1).point[Future]})
+        .flatMap(a => Pre(tags("simple.f1.2")){(_: ST[Unit]) => (a+1).point[Future]})
+        .flatMap(a => Pre(tags("simple.f1.3")){(_: ST[Unit]) => (a+1).point[Future]})
     def f2(i: Int) =
-      P(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
-        .flatMap(a => P(tags("simple.f2.1")){(_: ST[Unit]) => s"$a.1".point[Future]})
-        .flatMap(a => P(tags("simple.f2.2")){(_: ST[Unit]) => s"$a.2".point[Future]})
+      Pre(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
+        .flatMap(a => Pre(tags("simple.f2.1")){(_: ST[Unit]) => s"$a.1".point[Future]})
+        .flatMap(a => Pre(tags("simple.f2.2")){(_: ST[Unit]) => s"$a.2".point[Future]})
     def f3(s: String) =
-      P(tags("simple.f3")){(_: ST[Unit]) => s"$s finito".point[Future]}
+      Pre(tags("simple.f3")){(_: ST[Unit]) => s"$s finito".point[Future]}
 
-    val res = P(tags("root")) {
+    val res = Pre(tags("root")) {
       for {
         i <- f1
         s <- f2(i)
@@ -117,9 +119,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
 
   it should "OptT" in {
-    val f1 = P(tags("opt"))((_: ST[Unit]) => Option("foo").point[Future])
-    val f2 = P(tags("opt"))((_: ST[Unit]) => Option(1).point[Future])
-    val f3 = P(tags("opt"))((_: ST[Unit]) => (None: Option[Int]).point[Future])
+    val f1 = Pre(tags("opt"))((_: ST[Unit]) => Option("foo").point[Future])
+    val f2 = Pre(tags("opt"))((_: ST[Unit]) => Option(1).point[Future])
+    val f3 = Pre(tags("opt"))((_: ST[Unit]) => (None: Option[Int]).point[Future])
 
 
     val res = for {
@@ -146,9 +148,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
 
   it should "ListT" in {
-    val f1 = P(tags("listT"))((_: ST[Unit]) => List("foo", "bar").point[Future])
-    val f2 = P(tags("listT"))((_: ST[Unit]) => List(1, 2).point[Future])
-    val f3 = P(tags("listT"))((_: ST[Unit]) => List[Int]().point[Future])
+    val f1 = Pre(tags("listT"))((_: ST[Unit]) => List("foo", "bar").point[Future])
+    val f2 = Pre(tags("listT"))((_: ST[Unit]) => List(1, 2).point[Future])
+    val f3 = Pre(tags("listT"))((_: ST[Unit]) => List[Int]().point[Future])
 
     val res = for {
       e1 <- trans(f1)
@@ -177,12 +179,12 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     import scalaz.{ \/ , \/-, -\/}
     import EitherT.eitherTFunctor
 
-    val f1: P[String \/ String] =
-      P(tags("f1"))(_ => \/-("foo").point[Future])
-    val f2: P[String \/ Int] =
-      P(tags("f2"))(_ => \/-(1).point[Future])
-    val f3: P[String \/ String] =
-      P(tags("f3"))(_ => -\/("Error").point[Future])
+    val f1: Pre[String \/ String] =
+      Pre(tags("f1"))(_ => \/-("foo").point[Future])
+    val f2: Pre[String \/ Int] =
+      Pre(tags("f2"))(_ => \/-(1).point[Future])
+    val f3: Pre[String \/ String] =
+      Pre(tags("f3"))(_ => -\/("Error").point[Future])
 
     type Foo[A] = EitherT[Future, String, A]
 
@@ -372,14 +374,14 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     import scalaz._
     import scala.language.implicitConversions
 
-    val f1 = Option(1).point[P]
+    val f1 = Option(1).point[Pre]
 
     optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
 
   }
 
   it should "not stack overflow" in {
-    def pre(l: List[Int], i: Int) = P(tags(s"stack_$i"))((_: ST[Unit]) => l.point[Future])
+    def pre(l: List[Int], i: Int) = Pre(tags(s"stack_$i"))((_: ST[Unit]) => l.point[Future])
 
     val l = List.iterate(0, 100000){ i => i + 1 }
 
@@ -401,33 +403,35 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     def nostate = ST(Span.gen, env, Vector.empty, 0)
 
-    type P[A] = Pre[Future, Int, A]
-    val p0: P[Int] = P(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
-    val p1: P[Int] = P(tags("p1")).applyU((s: ST[Int]) => Future(1 -> 1))
-    val p2: P[Int] = P(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
-    val p3: P[Int] = P(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
-    val p4: P[Int] = P(tags("p4")).applyU((s: ST[Int]) => Future(4 -> 4))
-    val p5: P[Int] = P(tags("p5")).applyU((s: ST[Int]) => Future(5 -> 5))
-    val p6: P[Int] = P(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
-    val p7: P[Int] = P(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
+    // type Pre[A] = DefaultPre[Future, Int, A]
 
+    // object Pre extends DefaultPreBuilder[Future, Int, Pre]
+
+    val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
+    val p1 = Precepte(tags("p1")).applyU((s: ST[Int]) => Future(1 -> 1))
+    val p2 = Precepte(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
+    val p3 = Precepte(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
+    val p4 = Precepte(tags("p4")).applyU((s: ST[Int]) => Future(4 -> 4))
+    val p5 = Precepte(tags("p5")).applyU((s: ST[Int]) => Future(5 -> 5))
+    val p6 = Precepte(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
+    val p7 = Precepte(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
 
     val p8 =
       for {
       _ <- p0
       _ <- (p1 |@| p2 |@| p3).tupled
-      _ <- P(tags("sub"))(p4)
+      _ <- Precepte(tags("sub"))(p4)
       _ <- p5
-      _ <- P(tags("sub2"))(for {
+      _ <- Precepte(tags("sub2"))(for {
           _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
           _ <- p6
-          _ <- (p4 |@| p5 |@| P(tags("sub3"))(p6)).tupled
+          _ <- (p4 |@| p5 |@| Precepte(tags("sub3"))(p6)).tupled
           _ <- p7
         } yield ())
     } yield ()
-
+    
     val (s, _) =
-      P(tags("subzero")) { (s: ST[Int]) =>
+      Precepte(tags("subzero")) { (s: ST[Int]) =>
         p4.graph(Graph.empty).eval(s).map { case (g, a) =>
           val value = s.managed.path.last.tags.callee.value
           val id = value + "_" + s.managed.path.last.id.value
@@ -444,7 +448,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     println(s1.viz)
 
     println("=== s2 ===")
-    val (s2, _) = P(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
+    val (s2, _) = Precepte(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
     println(s2.viz)
 
     println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
@@ -457,11 +461,11 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     println(s3.viz)
 
     println("=== pX ===")
-   val px =
+    val px =
       for {
       _ <- p0
       _ <- (p1 |@| p2 |@| p3).tupled
-      _ <- P(tags("sub"))(p4)
+      _ <- Precepte(tags("sub"))(p4)
       _ <- p5
     } yield ()
 
@@ -469,8 +473,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     println(sx.viz)
 
     println("=== psubap ===")
-    // val psubap = P(tags("sub"))((p1 |@| p2).tupled)
-    val psubap = P(tags("sub"))(p1.map(identity))
+    // val psubap = Pre(tags("sub"))((p1 |@| p2).tupled)
+    val psubap = Precepte(tags("sub"))(p1.map(identity))
     val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
     println(ssubap.viz)
 
@@ -484,7 +488,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
     println("=== simple ===")
     val (sp1, _) =
-      P(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
+      Precepte(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
     println(sp1.viz)
 
     1 should ===(1)

@@ -25,7 +25,7 @@ import com.mfglabs.precepte._
 
 package object precepte {
 
-  implicit def toUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
+  implicit def toTCUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
     implicit
       una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],
       nosi: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A0]
@@ -36,6 +36,15 @@ package object precepte {
     def TC = nosi.MTC
 
     def leibniz = nosi.leibniz
+  }
+
+  implicit def toClassicUnapply[M0[_[_]], Ta, MS, C, F[_], A0](implicit m: M0[({ type λ[α] = Precepte[Ta, MS, C, F, α] })#λ]) = new Unapply[M0, Precepte[Ta, MS, C, F, A0]] {
+    type M[x] = Precepte[Ta, MS, C, F, x]
+    type A = A0
+
+    def TC = m
+
+    def leibniz = scalaz.Leibniz.refl
   }
 
   def trans[Ta, ManagedState, UnmanagedState, F[_], G[_]: *->*, A](
