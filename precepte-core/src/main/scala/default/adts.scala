@@ -103,7 +103,7 @@ case class PIdStream(ids: Stream[PId] = Stream.continually(PId.gen)) extends PId
 case class ManagedState[E <: Env, T <: Tags](env: E, span: Span, path: Call.Path[T], ids: PIdSeries = DefaultPIdSeries)
 
 
-import scala.language.higherKinds
-trait DefaultPreBuilder[F[_], C, P[_] <: DefaultPre[F, C, _]] {
-  def apply[A](tags: BaseTags) = Precepte[BaseTags](tags)
-}
+// import scala.language.higherKinds
+// trait DefaultPreBuilder[F[_], C, P[_] <: DefaultPre[F, C, _]] {
+//   def apply[A](tags: BaseTags) = Precepte[BaseTags](tags)
+// }
