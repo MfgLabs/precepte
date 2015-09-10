@@ -43,7 +43,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
 
   type Pre[A] = DefaultPre[Future, Unit, A]
 
-  object Pre extends DefaultPreBuilder[Future, Unit, Pre]
+  // object Pre extends DefaultPreBuilder[Future, Unit, Pre]
 
   val env = BaseEnv(Host("localhost"), Environment.Test, Version("1.0"))
 
@@ -88,7 +88,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
   "Precepte" should "run/eval pre" in {
 
     def res(i: Int): Pre[Int] = for {
-      i <- Pre(tags(s"f$i")){(_: ST[Unit]) => i.point[Future] }
+      i <- Precepte(tags(s"f$i")){(_: ST[Unit]) => i.point[Future] }
       r <- if(i>0) res(i-1) else i.point[Pre]
     } yield r
 
