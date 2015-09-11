@@ -18,11 +18,9 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scalaz.{Monad, Semigroup}
-import scalaz.syntax.monad._
 
 
-package object default {
+package object default extends Trans {
 
   type MS = ManagedState[BaseEnv, BaseTags]
 

@@ -314,7 +314,31 @@ private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I,
   }
 }
 
-/* A Step followed by a Map (mixes Step + Coyoneda) */
+object Precepte extends Implicits {
+
+  def apply[Ta](_tags: Ta) =
+    new PrecepteBuilder[Ta] {
+      val tags = _tags
+    }
+
+}
+
+/** A shorter but nicer name in the code :D */
+object Pre extends Implicits {
+
+  def apply[Ta](_tags: Ta) =
+    new PrecepteBuilder[Ta] {
+      val tags = _tags
+    }
+
+}
+
+
+/**
+  * PRECEPTE DSL
+  */
+  
+/** A Step followed by a Map (mixes Step + Coyoneda) */
 private [precepte] case class StepMap[Ta, ManagedState, UnmanagedState, F[_], I, A](
   st: Precepte[Ta, ManagedState, UnmanagedState, F, A]#S => F[I]
 , map: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, I) => (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)
@@ -337,71 +361,49 @@ private [precepte] case class Apply[Ta, ManagedState, UnmanagedState, F[_], A, B
   type _A = A
 }
 
-trait LowPriorityManagedStatetances {
-  implicit def precepteMonadManagedStatetance[Ta, ManagedState, UnmanagedState, F[_]] =
-    new Monad[({ type λ[α] = Precepte[Ta, ManagedState, UnmanagedState, F, α] })#λ] {
-      override def point[A](a: => A): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
-        Return(a)
-      override def map[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-        m.map(f)
-      override def bind[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-        m.flatMap(f)
 
-      override def ap[A, B](pa: => Precepte[Ta, ManagedState, UnmanagedState, F, A])(pab: => Precepte[Ta, ManagedState, UnmanagedState, F, A => B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
-        Apply(pa, pab)
-      }
+
+
+trait PrecepteBuilder[Ta] {
+  val tags: Ta
+
+  import scala.concurrent.Future
+  def future[M, U, A](λ: Precepte[Ta, M, U, Future, A]#S => Future[A])(implicit func: Functor[Future], ec: scala.concurrent.ExecutionContext): Precepte[Ta, M, U, Future, Throwable \/ A] =
+    apply { pa =>
+      func.map(λ(pa))(\/-.apply _)
+        .recover{ case e => -\/(e) }
     }
 
+  // Suspends an effect in the context of tagged step
+  // By construction, the returned Precepte is necessarily a Map (coyoneda trick)
+  def apply[M, U, F[_], A](λ: Precepte[Ta, M, U, F, A]#S => F[A]): Precepte[Ta, M, U, F, A] =
+    StepMap[Ta, M, U, F, A, A](
+      λ,
+      { (st: Precepte[Ta, M, U, F, A]#S, a: A) => st -> a },
+      tags
+    )
+
+  // Suspends an effect and updates the unmanaged state in the context of tagged step
+  // By construction, the returned Precepte is necessarily a Map (coyoneda trick)
+  def applyU[M, U, F[_], A](λ: Precepte[Ta, M, U, F, A]#S => F[(U, A)])(implicit upd: PStateUpdater[Ta, M, U]): Precepte[Ta, M, U, F, A] =
+    StepMap[Ta, M, U, F, (U, A), A](
+      λ,
+      { (st: Precepte[Ta, M, U, F, A]#S, ua: (U, A)) =>
+        val (unmanaged, a) = ua
+        upd.updateUnmanaged(st, unmanaged) -> a
+      },
+      tags
+    )
+
+  // Suspends a Precepte in the concept of a Step
+  // The other coyoneda trick
+  def apply[M, U, F[_], A](m: => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
+    SubStep(m, (s, i: A) => (s, i), tags)
+
+  def liftF[M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
+    Suspend(fa)
 }
 
-  object Precepte extends LowPriorityManagedStatetances {
-
-    trait PrecepteBuilder[Ta] {
-      val tags: Ta
-
-      import scala.concurrent.Future
-      def future[M, U, A](λ: Precepte[Ta, M, U, Future, A]#S => Future[A])(implicit func: Functor[Future], ec: scala.concurrent.ExecutionContext): Precepte[Ta, M, U, Future, Throwable \/ A] =
-        apply { pa =>
-          func.map(λ(pa))(\/-.apply _)
-            .recover{ case e => -\/(e) }
-        }
-
-      // Suspends an effect in the context of tagged step
-      // By construction, the returned Precepte is necessarily a Map (coyoneda trick)
-      def apply[M, U, F[_], A](λ: Precepte[Ta, M, U, F, A]#S => F[A]): Precepte[Ta, M, U, F, A] =
-        StepMap[Ta, M, U, F, A, A](
-          λ,
-          { (st: Precepte[Ta, M, U, F, A]#S, a: A) => st -> a },
-          tags
-        )
-
-      // Suspends an effect and updates the unmanaged state in the context of tagged step
-      // By construction, the returned Precepte is necessarily a Map (coyoneda trick)
-      def applyU[M, U, F[_], A](λ: Precepte[Ta, M, U, F, A]#S => F[(U, A)])(implicit upd: PStateUpdater[Ta, M, U]): Precepte[Ta, M, U, F, A] =
-        StepMap[Ta, M, U, F, (U, A), A](
-          λ,
-          { (st: Precepte[Ta, M, U, F, A]#S, ua: (U, A)) =>
-            val (unmanaged, a) = ua
-            upd.updateUnmanaged(st, unmanaged) -> a
-          },
-          tags
-        )
-
-      // Suspends a Precepte in the concept of a Step
-      // The other coyoneda trick
-      def apply[M, U, F[_], A](m: => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
-        SubStep(m, (s, i: A) => (s, i), tags)
-
-      def liftF[M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
-        Suspend(fa)
-    }
-
-    def apply[Ta](_tags: Ta) =
-      new PrecepteBuilder[Ta] {
-        val tags = _tags
-      }
-
-  }
 
 private [precepte] sealed trait ResumeStep[Ta, ManagedState, UnmanagedState, F[_], A]
 
@@ -433,3 +435,33 @@ private [precepte] case class ApplyStep[Ta, ManagedState, UnmanagedState, F[_], 
 , pf: Precepte[Ta, ManagedState, UnmanagedState, F, A => B]
 , next: B => Precepte[Ta, ManagedState, UnmanagedState, F, C]
 ) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, C]
+
+trait Implicits {
+  import scalaz.Unapply
+
+  implicit def precepteMonad[Ta, ManagedState, UnmanagedState, F[_]] =
+    new Monad[({ type λ[α] = Precepte[Ta, ManagedState, UnmanagedState, F, α] })#λ] {
+      override def point[A](a: => A): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
+        Return(a)
+      override def map[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
+        m.map(f)
+      override def bind[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
+        m.flatMap(f)
+
+      override def ap[A, B](pa: => Precepte[Ta, ManagedState, UnmanagedState, F, A])(pab: => Precepte[Ta, ManagedState, UnmanagedState, F, A => B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
+        Apply(pa, pab)
+      }
+    }
+
+
+  /** allows to unapply a Precepte into a F[A] */
+  implicit def toClassicUnapply[M0[_[_]], Ta, MS, C, F[_], A0](implicit m: M0[({ type λ[α] = Precepte[Ta, MS, C, F, α] })#λ]) = new Unapply[M0, Precepte[Ta, MS, C, F, A0]] {
+    type M[x] = Precepte[Ta, MS, C, F, x]
+    type A = A0
+
+    def TC = m
+
+    def leibniz = scalaz.Leibniz.refl
+  }
+
+}

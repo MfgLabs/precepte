@@ -43,12 +43,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
 
   type Pre[A] = DefaultPre[Future, Unit, A]
 
-  // object P {
-  //   def apply[A](tags: BaseTags) = Precepte[BaseTags](tags)
-  // }
-
-  // object Pre extends DefaultPreBuilder[Future, Unit, Pre]
-
   val env = BaseEnv(Host("localhost"), Environment.Test, Version("1.0"))
 
   private def tags(n: String) = BaseTags(Callee(n), Category.Database)
