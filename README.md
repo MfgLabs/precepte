@@ -1,85 +1,59 @@
-# MFG Labs Monitored
+# Precepte, let your code be state-aware & make runtime effect observation acceptable...
 
-## What is it
+Precepte is an opinionated purely functional & lazy API stacking some useful monads to help you observe the execution of your runtime effects
+by instrumenting your code with a managed state propagated all along your business workflow.
 
-Monitored is a simple library that helps passing state between the layers of your application. In the process, it also generate a tagged path of the monitored calls.
+Precepte embraces the concept that observing has a cost but let you control explicitly the balance between precision and performance without
+sacrifying code cleanness and FP purity & laziness.
 
-## Basics
+Precepte's idea is simply to make your code _state-aware_ by enabling you to obtain a State anywhere you need in your code.
+This state will provide you with:
+  - a context defining from where this code comes and where it is (function name, custom tags, etc..)
+  - any values you want to measure in your observation
 
-Consider this minimal example:
+The state provided by Precepte is composed of:
+  - a managed part that is managed by Precepte and that consists in:
+      * the Span: a global ID uniquely identifying the full execution workflow
+      * the Call Path: a sequence of tuples of PId (local step ID) and Tags (defined at compile-time)
+                       accumulated by Precepte all along the execution of the workflow. This is what
+                        provides you with the place from where you come and where you are...
 
-```scala
-import scala.concurrent.Future
+  - an unmanaged part that is just a container in which you can put anything you want and also perform some compile-time DI.
+
+```
+// A Sample with Future effects (the ugliest of the effects)
+// For now, we use scalaz (cats coming soon) so you need some monads from Scalaz
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scalaz.std.scalaFuture._
-import com.mfglabs.monitoring._, Monitored._, Call._, Tags._
+import scalaz.syntax.monad._
 
-val f1 = Monitored(Tags(Callee("f1"))){ (_: Call.State[Unit]) =>
-	Future.successful("foo")
-}
+// import the default Precepte representation using our provided Tags & ManagedState type
+import precepte.default._
+
+// create some effectful steps in which you can
+// ST[Int] represents a State with an unmanaged part in which you will inject an Int at execution 
+def f1 = Precepte(tags("simple.f1", DB)){(_: ST[Int]) => 1.point[Future]}
+def f2(i: Int) = Precepte(tags("simple.f2", API)){(_: ST[Int]) => s"foo $i".point[Future]}
+
+// Lazy definition of your effectful workflow
+val res = for {
+  i <- f1
+  r <- f2(i)
+} yield r
+
+// create the initial state
+// Span is the global unique ID
+// 42 is your injected unmanaged state part (could be something much more interesting ;))
+val state0 = ST(Span.gen, env, Vector.empty, 42)
+
+// execute your effectful workflow starting with state0
+val (s, a) = res.run(state0)
 ```
 
-The function `f1` is a "Monitored" function. Those function when executed will receive a call state. This call state contains:
-
-- A `span`. It's a global request identifier
-- A `path`. A path is a succession of call ids from the parent functions.
-
-To be called, a Monitored block needs to be passed an initial `State`.
-
-```scala
-val initialState = Monitored.Call.State(Call.Span.gen, Vector.empty, ())
-f1.eval(initialState)
-```
-
-So far, nothing of interest. Now let's add a little twist:
-
-```scala
-def printState[C](st: Call.State[C]) =
-	println(s"""${st.span.value}/${st.path.map(s => s.id.value + "(" + s.tags + ")".mkString("/")}""")
-
-val f1 = Monitored(Tags(Callee("f1"))){ (st: Call.State[Unit]) =>
-	printState(st)
-	Future.successful("foo")
-}
-
-def f2(s: String) = Monitored(Tags(Callee("f1"))){ (st: Call.State[Unit]) =>
-	printState(st)
-	Future.successful("f2 " + s)
-}
-```
-
-Note that `f1` and `f2` are both returning a `Future`. Suppose that I want to call `f1` and then `f2`.
-
-```scala
-val mon: Monitored[Unit, Future, String] =
-	for {
-		r1 <- f1
-		r2 <- f2(r1)
-	} yield r2
-```
-
-So far so good, I get a new `Monitored`. Note that it automatically took care of the `Future`.
-
-Just like the previous example, I can `eval` it to get the result:
-
-```scala
-mon.eval(initialState)
-res0: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@51fba78d
-d973de8a-55fd-432b-bfe8-7a5d91457f8f/DkdoYf9
-d973de8a-55fd-432b-bfe8-7a5d91457f8f/z43zso6
-```
-
-Note that it printed two calls. Both have the same `span` since they are from the same request.
-
-## Stacking monitored
-
-TODO
-
-## Passing State
-
-TODO
-
-## Transformers
-
-TODO
-
+Precepte is a custom purely functional structure based on:
+  - A State Monad to represent the pure propagation of the State in the workflow
+  - A Free Monad to represent our monadic & applicative effectful workflow
+  - Some helpers to make Precepte usable with Monad Transformers
+  - Coyoneda to reduce the requirement of effects to be Functor in Free Monads
+  - some custom optimization to reduce the burden of Free Monads classic model (right associatio, map fusion, structure squashing, )

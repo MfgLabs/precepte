@@ -33,7 +33,7 @@ case class PState[Ta, ManagedState, UnmanagedState](
   managed: ManagedState,
   unmanaged: UnmanagedState)
 
-/** A Typeclass representing an updatable Precepte state */
+/** A Typeclass representing an updatable Precepte state (can append a Tag+idx & update unmanaged part) */
 trait PStateUpdater[Ta, MS, FS] {
   type S = PState[Ta, MS, FS]
   def appendTags(s: S, t: Ta, idx: Int): S

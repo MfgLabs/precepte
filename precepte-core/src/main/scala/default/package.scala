@@ -20,13 +20,21 @@ package precepte
 import scala.language.higherKinds
 
 
+/**
+  * Default implementation of Precepte using:
+  *   - BaseTags for Precepte Tags
+  *   - ManagedState[BaseEnv, BaseTags] for the managed part.
+  *
+  * To use it, just do: `import com.mfglabs.precepte._`
+  */
 package object default extends Trans {
+
+  type DefaultPre[F[_], C, A] = Precepte[BaseTags, MS, C, F, A]
 
   type MS = ManagedState[BaseEnv, BaseTags]
 
+  /** A simple *->* type alias for internal state */
   type ST[C] = PState[BaseTags, MS, C]
-
-  type DefaultPre[F[_], C, A] = Precepte[BaseTags, MS, C, F, A]
 
   object ST {
     def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): ST[C] =
@@ -42,7 +50,7 @@ package object default extends Trans {
       )
   }
 
-  def tags(callee: String) = BaseTags(Callee(callee), Category.Database)
+  // def tags(callee: String) = BaseTags(Callee(callee), Category.Database)
 
   implicit def pstateUpdater[C] = new PStateUpdater[BaseTags, MS, C] {
     def appendTags(s: ST[C], tags: BaseTags, idx: Int) = {

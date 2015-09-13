@@ -17,7 +17,9 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
-
+/**
+  * Custom Graph ADT for precepte to graphviz manipulations
+  */
 trait Node {
   val id: String
   val value: String

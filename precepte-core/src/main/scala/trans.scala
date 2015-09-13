@@ -32,10 +32,14 @@ object *->*->* {
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 }
 
+/**
+  * Helpers for Precepte wrapped in Monad Transformers (OptionT, ListT, EitherT)
+  */
 trait Trans {
 
   /**
-    * Finds the right Monad Transformer (OptionT, ListT, EitherT) wrapped in a precepte and a
+    * Finds the right Monad Transformer (OptionT, ListT, EitherT) wrapped in a precepte using HasHoist typeclass
+    * and lifts the Precepte into a MonadTransformer instance. 
     */
   def trans[Ta, ManagedState, UnmanagedState, F[_], G[_]: *->*, A](
     m: Precepte[Ta, ManagedState, UnmanagedState, F, G[A]]
@@ -50,7 +54,9 @@ trait Trans {
   }
 
 
-  /** allows to go around higher-kind type unification issues in scalac when using Monad Transformers + Precepte */
+  /**
+    * A custom typeclass allowing to go around higher-kind type unification issues in scalac when using Monad Transformers + Precepte
+    */
   implicit def toTCUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
     implicit
       una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],

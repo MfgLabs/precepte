@@ -41,13 +41,14 @@ object SingletonOf {
   ): SingletonOf[TC, U, u.type] = SingletonOf(u)
 }
 
-
+/** Forces scalac to identify all the elements of the Precepte type... completely non generic and custom to Precepte type */
 trait PrecepteUnapply[TCA, TC[_[_], _], F[_], Ta, MS, UMS, A]
 
 object PrecepteUnapply {
   implicit def preUnapply[TC[_[_], _], F[_], Ta, MS, UMS, C, A] = new PrecepteUnapply[TC[({ type λ[α] = Precepte[Ta, MS, UMS, F, α] })#λ, A], TC, F, Ta, MS, UMS, A] { }
 }
 
+/** The horrible cludge to go around SI-2712 */
 trait PrecepteHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A] {
 
   type P[_]

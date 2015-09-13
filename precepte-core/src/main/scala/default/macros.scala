@@ -23,10 +23,18 @@ import scala.reflect.macros.blackbox.Context
 
 import scala.language.implicitConversions
 
-
+/** Some macro helpers for Precepte
+  *
+  * To use it:
+  *
+  * `import com.mfglabs.precepte.default.Macros._`
+  * 
+  */
 object Macros {
+  /** An implicit macro defining a Callee Precepte Tag evaluated at compile-time using the `enclosingOwner.fullName` (function name + package path) */
   implicit def callee: Callee = macro Macros.calleeMacro
 
+  /** A macro creating at compile-time a sequence of (name, value) for the values you pass to it */
   def params[T](ts: T*): Seq[(String, String)] = macro Macros.paramsMacro[T]
   def param[T](t: T): (String, String) = macro Macros.paramMacro[T]
 
