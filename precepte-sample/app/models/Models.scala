@@ -35,7 +35,7 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
 
 object Models {
 
-  def Timed[A](f: ST[Unit] => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): Pre[Future, Unit, A] =
+  def Timed[A](f: ST[Unit] => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): DPre[Future, Unit, A] =
     Monitoring.TimedAction.influx.Timed(Category.Database)(callee)(f)(fu)
 }
 

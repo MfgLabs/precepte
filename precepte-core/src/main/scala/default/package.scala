@@ -27,9 +27,11 @@ import scala.language.higherKinds
   *
   * To use it, just do: `import com.mfglabs.precepte._`
   */
-package object default extends Trans {
+package object default extends HK {
 
   type DefaultPre[F[_], C, A] = Precepte[BaseTags, MS, C, F, A]
+
+  type DPre[F[_], C, A] = DefaultPre[F, C, A]
 
   type MS = ManagedState[BaseEnv, BaseTags]
 

@@ -115,7 +115,7 @@ lazy val play =
         else
           Some("releases" at s3Repo + "/releases")
       },
-      libraryDependencies += "com.typesafe.play" %% "play" % "2.3.7",
+      libraryDependencies += "com.typesafe.play" %% "play" % "2.3.9",
       name := "precepte-play")
     .dependsOn(core, influx)
 

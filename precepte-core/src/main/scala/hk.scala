@@ -21,6 +21,7 @@ import scalaz.Unapply
 import scala.language.higherKinds
 import scala.language.implicitConversions
 
+
 trait *->*[F0[_]] {}
 
 object *->* {
@@ -35,7 +36,7 @@ object *->*->* {
 /**
   * Helpers for Precepte wrapped in Monad Transformers (OptionT, ListT, EitherT)
   */
-trait Trans {
+trait HK {
 
   /**
     * Finds the right Monad Transformer (OptionT, ListT, EitherT) wrapped in a precepte using HasHoist typeclass
@@ -72,4 +73,4 @@ trait Trans {
 
 }
 
-object trans extends Trans
+package object hk extends HK

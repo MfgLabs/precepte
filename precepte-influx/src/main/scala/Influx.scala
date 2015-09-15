@@ -30,7 +30,7 @@ import default._
 
 case class Influx[C : scalaz.Semigroup](influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit ex: ExecutionContext) {
 
-  type P[A] = Pre[Future, C, A]
+  type P[A] = DefaultPre[Future, C, A]
 
   private val builder = new com.ning.http.client.AsyncHttpClientConfig.Builder()
   private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
