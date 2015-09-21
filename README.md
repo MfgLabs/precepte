@@ -19,7 +19,7 @@ The state provided by Precepte is composed of:
 
   - an unmanaged part that is just a container in which you can put anything you want and also perform some compile-time DI.
 
-```
+```scala
 // A Sample with Future effects (the ugliest of the effects)
 // For now, we use scalaz (cats coming soon) so you need some monads from Scalaz
 import scala.concurrent.ExecutionContext.Implicits.global
