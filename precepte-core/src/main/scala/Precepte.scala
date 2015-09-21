@@ -18,7 +18,7 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, Semigroup }
+import scalaz.{ Monad, Applicative, Functor, \/, \/-, -\/, IndexedStateT, StateT, Semigroup, ~> }
 import scalaz.syntax.monad._
 
 import scala.annotation.tailrec
@@ -346,10 +346,33 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           })
       }
 
+
+    /** translates your effect into another one using a natural transformation */
+    final def compile[G[_]](nat: F ~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = this match {
+
+      case Return(a) => Return(a)
+
+      case Suspend(fa) => Suspend(nat(fa))
+
+      case ps@SubStep(sub, fmap, tags) =>
+        SubStep(sub.compile(nat), fmap, tags)
+
+      case sm@StepMap(fst, fmap, tags)  =>
+        def fst2 = (s:S) => nat(fst(s))
+        StepMap(fst2, fmap, tags)
+
+      case SMap(sub2, f2) => SMap(sub2.compile(nat), f2)
+
+      case f@Flatmap(sub, next) =>
+        def next2(gi: f._I) = next(gi).compile(nat)
+        Flatmap(sub.compile(nat), next2)
+
+      case Apply(pa, pfa) =>
+        Apply(pa.compile(nat), pfa.compile(nat))
+    }
   }
 
 
-// private [precepte] sealed trait SimplePrecepte[Ta, ManagedState, UnmanagedState, F[_], A] extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 private [precepte] case class Return[Ta, ManagedState, UnmanagedState, F[_], A](a: A) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 private [precepte] case class Suspend[Ta, ManagedState, UnmanagedState, F[_], A](a: F[A]) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 
@@ -374,7 +397,6 @@ private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I,
       upd: PStateUpdater[Ta, ManagedState, UnmanagedState],
       S: Semigroup[UnmanagedState]
     ): Precepte[Ta, ManagedState, UnmanagedState, F, A] = {
-    // val SubStep(p, fmap, tags) = this
     StepMap[Ta, ManagedState, UnmanagedState, F, (S, I), A](
       sub.run _,
       (_, si) => {
