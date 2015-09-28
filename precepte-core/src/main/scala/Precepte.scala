@@ -308,7 +308,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
         case ps@SubStep(sub, fmap, tags) =>
           SubStep(
-            sub.graph(Graph.empty),
+            s => sub(s).graph(Graph.empty),
             (s, gi: (Graph, ps._I)) => {
               val (g, i) = gi
               val node = nod.toNode(s)
@@ -355,7 +355,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case Suspend(fa) => Suspend(nat(fa))
 
       case ps@SubStep(sub, fmap, tags) =>
-        SubStep(sub.compile(nat), fmap, tags)
+        SubStep(s => sub(s).compile(nat), fmap, tags)
 
       case sm@StepMap(fst, fmap, tags)  =>
         def fst2 = (s:S) => nat(fst(s))
@@ -370,6 +370,47 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case Apply(pa, pfa) =>
         Apply(pa.compile(nat), pfa.compile(nat))
     }
+
+    import scalaz.Isomorphism.<=>
+
+    final def xmapState[UnmanagedState2](to0: UnmanagedState => UnmanagedState2, from0: UnmanagedState): Precepte[Ta, ManagedState, UnmanagedState2, F, A] =
+      xmapState[UnmanagedState2](
+        new <=>[UnmanagedState, UnmanagedState2] {
+          def to = to0
+          def from = _ => from0
+        }
+      )
+
+    final def xmapState[UnmanagedState2](f: UnmanagedState <=> UnmanagedState2): Precepte[Ta, ManagedState, UnmanagedState2, F, A] = this match {
+      case Return(a) => Return(a)
+
+      case Suspend(fa) => Suspend(fa)
+
+      case ps@SubStep(sub, fmap, tags) =>
+        def fmap2 = { (s: Precepte[Ta, ManagedState, UnmanagedState2, F, A]#S, i: ps._I) =>
+          val (s2, i2) = fmap(s.mapUnmanaged(s => f.from(s)), i)
+          (s2.mapUnmanaged(s => f.to(s)), i2)
+        }
+        SubStep(s => sub(s.mapUnmanaged(s => f.from(s))).xmapState(f), fmap2, tags)
+
+      case sm@StepMap(fst, fmap, tags)  =>
+        def fst2 = (s:Precepte[Ta, ManagedState, UnmanagedState2, F, A]#S) => fst(s.mapUnmanaged(s => f.from(s)))
+        def fmap2 = { (s: Precepte[Ta, ManagedState, UnmanagedState2, F, A]#S, i: sm._I) =>
+          val (s2, i2) = fmap(s.mapUnmanaged(s => f.from(s)), i)
+          (s2.mapUnmanaged(s => f.to(s)), i2)
+        }
+        StepMap(fst2, fmap2, tags)
+
+      case SMap(sub2, f2) => SMap(sub2.xmapState(f), f2)
+
+      case fm@Flatmap(sub, next) =>
+        def next2(gi: fm._I) = next(gi).xmapState(f)
+        Flatmap(sub.xmapState(f), next2)
+
+      case Apply(pa, pfa) =>
+        Apply(pa.xmapState(f), pfa.xmapState(f))
+    }
+
   }
 
 
@@ -385,7 +426,7 @@ private [precepte] case class SMap[Ta, ManagedState, UnmanagedState, F[_], I, A]
 }
 
 private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
-  sub: Precepte[Ta, ManagedState, UnmanagedState, F, I]
+  sub: Precepte[Ta, ManagedState, UnmanagedState, F, A]#S => Precepte[Ta, ManagedState, UnmanagedState, F, I]
 , map: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, I) => (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)
 , tags: Ta
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
@@ -398,7 +439,7 @@ private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I,
       S: Semigroup[UnmanagedState]
     ): Precepte[Ta, ManagedState, UnmanagedState, F, A] = {
     StepMap[Ta, ManagedState, UnmanagedState, F, (S, I), A](
-      sub.run _,
+      s => sub(s).run(s),
       (_, si) => {
         map(si._1, si._2.asInstanceOf[I])
       },
@@ -423,6 +464,8 @@ object Pre extends Implicits {
       val tags = _tags
     }
 
+  def liftF[Ta, M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
+    Suspend(fa)
 }
 
 
@@ -487,10 +530,15 @@ trait PrecepteBuilder[Ta] {
       tags
     )
 
+  // Suspends an effect and updates the unmanaged state in the context of tagged step
+  // By construction, the returned Precepte is necessarily a Map (coyoneda trick)
+  def applyP[M, U, F[_], A](λ: Precepte[Ta, M, U, F, A]#S => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
+    SubStep(λ, (s, i: A) => (s, i), tags)
+
   // Suspends a Precepte in the concept of a Step
   // The other coyoneda trick
   def apply[M, U, F[_], A](m: => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
-    SubStep(m, (s, i: A) => (s, i), tags)
+    applyP(s => m)
 
   def liftF[M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
     Suspend(fa)
@@ -557,3 +605,15 @@ trait Implicits {
   }
 
 }
+
+// trait <==>[A, B] {
+//   def to: A => B
+//   def from: B => A
+// }
+
+// object <==> {
+//   implicit def isoRefl[A, B](implicit i: <==>[A, B]) = new <==>[B, A] {
+//     def to = i.from
+//     def from = i.to
+//   }
+// }

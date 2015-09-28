@@ -38,6 +38,10 @@ package object default extends HK {
   type ST[C] = PState[BaseTags, MS, C]
 
   object ST {
+
+    def apply[C](span: Span, env: BaseEnv, value: C): ST[C] =
+      apply(span, env, Vector.empty, value)
+
     def apply[C](span: Span, env: BaseEnv, path: Call.Path[BaseTags], value: C): ST[C] =
       apply[C] (
         ManagedState(env, span, path),
