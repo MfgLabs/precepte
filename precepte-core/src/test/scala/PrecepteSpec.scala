@@ -389,7 +389,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
   }
 
   it should "observe" in {
-    import quiver.{ LNode, LEdge }
 
     implicit val intSG = new scalaz.Semigroup[Int] {
       def append(f1: Int, f2: => Int) = f1 + f2
@@ -423,7 +422,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
           _ <- p7
         } yield ())
     } yield ()
-    
+
     val (s, _) =
       Precepte(tags("subzero")) { (s: ST[Int]) =>
         p4.graph(Graph.empty).eval(s).map { case (g, a) =>
