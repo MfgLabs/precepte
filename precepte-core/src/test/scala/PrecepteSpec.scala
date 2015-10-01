@@ -488,6 +488,27 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     1 should ===(1)
   }
 
+  it should "compile using nat" in {
+    case class F[A](a: A)
+    def f1 = Precepte(tags("f1")){ (_: ST[Unit]) => F(1) }
+    def f2 = Precepte(tags("f2")){ (_: ST[Unit]) => F(2) }
+    def f3 = Precepte(tags("f3")){ (_: ST[Unit]) => F(3) }
+    def f4(i: Int) = Precepte(tags("f4")){ (_: ST[Unit]) => F(s"$i") }
+
+    val res = for {
+      i <- f1
+      a <- (f2 |@| f3).tupled
+      r <- f4(i + a._1 + a._2)
+    } yield r
+
+    val nat = new scalaz.~>[F, Future] {
+      def apply[A](f: F[A]): Future[A] = f.a.point[Future]
+    }
+
+    val a0 = res.compile(nat).eval(nostate).futureValue
+    a0 should ===("6")
+  }
+
 /*
   it should "real world wb.fr home" in {
 
