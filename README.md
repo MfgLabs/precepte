@@ -20,7 +20,7 @@ The state provided by Precepte is composed of:
 
   - an unmanaged part that is just a container in which you can put anything you want and also perform some compile-time DI.
 
-```
+```scala
 // A Sample with Future effects (the ugliest of the effects)
 // For now, we use scalaz (cats coming soon) so you need some monads from Scalaz
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -32,7 +32,7 @@ import scalaz.syntax.monad._
 import precepte.default._
 
 // create some effectful steps in which you can
-// ST[Int] represents a State with an unmanaged part in which you will inject an Int at execution 
+// ST[Int] represents a State with an unmanaged part in which you will inject an Int at execution
 def f1 = Precepte(tags("simple.f1", DB)){(_: ST[Int]) => 1.point[Future]}
 def f2(i: Int) = Precepte(tags("simple.f2", API)){(_: ST[Int]) => s"foo $i".point[Future]}
 
