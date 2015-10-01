@@ -7,6 +7,8 @@ lazy val commonSettings =  Seq(
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
     , "Oncue Bintray Repo" at "http://dl.bintray.com/oncue/releases"
+    , "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/"  //for play 2.3.9
+    , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn
 )
@@ -45,7 +47,6 @@ lazy val core =
       libraryDependencies ++= Seq(
           "org.scalaz"      %% "scalaz-core"      % "7.1.0"
         , "com.chuusai"     %% "shapeless"        % "2.2.4"
-        , "oncue.quiver"    %% "core"             % "3.2.0"   % "test"
         , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
