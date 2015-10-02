@@ -17,16 +17,21 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
+import cats.data.{ OptionT, XorT, Xor, StreamingT }
 import scala.language.higherKinds
 
 
-trait HasHoist[M[_]] {
-  type T[_[_], _]
-  def lift[F[_], A](f: F[M[A]]): T[F, A]
-}
+package object corecats {
 
-object HasHoist {
-  type Aux[M[_], T0[_[_], _]] = HasHoist[M] { type T[F[_], A] = T0[F, A] }
+  implicit object optionHasHoist extends HasHoist[Option] {
+    type T[F[_], A] = OptionT[F, A]
+    def lift[F[_], A](f: F[Option[A]]): OptionT[F, A] = OptionT(f)
+  }
 
-  def apply[M[_]](implicit h: HasHoist[M]): Aux[M, h.T] = h
+  // implicit object streamingTHasHoist extends HasHoist[StreamingT] {
+  //   type T[F[_], A] = StreamingT[F, A]
+  //   def lift[F[_], A](f: F[StreamingT[A]]): StreamingT[F, A] = StreamingT.wait(f)
+  // }
+
+  implicit def xorHasHoist[A]: HasHoist.Aux[({ type λ[α] = Xor[A, α] })#λ, ({ type λ[F[_], B] = XorT[F, A, B] })#λ] = new XorHasHoist[A]
 }

@@ -17,16 +17,20 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
+import scalaz.{ OptionT, ListT, EitherT, \/ }
 import scala.language.higherKinds
 
+package object corescalaz {
 
-trait HasHoist[M[_]] {
-  type T[_[_], _]
-  def lift[F[_], A](f: F[M[A]]): T[F, A]
-}
+  implicit object optionHasHoist extends HasHoist[Option] {
+    type T[F[_], A] = OptionT[F, A]
+    def lift[F[_], A](f: F[Option[A]]): OptionT[F, A] = OptionT.optionT[F](f)
+  }
 
-object HasHoist {
-  type Aux[M[_], T0[_[_], _]] = HasHoist[M] { type T[F[_], A] = T0[F, A] }
+  implicit object listHasHoist extends HasHoist[List] {
+    type T[F[_], A] = ListT[F, A]
+    def lift[F[_], A](f: F[List[A]]): ListT[F, A] = ListT.apply(f)
+  }
 
-  def apply[M[_]](implicit h: HasHoist[M]): Aux[M, h.T] = h
+  implicit def eitherHasHoist[A]: HasHoist.Aux[({ type λ[α] = A \/ α })#λ, ({ type λ[F[_], B] = EitherT[F, A, B] })#λ] = new EitherHasHoist[A]
 }
