@@ -64,42 +64,51 @@ class CatsProcessSpec extends FlatSpec with ScalaFutures {
     // val api = Precepte(tags("api")).apply((s: ST[Int]) => Future(0))
     // val theEnd = Precepte(tags("the end")).apply((s: ST[Int]) => Future(0))
 
-    // val p9 = (Pre(tags("persian")).apply((s: ST[Int]) => Future(2))
-    //                     |@| Pre(tags("main coon")).apply((s: ST[Int]) => Future(2))).tupled 
-    // val p8 =
-    //   for {
-    //     _ <-  Pre(tags("cats")).apply((s: ST[Int]) => Future(0))
-    //     _ <-  Pre(tags("can be"))(p9)
-                
-    //     // _ <- but
-    //     // _ <- kats
-    //     // _ <- is
-    //     // _ <- (purely |@| functional |@| typesafe |@| api).tupled
-    //     // _ <- theEnd
-    //   } yield ()
-
-    val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
-    val p1 = Precepte(tags("p1")).applyU((s: ST[Int]) => Future(1 -> 1))
-    val p2 = Precepte(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
-    val p3 = Precepte(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
-    val p4 = Precepte(tags("p4")).applyU((s: ST[Int]) => Future(4 -> 4))
-    val p5 = Precepte(tags("p5")).applyU((s: ST[Int]) => Future(5 -> 5))
-    val p6 = Precepte(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
-    val p7 = Precepte(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
-
     val p8 =
       for {
-      // _ <- p0
-      // _ <- (p1 |@| p2 |@| p3).tupled
-      _ <- Precepte(tags("sub"))(p4)
-      // _ <- p5
-      // _ <- Precepte(tags("sub2"))(for {
-      //     _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
-      //     _ <- p6
-      //     _ <- (p4 |@| p5 |@| Precepte(tags("sub3"))(p6)).tupled
-      //     _ <- p7
-      //   } yield ())
-    } yield ()
+        _ <- Pre(tags("cats")).apply((s: ST[Int]) => Future(0))
+        _ <- Pre(tags("can be")).apply((s: ST[Int]) => Future(1))
+        _ <- (Pre(tags("persian")).apply((s: ST[Int]) => Future(2))
+                |@| Pre(tags("main coon")).apply((s: ST[Int]) => Future(3))
+                |@| Pre(tags("siamese")).apply((s: ST[Int]) => Future(4))
+                |@| Pre(tags("sphynx")).apply((s: ST[Int]) => Future(5))
+                |@| Pre(tags("burmese")).apply((s: ST[Int]) => Future(6))
+                |@| Pre(tags("munchkin")).apply((s: ST[Int]) => Future(7))
+                |@| Pre(tags("tabby")).apply((s: ST[Int]) => Future(8))
+                |@| Pre(tags("himalayan")).apply((s: ST[Int]) => Future(9))
+              ).tupled
+        _ <- Pre(tags("but")).apply((s: ST[Int]) => Future(10))
+        _ <- Pre(tags("none is")).apply((s: ST[Int]) => Future(11))
+        _ <- Pre(tags("as")).apply((s: ST[Int]) => Future(12))
+        _ <- (Pre(tags("purely")).apply((s: ST[Int]) => Future(13))
+              |@| Pre(tags("functional")).apply((s: ST[Int]) => Future(14))
+              |@| Pre(tags("typesafe")).apply((s: ST[Int]) => Future(15))).tupled
+        _ <- Pre(tags("as")).apply((s: ST[Int]) => Future(16))
+        _ <- Pre(tags("cats")).apply((s: ST[Int]) => Future(17))
+      } yield ()
+
+    // val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
+    // val p1 = Precepte(tags("p1")).applyU((s: ST[Int]) => Future(1 -> 1))
+    // val p2 = Precepte(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
+    // val p3 = Precepte(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
+    // val p4 = Precepte(tags("p4")).applyU((s: ST[Int]) => Future(4 -> 4))
+    // val p5 = Precepte(tags("p5")).applyU((s: ST[Int]) => Future(5 -> 5))
+    // val p6 = Precepte(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
+    // val p7 = Precepte(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
+
+    // val p8 =
+    //   for {
+    //   // _ <- p0
+    //   // _ <- (p1 |@| p2 |@| p3).tupled
+    //   _ <- Precepte(tags("sub"))(p4)
+    //   // _ <- p5
+    //   // _ <- Precepte(tags("sub2"))(for {
+    //   //     _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
+    //   //     _ <- p6
+    //   //     _ <- (p4 |@| p5 |@| Precepte(tags("sub3"))(p6)).tupled
+    //   //     _ <- p7
+    //   //   } yield ())
+    // } yield ()
 
 
     val (ssubap2, _) =
