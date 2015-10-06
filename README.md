@@ -1,5 +1,7 @@
 # Precepte, let your code be state-aware & make runtime effect observation acceptable...
 
+[![Join the chat at https://gitter.im/MfgLabs/precepte](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/MfgLabs/precepte?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Precepte is an opinionated purely functional & lazy API stacking some useful monads to help you observe the execution of your runtime effects by instrumenting your code with a managed state propagated all along your business workflow.
 
 Precepte embraces the concept that observing has a cost but let you control explicitly the balance between precision and performance without
