@@ -16,6 +16,7 @@ limitations under the License.
 
 package com.mfglabs
 package precepte
+package corescalaz
 
 import scala.language.higherKinds
 

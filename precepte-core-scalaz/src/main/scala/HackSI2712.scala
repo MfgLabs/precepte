@@ -16,6 +16,7 @@ limitations under the License.
 
 package com.mfglabs
 package precepte
+package corescalaz
 
 import scala.language.existentials
 
@@ -106,10 +107,10 @@ class NoSI2712Macros(val c: whitebox.Context) {
     val nme2 = TypeName(c.freshName)
 
     val p = q"""
-      new _root_.com.mfglabs.precepte.PrecepteHackSI2712[$tcaTpe, $tcTpe, $mTpe, $fTpe, $tagsTpe, $msTpe, $umsTpe, $aTpe] {
+      new _root_.com.mfglabs.precepte.corescalaz.PrecepteHackSI2712[$tcaTpe, $tcTpe, $mTpe, $fTpe, $tagsTpe, $msTpe, $umsTpe, $aTpe] {
         self =>
 
-        type P[$nme] = _root_.com.mfglabs.precepte.Precepte[$tagsTpe, $msTpe, $umsTpe, $fTpt, $nme]
+        type P[$nme] = _root_.com.mfglabs.precepte.corescalaz.Precepte[$tagsTpe, $msTpe, $umsTpe, $fTpt, $nme]
 
         type T[$nme2] = $tcTpt[P, $nme2]
 

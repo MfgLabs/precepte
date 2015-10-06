@@ -16,6 +16,7 @@ limitations under the License.
 
 package com.mfglabs
 package precepte
+package corescalaz
 
 import org.scalatest._
 import Matchers._

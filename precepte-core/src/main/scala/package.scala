@@ -16,11 +16,4 @@ limitations under the License.
 
 package com.mfglabs
 
-import scalaz._
-import scala.language.higherKinds
-import scala.language.implicitConversions
-
-import com.mfglabs.precepte._
-
-
 package object precepte

@@ -15,7 +15,9 @@ limitations under the License.
 */
 package com.mfglabs
 package precepte
+package corescalaz
 package default
+
 
 
 /** Abstract Name/Value Tag used to classify your Precepte's Step */

@@ -16,6 +16,7 @@ limitations under the License.
 
 package com.mfglabs
 package precepte
+package corescalaz
 package default
 
 import scala.language.experimental.macros

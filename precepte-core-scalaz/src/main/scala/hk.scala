@@ -16,10 +16,18 @@ limitations under the License.
 
 package com.mfglabs
 package precepte
+package corescalaz
 
-import scalaz.Unapply
 import scala.language.higherKinds
 import scala.language.implicitConversions
+
+import scalaz.{ EitherT, \/, Unapply }
+
+
+class EitherHasHoist[A] extends HasHoist[({ type λ[α] = A \/ α })#λ] {
+  type T[F[_], B] = EitherT[F, A, B]
+  def lift[F[_], B](f: F[A \/ B]): EitherT[F, A, B] = EitherT.apply(f)
+}
 
 
 trait *->*[F0[_]] {}
@@ -54,7 +62,6 @@ trait HK {
     trans[Ta, ManagedState, UnmanagedState, F, λ, B](m)(new *->*[λ] {}, hh)
   }
 
-
   /**
     * A custom typeclass allowing to go around higher-kind type unification issues in scalac when using Monad Transformers + Precepte
     */
@@ -70,7 +77,6 @@ trait HK {
 
     def leibniz = nosi.leibniz
   }
-
 }
 
 package object hk extends HK
