@@ -25,10 +25,10 @@ import scala.annotation.tailrec
 
 /**
   * Precepte, let your code be state-aware and make runtime effect observation acceptable...
-  * 
+  *
   * Precepte is an opinionated purely functional & lazy API stacking some useful monads to help you observe the execution of your runtime effects
   * by instrumenting your code with a managed state propagated all along your business workflow.
-  * 
+  *
   * Precepte embraces the concept that observing has a cost but let you control explicitly the balance between precision and performance without
   * sacrifying code cleanness and FP purity & laziness.
   *
@@ -58,7 +58,7 @@ import scala.annotation.tailrec
   *  // import the default Precepte representation using our provided Tags & ManagedState type
   *  import precepte.default._
   *
-  *  // create some effectful steps in which you can 
+  *  // create some effectful steps in which you can
   *  def f1 = Precepte(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
   *  def f2(i: Int) = Precepte(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
   *
@@ -67,7 +67,7 @@ import scala.annotation.tailrec
   *    i <- f1
   *    r <- f2(i)
   *  } yield r
-  *  
+  *
   *  // create the initial state
   *  val state0 = ST(Span.gen, env, Vector.empty, ())
   *
@@ -81,9 +81,9 @@ import scala.annotation.tailrec
   *   - Some helpers to make Precepte usable with Monad Transformers
   *   - Coyoneda to reduce the requirement of effects to be Functor in Free Monads
   *   - some custom optimization to reduce the burden of Free Monads classic model (right associatio, map fusion, structure squashing, )
-  * 
+  *
   * ```
-  * 
+  *
   * ```
   * This is the main ADT:
   *
@@ -346,6 +346,29 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           })
       }
 
+    type SF[T] = (S, F[T])
+    final def mapSuspension(f: SF ~> F): Precepte[Ta, ManagedState, UnmanagedState, F, A] = this match {
+      case Return(a) =>
+        Return(a)
+
+      case Suspend(fa) =>
+        Suspend(fa)
+
+      case SubStep(sub, fmap, tags) =>
+        SubStep(sub.mapSuspension(f), fmap, tags)
+
+      case StepMap(fst, fmap, tags)  =>
+        StepMap(s => f(s -> fst(s)), fmap, tags)
+
+      case SMap(sub2, f2) =>
+        SMap(sub2.mapSuspension(f), f2)
+
+      case fl@Flatmap(sub, next) =>
+        Flatmap(sub.mapSuspension(f), (i :fl._I) => next(i).mapSuspension(f))
+
+      case Apply(pa, pfa) =>
+        Apply(pa.mapSuspension(f), pfa.mapSuspension(f))
+    }
 
     /** translates your effect into another one using a natural transformation */
     final def compile[G[_]](nat: F ~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = this match {
