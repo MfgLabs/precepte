@@ -309,10 +309,10 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case ps@SubStep(sub, fmap, tags) =>
           SubStep(
             sub.graph(Graph.empty),
-            (s, gi: (Graph, ps._I)) => {
+            (b, s, gi: (Graph, ps._I)) => {
               val (g, i) = gi
-              val node = nod.toNode(s)
-              val (s1, a) = fmap(s, i)
+              val node = nod.toNode(b)
+              val (s1, a) = fmap(b, s, i)
               (s1, (g0 + Sub(node.id, node.value, g), a))
             },
             tags)
@@ -409,7 +409,7 @@ private [precepte] case class SMap[Ta, ManagedState, UnmanagedState, F[_], I, A]
 
 private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
   sub: Precepte[Ta, ManagedState, UnmanagedState, F, I]
-, map: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, I) => (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)
+, map: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, I) => (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)
 , tags: Ta
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
   type _I = I
@@ -422,8 +422,8 @@ private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I,
     ): Precepte[Ta, ManagedState, UnmanagedState, F, A] = {
     StepMap[Ta, ManagedState, UnmanagedState, F, (S, I), A](
       sub.run _,
-      (_, si) => {
-        map(si._1, si._2.asInstanceOf[I])
+      (b, si) => {
+        map(b, si._1, si._2.asInstanceOf[I])
       },
       tags)
   }
@@ -513,7 +513,7 @@ trait PrecepteBuilder[Ta] {
   // Suspends a Precepte in the concept of a Step
   // The other coyoneda trick
   def apply[M, U, F[_], A](m: => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
-    SubStep(m, (s, i: A) => (s, i), tags)
+    SubStep(m, (_, s, i: A) => (s, i), tags)
 
   def liftF[M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
     Suspend(fa)

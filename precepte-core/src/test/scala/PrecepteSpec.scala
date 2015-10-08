@@ -442,7 +442,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     // s2
     val (s2, _) = Precepte(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
     s2.viz should ===(
-      Graph(Set(Sub("p1_3_0", "p1", // TODO: should be sub
+      Graph(Set(Sub("sub_1_0", "sub", // TODO: should be sub
         Graph(Set(
           Leaf("p4_2_0", "p4"),
           Leaf("p1_3_0", "p1")),
@@ -484,7 +484,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         Leaf("p5_5_0", "p5"),
         Leaf("p2_2_4", "p2"),
         Leaf("p0_1_0", "p0"),
-        Sub("p4_4_0", "p4", Graph(Set(Leaf("p4_4_0", "p4")),Set())),
+        Sub("sub_3_0", "sub", Graph(Set(Leaf("p4_4_0", "p4")),Set())),
         Leaf("p1_2_6", "p1")),
       Set(
         Edge("p0_1_0", "p1_2_6"),
@@ -501,7 +501,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
     ssubap.viz should === (
       Graph(Set(
-        Sub("p1_2_0", "p1",
+        Sub("sub_1_0", "sub",
           Graph(Set(
             Leaf("p1_2_0", "p1")),
           Set()))),
@@ -509,14 +509,30 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     )
 
     // psubap2
+
+    //  val p8 =
+    //   for {
+    //   _ <- p0
+    //   _ <- (p1 |@| p2 |@| p3).tupled
+    //   _ <- Precepte(tags("sub"))(p4)
+    //   _ <- p5
+    //   _ <- Precepte(tags("sub2"))(for {
+    //       _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
+    //       _ <- p6
+    //       _ <- (p4 |@| p5 |@| Precepte(tags("sub3"))(p6)).tupled
+    //       _ <- p7
+    //     } yield ())
+    // } yield ()
+
     val (ssubap2, _) =
       p8
         .graph(Graph.empty)
         .eval(nostate)
         .futureValue
+
     ssubap2.viz should === (
       Graph(Set(
-        Sub("p7_11_0", "p7",
+        Sub("sub2_6_0", "sub2",
           Graph(Set(
             Leaf("p3_7_4", "p3"),
             Leaf("p4_9_6", "p4"),
@@ -524,7 +540,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
             Leaf("p4_7_2", "p4"),
             Leaf("p6_8_0", "p6"),
             Leaf("p1_7_6", "p1"),
-            Sub("p6_10_0", "p6",
+            Sub("sub3_9_1", "sub3",
               Graph(Set(
                 Leaf("p6_10_0", "p6")),Set())),
             Leaf("p2_7_4", "p2"),
@@ -540,7 +556,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
             Edge("p5_9_4", "p7_11_0"),
             Edge("p4_9_6", "p7_11_0"),
             Edge("p2_7_4", "p6_8_0")))),
-        Sub("p4_4_0", "p4",
+        Sub("sub_3_0", "sub",
           Graph(Set(Leaf("p4_4_0", "p4")),Set())),
         Leaf("p3_2_1", "p3"),
         Leaf("p5_5_0", "p5"),
@@ -566,8 +582,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       Precepte(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
     sp1.viz should === (
       Graph(Set(
-        Sub("p1_2_0", "p1",
-          Graph(Set(Leaf("p1_2_0", "p1")),Set()))),Set()).viz
+        Sub("sub_1_0", "sub",
+          Graph(Set(Leaf("p1_2_0", "p1")), Set()))), Set()).viz
     )
   }
 
