@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit
 import org.influxdb._
 
 object Influx {
-  type SF[T] = (ST[Int], Future[T])
+  type SF[C, T] = (ST[C], Future[T])
 }
 
 import Influx.SF
@@ -42,14 +42,14 @@ case class Influx[C : scalaz.Semigroup](
   user: String,
   password: String,
   dbName: String
-)(implicit ex: ExecutionContext) extends (SF ~> Future){
+)(implicit ex: ExecutionContext) extends (({ type λ[α] = SF[C, α] })#λ ~> Future){
   private val influxDB = {
     val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
     in.createDatabase(dbName)
     in.enableBatch(2000, 3, TimeUnit.SECONDS)
   }
 
-  def apply[A](sf: SF[A]): Future[A] = {
+  def apply[A](sf: SF[C, A]): Future[A] = {
     val t0 = System.nanoTime()
     val (st, f) = sf
     f.map { r =>
