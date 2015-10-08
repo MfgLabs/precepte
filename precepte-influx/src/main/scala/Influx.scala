@@ -31,62 +31,63 @@ import default._
 import java.util.concurrent.TimeUnit
 import org.influxdb._
 
-object Influx {
-  type SF[C, T] = (ST[C], Future[T])
-}
-
-import Influx.SF
-
 case class Influx[C : scalaz.Semigroup](
   influxdbURL: URL,
   user: String,
   password: String,
   dbName: String
-)(implicit ex: ExecutionContext) extends (({ type λ[α] = SF[C, α] })#λ ~> Future){
+)(implicit ex: ExecutionContext) {
+
   private val influxDB = {
     val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
     in.createDatabase(dbName)
     in.enableBatch(2000, 3, TimeUnit.SECONDS)
   }
 
-  def apply[A](sf: SF[C, A]): Future[A] = {
-    val t0 = System.nanoTime()
-    val (st, f) = sf
-    f.map { r =>
-      val t1 = System.nanoTime()
-      val duration = t1 - t0
+  type SF[T] = (ST[C], Future[T])
 
-      val sep = "/"
-      val path = st.managed.path
-      val p =
-        path.map { c =>
-          c.id.value
-        }.mkString(sep, sep, "")
+  val monitor =
+    new (SF ~> Future) {
+      def apply[A](sf: SF[A]): Future[A] = {
+        val t0 = System.nanoTime()
+        val (st, f) = sf
+        f.map { r =>
+          val t1 = System.nanoTime()
+          val duration = t1 - t0
 
-      val method = path.last.tags.callee.value
+          val sep = "/"
+          val path = st.managed.path
+          val p =
+            path.map { c =>
+              c.id.value
+            }.mkString(sep, sep, "")
 
-      val callees: String =
-        path.map(_.tags.callee.value).mkString(sep, sep, "")
+          val method = path.last.tags.callee.value
 
-      val category =
-        path.last.tags.category.value
+          val callees: String =
+            path.map(_.tags.callee.value).mkString(sep, sep, "")
 
-      val serie =
-        dto.Point.measurement("response_times")
-          .time(System.currentTimeMillis(), TimeUnit.MILLISECONDS)
-          .tag("host", st.managed.env.host.value)
-          .tag("environment", st.managed.env.environment.value)
-          .tag("version", st.managed.env.version.value)
-          .tag("category", category)
-          .tag("callees", callees)
-          .tag("method", method)
-          .field("span", st.managed.span.value)
-          .field("path", p)
-          .field("execution_time", duration)
-          .build();
+          val category =
+            path.last.tags.category.value
 
-      influxDB.write(dbName, "default", serie)
-      r
+          val serie =
+            dto.Point.measurement("response_times")
+              .time(System.currentTimeMillis(), TimeUnit.MILLISECONDS)
+              .tag("host", st.managed.env.host.value)
+              .tag("environment", st.managed.env.environment.value)
+              .tag("version", st.managed.env.version.value)
+              .tag("category", category)
+              .tag("callees", callees)
+              .tag("method", method)
+              .field("span", st.managed.span.value)
+              .field("path", p)
+              .field("execution_time", duration)
+              .build();
+
+          influxDB.write(dbName, "default", serie)
+          r
+        }
+      }
     }
-  }
+
 }
