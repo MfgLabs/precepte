@@ -509,21 +509,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     )
 
     // psubap2
-
-    //  val p8 =
-    //   for {
-    //   _ <- p0
-    //   _ <- (p1 |@| p2 |@| p3).tupled
-    //   _ <- Precepte(tags("sub"))(p4)
-    //   _ <- p5
-    //   _ <- Precepte(tags("sub2"))(for {
-    //       _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
-    //       _ <- p6
-    //       _ <- (p4 |@| p5 |@| Precepte(tags("sub3"))(p6)).tupled
-    //       _ <- p7
-    //     } yield ())
-    // } yield ()
-
     val (ssubap2, _) =
       p8
         .graph(Graph.empty)
