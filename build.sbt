@@ -83,7 +83,12 @@ lazy val influx =
         else
           Some("releases" at s3Repo + "/releases")
       },
-      libraryDependencies ++= Seq(ws))
+      libraryDependencies ++= Seq(
+        // influx deps
+        "com.google.guava" % "guava" % "18.0",
+        "com.squareup.retrofit" % "retrofit" % "1.9.0",
+        "com.squareup.okhttp" % "okhttp" % "2.4.0"
+      ))
     .dependsOn(core)
 
 lazy val logback =

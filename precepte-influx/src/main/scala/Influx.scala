@@ -24,80 +24,69 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.language.postfixOps
 
-import akka.actor.{ Actor, Props, ActorSystem }
+import scalaz.~>
 
 import default._
 
-case class Influx[C : scalaz.Semigroup](influxdbURL: URL, env: BaseEnv, system: ActorSystem)(implicit ex: ExecutionContext) {
+import java.util.concurrent.TimeUnit
+import org.influxdb._
 
-  type P[A] = DefaultPre[Future, C, A]
+object Influx {
+  type SF[T] = (ST[Int], Future[T])
+}
 
-  private val builder = new com.ning.http.client.AsyncHttpClientConfig.Builder()
-  private val WS = new play.api.libs.ws.ning.NingWSClient(builder.build())
+import Influx.SF
 
-  private case object Publish
-  private case class Metric(time: Long, span: Span, path: Call.Path[BaseTags], duration: Duration)
+case class Influx[C : scalaz.Semigroup](
+  influxdbURL: URL,
+  user: String,
+  password: String,
+  dbName: String
+)(implicit ex: ExecutionContext) extends (SF ~> Future){
+  private val influxDB = {
+    val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
+    in.createDatabase(dbName)
+    in.enableBatch(2000, 3, TimeUnit.SECONDS)
+  }
 
-  private class InfluxClient extends Actor {
-    val metrics = scala.collection.mutable.ArrayBuffer[Metric]()
+  def apply[A](sf: SF[A]): Future[A] = {
+    val t0 = System.nanoTime()
+    val (st, f) = sf
+    f.map { r =>
+      val t1 = System.nanoTime()
+      val duration = t1 - t0
 
-    // fast and ugly json serialization
-    private def json: String = {
       val sep = "/"
+      val path = st.managed.path
+      val p =
+        path.map { c =>
+          c.id.value
+        }.mkString(sep, sep, "")
 
-      val points =
-        metrics.map { case Metric(time, span, path, duration) =>
-          val p = path.map { c =>
-            c.id.value
-          }.mkString(sep, sep, "")
+      val method = path.last.tags.callee.value
 
-          val callees =
-            path.map(_.tags.callee).mkString(sep, sep, "")
+      val callees: String =
+        path.map(_.tags.callee.value).mkString(sep, sep, "")
 
-          val category =
-            path.map(_.tags.category).mkString(sep, sep, "")
+      val category =
+        path.last.tags.category.value
 
-          s"""["${env.host.value}", "${env.environment.value}", "$category", "${span.value}", "$p", "$callees", $time, ${duration.toNanos}]"""
-        }.mkString(",")
+      val serie =
+        dto.Point.measurement("response_times")
+          .time(System.currentTimeMillis(), TimeUnit.MILLISECONDS)
+          .tag("host", st.managed.env.host.value)
+          .tag("environment", st.managed.env.environment.value)
+          .tag("version", st.managed.env.version.value)
+          .tag("category", category)
+          .tag("callees", callees)
+          .tag("method", method)
+          .field("span", st.managed.span.value)
+          .field("path", p)
+          .field("execution_time", duration)
+          .build();
 
-      s"""[{"name": "response_times", "columns": ["host", "environment", "category", "span", "path", "callees", "time", "duration"], "points": [$points] }]"""
-    }
-
-    def receive = {
-      case m: Metric =>
-        metrics += m
-        ()
-      case Publish =>
-        if(metrics.nonEmpty) {
-          WS.url(influxdbURL.toString).post(json)
-          metrics.clear()
-        }
-    }
-  }
-
-  private val client = system.actorOf(Props(new InfluxClient))
-
-  system.scheduler.schedule(10 seconds, 10 seconds, client, Publish)
-
-  case class Timer(span: Span, path: Call.Path[BaseTags]) {
-    def timed[A](f: scala.concurrent.Future[A]) = {
-      val t0 = System.nanoTime()
-      f.map { x =>
-        val t1 = System.nanoTime()
-        client ! Metric(t0 / 1000000, span, path, (t1 -t0) nanoseconds)
-        x
-      }
+      influxDB.write(dbName, "default", serie)
+      r
     }
   }
-
-  def Timed[A](category: Category)(callee: Callee)(f: ST[C] => Future[A])(implicit fu: scalaz.Functor[Future]): P[A] =
-    Precepte(BaseTags(callee, category)){ (c: ST[C]) =>
-      Timer(c.managed.span, c.managed.path).timed(f(c))
-    }
-
-  def TimedM[A](category: Category)(callee: Callee)(f: P[A])(implicit mo: scalaz.Monad[Future]): P[A] =
-    Precepte(BaseTags(callee, category)){ (c: ST[C]) =>
-      Timer(c.managed.span, c.managed.path).timed(f.eval(c))
-    }
-
 }
