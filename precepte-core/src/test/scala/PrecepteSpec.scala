@@ -23,12 +23,12 @@ import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.time.{Millis, Seconds, Span => TSpan}
+import org.scalatest.time.{ Millis, Seconds, Span => TSpan }
 
 import scala.language.higherKinds
 
 
-class PrecepteSpec extends FlatSpec with ScalaFutures {
+class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
   implicit val defaultPatience =
     PatienceConfig(timeout =  TSpan(300, Seconds), interval = TSpan(5, Millis))
@@ -394,7 +394,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
       def append(f1: Int, f2: => Int) = f1 + f2
     }
 
-    def nostate = ST(Span.gen, env, Vector.empty, 0)
+    def nostate = ST(ManagedState(env, Span.gen, Vector.empty, PIdStream(ids = Stream.from(1).map(i => PId(i.toString)))), 0)
 
     // type Pre[A] = DefaultPre[Future, Int, A]
 
@@ -433,27 +433,42 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         }
       }.eval(nostate).futureValue
 
-    println("=== s ===")
-    println(s.viz)
+    s.viz should ===(Graph(Set(Sub("subzero_1_0", "subzero", Graph(Set(Leaf("p4_2_0", "p4")),Set()))),Set()).viz)
 
-    println("=== (p1 |@| p2) ===")
+    // (p1 |@| p2)
     val (s1, _) = (p1 |@| p2).tupled.graph(Graph.empty).eval(nostate).futureValue
-    println(s1.viz)
+    s1.viz should ===(Graph(Set(Leaf("p2_1_1", "p2"), Leaf("p1_1_3", "p1")),Set()).viz)
 
-    println("=== s2 ===")
+    // s2
     val (s2, _) = Precepte(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
-    println(s2.viz)
+    s2.viz should ===(
+      Graph(Set(Sub("p1_3_0", "p1", // TODO: should be sub
+        Graph(Set(
+          Leaf("p4_2_0", "p4"),
+          Leaf("p1_3_0", "p1")),
+        Set(Edge("p4_2_0", "p1_3_0"))))), Set()
+      ).viz)
 
-    println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
+    // (p1 |@| p2 |@| p3) flatMap p4
     val ptest =
       for {
         _ <- (p1 |@| p2 |@| p3).tupled
         _ <- p4
       } yield ()
     val (s3, _) = ptest.graph(Graph.empty).eval(nostate).futureValue
-    println(s3.viz)
+    s3.viz should ===(
+      Graph(Set(
+        Leaf("p3_1_1", "p3"),
+        Leaf("p2_1_4", "p2"),
+        Leaf("p1_1_6", "p1"),
+        Leaf("p4_2_0", "p4")),
+      Set(
+        Edge("p3_1_1", "p4_2_0"),
+        Edge("p2_1_4", "p4_2_0"),
+        Edge("p1_1_6", "p4_2_0"))).viz
+      )
 
-    println("=== pX ===")
+    // pX
     val px =
       for {
       _ <- p0
@@ -463,28 +478,97 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     } yield ()
 
     val (sx, _) = px.graph(Graph.empty).eval(nostate).futureValue
-    println(sx.viz)
+    sx.viz should ===(
+      Graph(Set(
+        Leaf("p3_2_1", "p3"),
+        Leaf("p5_5_0", "p5"),
+        Leaf("p2_2_4", "p2"),
+        Leaf("p0_1_0", "p0"),
+        Sub("p4_4_0", "p4", Graph(Set(Leaf("p4_4_0", "p4")),Set())),
+        Leaf("p1_2_6", "p1")),
+      Set(
+        Edge("p0_1_0", "p1_2_6"),
+        Edge("p0_1_0", "p3_2_1"),
+        Edge("p2_2_4", "p4_4_0"),
+        Edge("p0_1_0", "p2_2_4"),
+        Edge("p1_2_6", "p4_4_0"),
+        Edge("p4_4_0", "p5_5_0"),
+        Edge("p3_2_1", "p4_4_0"))).viz
+      )
 
-    println("=== psubap ===")
-    // val psubap = Precepte(tags("sub"))((p1 |@| p2).tupled)
+    // psubap
     val psubap = Precepte(tags("sub"))(p1.map(identity))
     val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
-    println(ssubap.viz)
+    ssubap.viz should === (
+      Graph(Set(
+        Sub("p1_2_0", "p1",
+          Graph(Set(
+            Leaf("p1_2_0", "p1")),
+          Set()))),
+      Set()).viz
+    )
 
-    println("=== psubap2 ===")
+    // psubap2
     val (ssubap2, _) =
       p8
         .graph(Graph.empty)
         .eval(nostate)
         .futureValue
-    println(ssubap2.viz)
+    ssubap2.viz should === (
+      Graph(Set(
+        Sub("p7_11_0", "p7",
+          Graph(Set(
+            Leaf("p3_7_4", "p3"),
+            Leaf("p4_9_6", "p4"),
+            Leaf("p5_9_4", "p5"),
+            Leaf("p4_7_2", "p4"),
+            Leaf("p6_8_0", "p6"),
+            Leaf("p1_7_6", "p1"),
+            Sub("p6_10_0", "p6",
+              Graph(Set(
+                Leaf("p6_10_0", "p6")),Set())),
+            Leaf("p2_7_4", "p2"),
+            Leaf("p7_11_0", "p7")),
+          Set(
+            Edge("p6_8_0", "p4_9_6"),
+            Edge("p1_7_6", "p6_8_0"),
+            Edge("p3_7_4", "p6_8_0"),
+            Edge("p6_10_0", "p7_11_0"),
+            Edge("p4_7_2", "p6_8_0"),
+            Edge("p6_8_0", "p6_10_0"),
+            Edge("p6_8_0", "p5_9_4"),
+            Edge("p5_9_4", "p7_11_0"),
+            Edge("p4_9_6", "p7_11_0"),
+            Edge("p2_7_4", "p6_8_0")))),
+        Sub("p4_4_0", "p4",
+          Graph(Set(Leaf("p4_4_0", "p4")),Set())),
+        Leaf("p3_2_1", "p3"),
+        Leaf("p5_5_0", "p5"),
+        Leaf("p2_2_4", "p2"),
+        Leaf("p0_1_0", "p0"),
+        Leaf("p1_2_6", "p1")),
+      Set(
+        Edge("p0_1_0", "p1_2_6"),
+        Edge("p0_1_0", "p3_2_1"),
+        Edge("p2_2_4", "p4_4_0"),
+        Edge("p5_5_0", "p1_7_6"),
+        Edge("p0_1_0", "p2_2_4"),
+        Edge("p1_2_6", "p4_4_0"),
+        Edge("p4_4_0", "p5_5_0"),
+        Edge("p5_5_0", "p2_7_4"),
+        Edge("p5_5_0", "p4_7_2"),
+        Edge("p5_5_0", "p3_7_4"),
+        Edge("p3_2_1", "p4_4_0"))).viz
+    )
 
-    println("=== simple ===")
+    // simple
     val (sp1, _) =
       Precepte(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
-    println(sp1.viz)
-
-    1 should ===(1)
+    sp1.viz should === (
+      Graph(Set(
+        Sub("p1_2_0", "p1",
+          Graph(Set(Leaf("p1_2_0", "p1")),Set()))),Set()).viz
+    )
   }
 
   it should "compile using nat" in {
@@ -543,7 +627,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
         f._2.map { a =>
           val t1 = System.nanoTime()
           val duration = t1 - t0
-          println(s"$method was executed in ${duration / 1000} ms")
+          // TODO: Store measure and test result
           a
         }
       }
@@ -554,7 +638,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures {
     }
     def nostate = ST(Span.gen, env, Vector.empty, 0)
 
-    println("==== mapSuspension ====")
     val res = p8.mapSuspension(Mon).eval(nostate).futureValue
     res should ===(())
   }
