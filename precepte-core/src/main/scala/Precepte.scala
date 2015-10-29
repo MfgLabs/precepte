@@ -60,7 +60,7 @@ import scala.annotation.tailrec
   *
   *  // create some effectful steps in which you can
   *  def f1 = Precepte(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
-  *  def f2(i: Int) = Precepte(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
+  *  def f2(i: Int) = Precepte(tags("simple.f2")){(_: ST[Unit]) => s"foo \$i".point[Future]}
   *
   *  // Lazy definition of your effectful workflow
   *  val res = for {
