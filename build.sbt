@@ -30,19 +30,22 @@ lazy val strictScalac =
     //, "-Ywarn-unused-import"
 )
 
+lazy val publishSettings =
+   Seq(publishTo := {
+      val s3Repo = "s3://mfg-mvn-repo"
+      if (isSnapshot.value)
+        Some("snapshots" at s3Repo + "/snapshots")
+      else
+        Some("releases" at s3Repo + "/releases")
+    })
+
 lazy val core =
   project.in(file("precepte-core"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
+    .settings(publishSettings:_*)
     .settings(
       name := "precepte-core",
-      publishTo := {
-        val s3Repo = "s3://mfg-mvn-repo"
-        if (isSnapshot.value)
-          Some("snapshots" at s3Repo + "/snapshots")
-        else
-          Some("releases" at s3Repo + "/releases")
-      },
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
           "org.scalaz"      %% "scalaz-core"      % "7.1.0"
@@ -74,15 +77,9 @@ lazy val influx =
   project.in(file("precepte-influx"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
+    .settings(publishSettings:_*)
     .settings(
       name := "precepte-influx",
-      publishTo := {
-        val s3Repo = "s3://mfg-mvn-repo"
-        if (isSnapshot.value)
-          Some("snapshots" at s3Repo + "/snapshots")
-        else
-          Some("releases" at s3Repo + "/releases")
-      },
       libraryDependencies ++= Seq(
         // influx deps
         "com.google.guava" % "guava" % "18.0",
@@ -95,15 +92,9 @@ lazy val logback =
   project.in(file("precepte-logback"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
+    .settings(publishSettings:_*)
     .settings(
       name := "precepte-logback",
-      publishTo := {
-        val s3Repo = "s3://mfg-mvn-repo"
-        if (isSnapshot.value)
-          Some("snapshots" at s3Repo + "/snapshots")
-        else
-          Some("releases" at s3Repo + "/releases")
-      },
       libraryDependencies ++= Seq(
         "ch.qos.logback" % "logback-classic" % "1.1.2",
         "net.logstash.logback" % "logstash-logback-encoder" % "4.2"))
@@ -113,14 +104,8 @@ lazy val play =
   project.in(file("precepte-play"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
+    .settings(publishSettings:_*)
     .settings(
-      publishTo := {
-        val s3Repo = "s3://mfg-mvn-repo"
-        if (isSnapshot.value)
-          Some("snapshots" at s3Repo + "/snapshots")
-        else
-          Some("releases" at s3Repo + "/releases")
-      },
       libraryDependencies += "com.typesafe.play" %% "play" % "2.3.9",
       name := "precepte-play")
     .dependsOn(core, influx)
@@ -129,14 +114,8 @@ lazy val stream =
   project.in(file("precepte-stream"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
+    .settings(publishSettings:_*)
     .settings(
-      publishTo := {
-        val s3Repo = "s3://mfg-mvn-repo"
-        if (isSnapshot.value)
-          Some("snapshots" at s3Repo + "/snapshots")
-        else
-          Some("releases" at s3Repo + "/releases")
-      },
       libraryDependencies ++= Seq(
           "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0"
         , "org.scalatest"     %%  "scalatest"                  % "2.2.1"  % "test"

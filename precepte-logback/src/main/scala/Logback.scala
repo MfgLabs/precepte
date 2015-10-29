@@ -20,7 +20,7 @@ package precepte
 import scala.language.higherKinds
 
 import default._
-// import scala.collection.immutable.{ map => SMap }
+import scala.collection.immutable.{ Map => ScMap }
 
 case class Logback(env: BaseEnv) {
 
@@ -39,12 +39,12 @@ case class Logback(env: BaseEnv) {
           c.tags.callee.value
         }.mkString(sep, sep, "")
 
-      Map(
+      ScMap(
         env.environment.name -> env.environment.value,
         "span" -> span.value,
         "path" -> path.map(_.id.value).mkString(sep, sep, ""),
         "callees" -> callees,
-        "parameters" -> Map(params:_*).asJava).asJava
+        "parameters" -> ScMap(params:_*).asJava).asJava
     }
 
     def debug(message: => String, params: (String, String)*): Unit =
