@@ -34,9 +34,8 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
 }
 
 object Models {
-
   def Timed[A](f: ST[Unit] => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): DPre[Future, Unit, A] =
-    Monitoring.TimedAction.influx.Timed(Category.Database)(callee)(f)(fu)
+    Pre(BaseTags(callee, Category.Database)) { (st: ST[Unit]) => f(st) }
 }
 
 object Computer {
@@ -52,7 +51,7 @@ object Computer {
     get[Option[Date]]("computer.introduced") ~
     get[Option[Date]]("computer.discontinued") ~
     get[Option[Long]]("computer.company_id") map {
-      case id~name~introduced~discontinued~companyId => Computer(id, name, introduced, discontinued, companyId)
+      case id ~ name ~ introduced ~ discontinued ~ companyId => Computer(id, name, introduced, discontinued, companyId)
     }
   }
 

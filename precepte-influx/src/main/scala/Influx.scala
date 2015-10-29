@@ -38,11 +38,13 @@ case class Influx[C : scalaz.Semigroup](
   dbName: String
 )(implicit ex: ExecutionContext) {
 
-  private val influxDB = {
-    val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
-    in.createDatabase(dbName)
-    in.enableBatch(2000, 3, TimeUnit.SECONDS)
-  }
+  import scala.util.{ Try, Failure, Success }
+  private lazy val influxDB =
+    Try {
+      val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
+      in.createDatabase(dbName)
+      in.enableBatch(2000, 3, TimeUnit.SECONDS)
+    }
 
   type SF[T] = (ST[C], Future[T])
 
@@ -77,18 +79,23 @@ case class Influx[C : scalaz.Semigroup](
       .build()
   }
 
-  val monitor =
-    new (SF ~> Future) {
-      def apply[A](sf: SF[A]): Future[A] = {
-        val t0 = System.nanoTime()
-        val (st, f) = sf
-        f.map { r =>
-          val t1 = System.nanoTime()
-          val serie = toSerie(t0, t1, System.currentTimeMillis(), st)
-          influxDB.write(dbName, "default", serie)
-          r
+  def monitor =
+    influxDB match {
+      case Success(in) =>
+        new (SF ~> Future) {
+          def apply[A](sf: SF[A]): Future[A] = {
+            val t0 = System.nanoTime()
+            val (st, f) = sf
+            f.map { r =>
+              val t1 = System.nanoTime()
+              val serie = toSerie(t0, t1, System.currentTimeMillis(), st)
+              in.write(dbName, "default", serie)
+              r
+            }
+          }
         }
-      }
+      case Failure(e) => throw e
     }
+
 
 }

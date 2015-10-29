@@ -27,25 +27,26 @@ import scala.language.higherKinds
 import com.mfglabs.precepte._
 import default._
 
-trait ActionFunction[-R[_], +P[_], F[_], C] {
+trait PreActionFunction[-R[_], +P[_], F[_], C] {
   self =>
   def invokeBlock[A](request: R[A], block: (ST[C], P[A]) => DPre[F, C, Result]): DPre[F, C, Result]
 
   protected def executionContext: scala.concurrent.ExecutionContext = play.api.libs.concurrent.Execution.defaultContext
 
-  def andThen[Q[_]](other: ActionFunction[P, Q, F, C]): ActionFunction[R, Q, F, C]
+  def andThen[Q[_]](other: PreActionFunction[P, Q, F, C]): PreActionFunction[R, Q, F, C]
 }
 
 
-trait ActionBuilder[+R[_], C] extends ActionFunction[Request, R, Future, C] {
+trait PreActionBuilder[+R[_], C] extends PreActionFunction[Request, R, Future, C] {
   self =>
 
-  val initialState: C
-  val version: default.Version
-  val environment: default.Environment
+  def initialState: C
+  def version: default.Version
+  def environment: default.Environment
+  def host: default.Host
 
-  val env = default.BaseEnv(default.Host(java.net.InetAddress.getLocalHost().getHostName()), environment, version)
-  val initialST = default.ST(Span.gen, env, Vector.empty, initialState)
+  def _env = default.BaseEnv(host, environment, version)
+  def initialST = default.ST(Span.gen, _env, Vector.empty, initialState)
 
   private def addSpan(fr: Future[Result]) = fr.map(_.withHeaders("Span-Id" -> initialST.managed.span.value))(executionContext)
 
@@ -71,10 +72,12 @@ trait ActionBuilder[+R[_], C] extends ActionFunction[Request, R, Future, C] {
 
   protected def composeParser[A](bodyParser: BodyParser[A]): BodyParser[A] = bodyParser
 
-  override def andThen[Q[_]](other: ActionFunction[R, Q, Future, C]): ActionBuilder[Q, C] = new ActionBuilder[Q, C] {
-    val initialState = self.initialState
-    val version = self.version
-    val environment = self.environment
+  // TODO: composition with play action builder ?
+  override def andThen[Q[_]](other: PreActionFunction[R, Q, Future, C]): PreActionBuilder[Q, C] = new PreActionBuilder[Q, C] {
+    def initialState = self.initialState
+    def version = self.version
+    def environment = self.environment
+    def host = self.host
 
     def invokeBlock[A](request: Request[A], block: (ST[C], Q[A]) => DPre[Future, C, Result]): DPre[Future, C, Result] =
       self.invokeBlock[A](request, (st, b) => other.invokeBlock[A](b, block))

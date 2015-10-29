@@ -14,9 +14,9 @@ import models._
 
 import com.mfglabs.precepte._
 import com.mfglabs.precepte.default._
+import Macros.callee
 
-import commons.Monitoring
-import Monitoring.TimedAction
+import commons.Monitoring._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scalaz.std.scalaFuture._
@@ -50,9 +50,10 @@ object Application extends Controller {
   /**
    * Handle default path requests, redirect to computers list
    */
-  def index = TimedAction.action { _ =>
-    Future.successful(Home)
-  }
+  def index =
+    TimedAction.future { (_, _) =>
+      Future.successful(Home)
+    }
 
   /**
    * Display the paginated list of computers.
@@ -61,7 +62,8 @@ object Application extends Controller {
    * @param orderBy Column to be sorted
    * @param filter Filter applied on computer names
    */
-  def list(page: Int, orderBy: Int, filter: String) = TimedAction { implicit request =>
+  def list(page: Int, orderBy: Int, filter: String) = TimedAction.async { (_, request) =>
+    implicit val r = request
     for {
       cs <- Computer.list(page = page, orderBy = orderBy, filter = ("%"+filter+"%"))
     } yield Ok(html.list(cs, orderBy, filter))
@@ -72,7 +74,7 @@ object Application extends Controller {
    *
    * @param id Id of the computer to edit
    */
-  def edit(id: Long) = TimedAction { _ =>
+  def edit(id: Long) = TimedAction.async { (_, _) =>
     (for {
       computer <- trans(Computer.findById(id))
       options <- trans(Company.options.lift[Option])
@@ -86,7 +88,8 @@ object Application extends Controller {
    *
    * @param id Id of the computer to edit
    */
-  def update(id: Long) = TimedAction { implicit request =>
+  def update(id: Long) = TimedAction.async { (_, request) =>
+    implicit val r = request
     computerForm.bindFromRequest.fold(
       formWithErrors =>
         for {
@@ -101,7 +104,7 @@ object Application extends Controller {
   /**
    * Display the 'new computer form'.
    */
-  def create = TimedAction { _ =>
+  def create = TimedAction.async { (_, _) =>
     for {
       options <- Company.options
     } yield Ok(html.createForm(computerForm, options))
@@ -110,7 +113,8 @@ object Application extends Controller {
   /**
    * Handle the 'new computer form' submission.
    */
-  def save = TimedAction { implicit request =>
+  def save = TimedAction.async { (_, request) =>
+    implicit val r = request
     computerForm.bindFromRequest.fold(
       formWithErrors =>
         for {
@@ -127,7 +131,7 @@ object Application extends Controller {
   /**
    * Handle computer deletion.
    */
-  def delete(id: Long) = TimedAction { _ =>
+  def delete(id: Long) = TimedAction.async { (_, _) =>
     for {
       _ <- Computer.delete(id)
     } yield Home.flashing("success" -> "Computer has been deleted")
