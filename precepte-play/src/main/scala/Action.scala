@@ -29,7 +29,7 @@ import default._
 
 trait PreActionFunction[-R[_], +P[_], F[_], C] {
   self =>
-  def invokeBlock[A](request: R[A], block: (ST[C], P[A]) => DPre[F, C, Result]): DPre[F, C, Result]
+  def invokeBlock[A](request: R[A], block: P[A] => DPre[F, C, Result]): DPre[F, C, Result]
 
   protected def executionContext: scala.concurrent.ExecutionContext = play.api.libs.concurrent.Execution.defaultContext
 
@@ -50,20 +50,20 @@ trait PreActionBuilder[+R[_], C] extends PreActionFunction[Request, R, Future, C
 
   private def addSpan(fr: Future[Result]) = fr.map(_.withHeaders("Span-Id" -> initialST.managed.span.value))(executionContext)
 
-  final def future(block: (ST[C], R[AnyContent]) => Future[Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[AnyContent] =
+  final def future(block: R[AnyContent] => Future[Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[AnyContent] =
     future(BodyParsers.parse.anyContent)(block)
 
-  final def future[A](bodyParser: BodyParser[A])(block: (ST[C], R[A]) => Future[Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[A] =
+  final def future[A](bodyParser: BodyParser[A])(block: R[A] => Future[Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[A] =
     Action.async(bodyParser) { r =>
-      addSpan(invokeBlock(r, { (mc: ST[C], p: R[A]) =>
-        Precepte(default.BaseTags(callee, default.Category.Api)) { st: ST[C] => block(st, p) }
+      addSpan(invokeBlock(r, { p: R[A] =>
+        Precepte(default.BaseTags(callee, default.Category.Api)) { st: ST[C] => block(p) }
       }).eval(initialST))
     }
 
-  final def async(block: (ST[C], R[AnyContent]) => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[AnyContent] =
+  final def async(block: R[AnyContent] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[AnyContent] =
     async(BodyParsers.parse.anyContent)(block)
 
-  final def async[A](bodyParser: BodyParser[A])(block: (ST[C], R[A]) => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[A] =
+  final def async[A](bodyParser: BodyParser[A])(block: R[A] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[A] =
     Action.async(bodyParser) { r =>
       addSpan(Precepte(default.BaseTags(callee, default.Category.Api)) {
         invokeBlock(r, block)
@@ -79,8 +79,8 @@ trait PreActionBuilder[+R[_], C] extends PreActionFunction[Request, R, Future, C
     def environment = self.environment
     def host = self.host
 
-    def invokeBlock[A](request: Request[A], block: (ST[C], Q[A]) => DPre[Future, C, Result]): DPre[Future, C, Result] =
-      self.invokeBlock[A](request, (st, b) => other.invokeBlock[A](b, block))
+    def invokeBlock[A](request: Request[A], block: Q[A] => DPre[Future, C, Result]): DPre[Future, C, Result] =
+      self.invokeBlock[A](request, b => other.invokeBlock[A](b, block))
 
     override protected def composeParser[A](bodyParser: BodyParser[A]): BodyParser[A] =
       self.composeParser(bodyParser)

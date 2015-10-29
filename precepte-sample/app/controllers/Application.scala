@@ -51,7 +51,7 @@ object Application extends Controller {
    * Handle default path requests, redirect to computers list
    */
   def index =
-    TimedAction.future { (_, _) =>
+    TimedAction.future { _ =>
       Future.successful(Home)
     }
 
@@ -62,8 +62,8 @@ object Application extends Controller {
    * @param orderBy Column to be sorted
    * @param filter Filter applied on computer names
    */
-  def list(page: Int, orderBy: Int, filter: String) = TimedAction.async { (_, request) =>
-    implicit val r = request
+  def list(page: Int, orderBy: Int, filter: String) = TimedAction.async { req =>
+    implicit val r = req._2
     for {
       cs <- Computer.list(page = page, orderBy = orderBy, filter = ("%"+filter+"%"))
     } yield Ok(html.list(cs, orderBy, filter))
@@ -74,7 +74,7 @@ object Application extends Controller {
    *
    * @param id Id of the computer to edit
    */
-  def edit(id: Long) = TimedAction.async { (_, _) =>
+  def edit(id: Long) = TimedAction.async { _ =>
     (for {
       computer <- trans(Computer.findById(id))
       options <- trans(Company.options.lift[Option])
@@ -88,8 +88,8 @@ object Application extends Controller {
    *
    * @param id Id of the computer to edit
    */
-  def update(id: Long) = TimedAction.async { (_, request) =>
-    implicit val r = request
+  def update(id: Long) = TimedAction.async { req =>
+    implicit val r = req._2
     computerForm.bindFromRequest.fold(
       formWithErrors =>
         for {
@@ -104,7 +104,7 @@ object Application extends Controller {
   /**
    * Display the 'new computer form'.
    */
-  def create = TimedAction.async { (_, _) =>
+  def create = TimedAction.async { _ =>
     for {
       options <- Company.options
     } yield Ok(html.createForm(computerForm, options))
@@ -113,8 +113,8 @@ object Application extends Controller {
   /**
    * Handle the 'new computer form' submission.
    */
-  def save = TimedAction.async { (_, request) =>
-    implicit val r = request
+  def save = TimedAction.async { req =>
+    implicit val r = req._2
     computerForm.bindFromRequest.fold(
       formWithErrors =>
         for {
@@ -131,7 +131,7 @@ object Application extends Controller {
   /**
    * Handle computer deletion.
    */
-  def delete(id: Long) = TimedAction.async { (_, _) =>
+  def delete(id: Long) = TimedAction.async { _ =>
     for {
       _ <- Computer.delete(id)
     } yield Home.flashing("success" -> "Computer has been deleted")

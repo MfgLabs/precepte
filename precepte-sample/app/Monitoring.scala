@@ -32,16 +32,18 @@ object Monitoring {
 
   lazy val logback = Logback(env)
 
+  type Req[A] = (MonitoringContext, Request[A])
+
   def TimedAction(implicit callee: Callee) =
-    new PreActionBuilder[Request, Unit] {
+    new PreActionBuilder[Req, Unit] {
       def initialState = ()
       def version = env.version
       def environment = env.environment
       def host = env.host
 
-      def invokeBlock[A](request: Request[A], block: (ST[Unit], Request[A]) => DPre[Future, Unit, Result]) =
+      def invokeBlock[A](request: Request[A], block: ((MonitoringContext, Request[A])) => DPre[Future, Unit, Result]) =
         Pre(BaseTags(callee, Category.Api)) { (st: ST[Unit]) => Future.successful(st) } // XXX: does not make sense at the graph level
-          .flatMap{ st => block(st, request) }
+          .flatMap{ st => block(MonitoringContext(st) -> request) }
           .mapSuspension(influx.monitor)
     }
 
