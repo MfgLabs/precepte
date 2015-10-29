@@ -55,6 +55,8 @@ case class Logback(env: BaseEnv) {
       logger.warn(appendEntries(p(params)), message)
     def error(message: => String, params: (String, String)*): Unit =
       logger.error(appendEntries(p(params)), message)
+    def error(message: => String, ex: Exception, params: (String, String)*): Unit =
+      logger.error(appendEntries(p(params)), message, ex)
   }
 
 }
