@@ -11,7 +11,7 @@ lazy val commonSettings =  Seq(
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn
-)
+) ++ tutSettings :+ (tutTargetDirectory := baseDirectory.value / "documentation")
 
 lazy val strictScalac =
   scalacOptions ++= Seq(
