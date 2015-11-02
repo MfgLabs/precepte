@@ -18,6 +18,8 @@ class ModelSpec extends PlaySpecification {
   // --
   import com.mfglabs.precepte._
   import default._
+  import corescalaz._
+  
   import scala.concurrent.ExecutionContext.Implicits.global
   import scalaz.std.scalaFuture._
 

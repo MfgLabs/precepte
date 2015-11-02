@@ -15,15 +15,32 @@ limitations under the License.
 */
 
 package com.mfglabs
+package precepte
 
 import scala.language.higherKinds
-import scala.language.implicitConversions
-
-import com.mfglabs.precepte._
 
 
-package object precepte {
-  /** A shorter but nicer name in the code :D */
-  val Pre = Precepte
+trait MetaSemigroup[A] {
+  def combine(a: A, b: A): A
+}
 
+trait MetaFunctor[F[_]] {
+  def map[A, B](fa: F[A])(f: A => B): F[B]
+}
+
+trait MetaApplicative[F[_]] extends MetaFunctor[F] {
+  def pure[A](x: A): F[A]
+  def ap[A, B](fa: F[A])(f: F[A => B]): F[B]
+
+  final def map2[A, B, Z](fa: F[A], fb: F[B])(f: (A, B) => Z): F[Z] =
+    ap(fb)(map(fa)(a => (b: B) => f(a, b)))
+}
+
+trait MetaMonad[F[_]] extends MetaApplicative[F] {
+  def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
+}
+
+
+trait ~~>[F[_], G[_]] {
+  def apply[A](f: F[A]): G[A]
 }

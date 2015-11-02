@@ -31,7 +31,12 @@ object NoTags extends Tags
   */
 case class PState[Ta, ManagedState, UnmanagedState](
   managed: ManagedState,
-  unmanaged: UnmanagedState)
+  unmanaged: UnmanagedState) {
+
+  @inline def um = unmanaged
+
+  def mapUnmanaged[UnmanagedState2](f: UnmanagedState => UnmanagedState2): PState[Ta, ManagedState, UnmanagedState2] = PState(managed, f(unmanaged))
+}
 
 /** A Typeclass representing an updatable Precepte state (can append a Tag+idx & update unmanaged part) */
 trait PStateUpdater[Ta, MS, FS] {

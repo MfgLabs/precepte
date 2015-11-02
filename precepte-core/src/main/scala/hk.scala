@@ -17,7 +17,6 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
-import scalaz.Unapply
 import scala.language.higherKinds
 import scala.language.implicitConversions
 
@@ -32,6 +31,25 @@ trait *->*->*[F0[_, _]] {}
 object *->*->* {
   implicit def fKindEv2[F0[_, _]] = new *->*->*[F0] {}
 }
+
+// Not used but can be useful to hack SI-2172
+case class SingletonOf[TC[_[_], _], U, V <: { type A; type T[_] }](
+  widen: U { type A = V#A ; type T[x] = V#T[x] }
+)
+
+object SingletonOf {
+  implicit def mkSingletonOf[TC[_[_], _], U <: { type A; type T[_] }](implicit
+    u: U
+  ): SingletonOf[TC, U, u.type] = SingletonOf(u)
+}
+
+/** Forces scalac to identify all the elements of the Precepte type... completely non generic and custom to Precepte type */
+trait PrecepteUnapply[TCA, TC[_[_], _], F[_], Ta, MS, UMS, A]
+
+object PrecepteUnapply {
+  implicit def preUnapply[TC[_[_], _], F[_], Ta, MS, UMS, C, A] = new PrecepteUnapply[TC[({ type λ[α] = Precepte[Ta, MS, UMS, F, α] })#λ, A], TC, F, Ta, MS, UMS, A] { }
+}
+
 
 /**
   * Helpers for Precepte wrapped in Monad Transformers (OptionT, ListT, EitherT)
@@ -52,23 +70,6 @@ trait HK {
   )(implicit hh: HasHoist[({ type λ[α] = G[A, α] })#λ]): hh.T[({ type λ[α] = Precepte[Ta, ManagedState, UnmanagedState, F, α] })#λ, B] = {
     type λ[α] = G[A, α]
     trans[Ta, ManagedState, UnmanagedState, F, λ, B](m)(new *->*[λ] {}, hh)
-  }
-
-
-  /**
-    * A custom typeclass allowing to go around higher-kind type unification issues in scalac when using Monad Transformers + Precepte
-    */
-  implicit def toTCUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
-    implicit
-      una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],
-      nosi: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A0]
-  ) = new Unapply[M, TCA] {
-    type M[x] = nosi.T[x]
-    type A = A0
-
-    def TC = nosi.MTC
-
-    def leibniz = nosi.leibniz
   }
 
 }

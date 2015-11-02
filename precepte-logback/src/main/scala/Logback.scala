@@ -22,12 +22,12 @@ import scala.language.higherKinds
 import default._
 import scala.collection.immutable.{ Map => ScMap }
 
-case class Logback(env: BaseEnv) {
+case class Logback(env: BaseEnv, loggerName: String) {
 
   import net.logstash.logback.marker.Markers._
   import org.slf4j.LoggerFactory
 
-  private val logger = LoggerFactory.getLogger("application");
+  val logger = LoggerFactory.getLogger(loggerName)
 
   val sep = "/"
 

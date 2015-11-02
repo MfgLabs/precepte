@@ -23,6 +23,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 import akka.stream.stage._
 
+import corescalaz._
 
 object PreStream {
 
