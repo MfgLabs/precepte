@@ -14,11 +14,10 @@ most of this documentation is using `Future`, since it's familiar to most Scala 
 
 Let's say you've written the following code:
 
-```tut:invisible
-import scala.language._
-```
 
-```tut:silent
+
+
+```scala
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -28,7 +27,7 @@ def f2(s: Int): Future[String] = Future.successful(s"The answer to life the univ
 
 If you were to "chain" the calls to f1 and f2, that is call f1 and feed it's return to f2, you'd be writing something like:
 
-```tut:silent
+```scala
 val ultimateAnswer: Future[String] =
   for {
     s <- f1
@@ -38,7 +37,7 @@ val ultimateAnswer: Future[String] =
 
 Let's define a simple await function to test our code:
 
-```tut:silent
+```scala
 import scala.concurrent.Await
 import scala.concurrent.duration._
 def await[A](f: Future[A]) = Await.result(f, 10 seconds)
@@ -46,8 +45,9 @@ def await[A](f: Future[A]) = Await.result(f, 10 seconds)
 
 Now we can test it:
 
-```tut
-await(ultimateAnswer)
+```scala
+scala> await(ultimateAnswer)
+res1: String = The answer to life the universe and everything is 42
 ```
 
 
@@ -55,7 +55,7 @@ All is well, but you'd really like to be able to collect insights on your code, 
 
 Let's rewrite you code to use Précepte, and attach some metadata to it.
 
-```tut:silent
+```scala
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -85,7 +85,7 @@ What we've done so far is not particularly exiting. We wrapped everything in a P
 
 One interesting point is that, at call site, apart from the return type, everything stays identical to our old `Future` version (pun totally intended).
 
-```tut:silent
+```scala
 val ultimateAnswerPre: Pre[String] =
   for {
     s <- f1
@@ -100,7 +100,7 @@ The type of the custom state is fixed in our type definition for Pre. We said it
 
 Now if we want to run our code, we need to provide an initial state. Précepte will also ask you to provide information about the environment in which our application is executing.
 
-```tut:silent
+```scala
 val env = BaseEnv(Host("localhost"), Environment.Dev, Version("1.0-DEMO"))
 val nostate = ST(Span.gen, env, Vector.empty, ())
 
@@ -115,9 +115,12 @@ import scalaz.std.scalaFuture._
 
 Ok so we've added a bit of code, and finally, we're able to test the execution:
 
-```tut
-val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-await(eventuallyUltimateAnswer)
+```scala
+scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@53caed29
+
+scala> await(eventuallyUltimateAnswer)
+res9: String = The answer to life the universe and everything is 42
 ```
 
 // TODO: Précepte and the State Monad
@@ -131,11 +134,13 @@ TODO
 Now that you have access to metadata about the executing code, you can do pretty interesting things, like hava contextualized logs.
 Précepte has a module to use Logback. all you have to to is add it into your `build.sbt` file.
 
-TODO: add code for build.sbt.
+```scala
+libraryDependencies += "com.mfglabs" %% "precepte-logback" % precepteVersion
+```
 
 Once you have that, you can start using you contextualized Logger :)
 
-```tut:silent
+```scala
 val logback = Logback(env)
 
 object WithLogger extends Category("demo") {
@@ -169,7 +174,7 @@ val ultimateAnswerPre: Pre[String] =
 
 And now when we run the code:
 
-```tut:silent
+```scala
 val ultimateAnswer = ultimateAnswerPre.eval(nostate)
 await(ultimateAnswer)
 ```
