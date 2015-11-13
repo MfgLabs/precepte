@@ -117,7 +117,7 @@ Ok so we've added a bit of code, and finally, we're able to test the execution:
 
 ```scala
 scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@53caed29
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@f09400f
 
 scala> await(eventuallyUltimateAnswer)
 res9: String = The answer to life the universe and everything is 42
@@ -179,7 +179,7 @@ val ultimateAnswer = ultimateAnswerPre.eval(nostate)
 await(ultimateAnswer)
 ```
 
-Assuming logback is configured properly (see [the example logback.xml](precepte-tut/src/main/resources/logback.xml)), the following should appear in your console:
+Assuming logback is configured properly (see [the example logback.xml](../precepte-tut/src/main/resources/logback.xml)), the following should appear in your console:
 
 ```json
 {

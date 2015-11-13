@@ -176,7 +176,7 @@ val ultimateAnswer = ultimateAnswerPre.eval(nostate)
 await(ultimateAnswer)
 ```
 
-Assuming logback is configured properly (see [the example logback.xml](precepte-tut/src/main/resources/logback.xml)), the following should appear in your console:
+Assuming logback is configured properly (see [the example logback.xml](../precepte-tut/src/main/resources/logback.xml)), the following should appear in your console:
 
 ```json
 {
