@@ -26,8 +26,11 @@ case class Logback(env: BaseEnv) {
 
   import net.logstash.logback.marker.Markers._
   import org.slf4j.LoggerFactory
+  import ch.qos.logback.core.util.StatusPrinter
+  import ch.qos.logback.classic.LoggerContext
 
-  private val logger = LoggerFactory.getLogger("application");
+  private val logger = LoggerFactory.getLogger("application")
+  StatusPrinter.print((LoggerFactory.getILoggerFactory).asInstanceOf[LoggerContext])
 
   val sep = "/"
 

@@ -11,7 +11,7 @@ lazy val commonSettings =  Seq(
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn
-) ++ tutSettings :+ (tutTargetDirectory := baseDirectory.value / "documentation")
+) ++ tutSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
 
 lazy val strictScalac =
   scalacOptions ++= Seq(
@@ -123,7 +123,14 @@ lazy val stream =
       name := "precepte-stream")
     .dependsOn(core)
 
+lazy val doc =
+  project.in(file("precepte-tut"))
+    .settings(commonSettings:_*)
+    .settings(strictScalac)
+    .settings(publishSettings:_*)
+    .dependsOn(core, play, influx, logback, sample, stream)
+
 lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
   .settings(name := "precepte-root")
-  .aggregate(core, play, influx, logback, sample, stream)
+  .aggregate(core, play, influx, logback, sample, stream, doc)
