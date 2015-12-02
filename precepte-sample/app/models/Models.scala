@@ -91,7 +91,7 @@ object Computer {
     Models.Timed { (st: ST[Unit]) =>
       val ctx = MonitoringContext(st)
       import ctx._
-      logger.debug(s"Listing all computers", Macros.params(page, pageSize, orderBy, filter):_*)
+      logger.debug(s"Listing all computers", Macros.params(page, pageSize, orderBy, filter))
       Future.successful {
         val offest = pageSize * page
 
@@ -137,7 +137,7 @@ object Computer {
   def update(id: Long, computer: Computer) = Models.Timed { (st: ST[Unit]) =>
     val ctx = MonitoringContext(st)
     import ctx._
-    logger.info(s"updating computer with id", Macros.params(id, computer):_*)
+    logger.info(s"updating computer with id", Macros.params(id, computer))
     Future.successful {
       DB.withConnection { implicit connection =>
         SQL(
