@@ -1,4 +1,4 @@
-/*
+  /*
 Copyright 2015 Mfg labs.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,15 +15,19 @@ limitations under the License.
 */
 
 package com.mfglabs
+package precepte
+package corecats
+
+import cats.~>
 
 import scala.language.higherKinds
-import scala.language.implicitConversions
-
-import com.mfglabs.precepte._
 
 
-package object precepte {
-  /** A shorter but nicer name in the code :D */
-  val Pre = Precepte
+/** Implicit conversions to correct these functions doesn't work, scalac still uses original ones */
+case class CatsExt[Ta, ManagedState, UnmanagedState, F[_], A](
+  p: Precepte[Ta, ManagedState, UnmanagedState, F, A]
+) extends AnyVal {
+  final def compile[G[_]](nat: F ~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = p.compile(CatsMetaNat(nat))
 
-}
+  final def mapSuspension(nat: p.SF ~> F): Precepte[Ta, ManagedState, UnmanagedState, F, A] = p.mapSuspension(CatsMetaNat(nat))
+} 

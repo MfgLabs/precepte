@@ -16,6 +16,7 @@ limitations under the License.
 
 package com.mfglabs
 package precepte
+package corecats
 
 import org.scalatest._
 import Matchers._
@@ -27,7 +28,6 @@ import org.scalatest.time.{Millis, Seconds, Span => TSpan}
 
 import scala.language.higherKinds
 
-
 class CostSpec extends FlatSpec with ScalaFutures {
 
   implicit val defaultPatience =
@@ -35,9 +35,11 @@ class CostSpec extends FlatSpec with ScalaFutures {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
-  import scalaz.std.scalaFuture._
-  import scalaz.syntax.monad._
-  import scalaz.EitherT
+  import cats.std.future._
+  import cats.Applicative
+  import cats.syntax.flatMap._
+  import cats.syntax.apply._
+  import cats.data.XorT
 
   import default._
 
@@ -51,8 +53,8 @@ class CostSpec extends FlatSpec with ScalaFutures {
 
   def nostate = ST(Span.gen, env, Vector.empty, ())
 
-  implicit val unitSG = new scalaz.Semigroup[Unit] {
-    def append(f1: Unit, f2: => Unit) = ()
+  implicit val unitSG = new cats.Semigroup[Unit] {
+    def combine(f1: Unit, f2: Unit) = ()
   }
 
   val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
@@ -69,8 +71,8 @@ class CostSpec extends FlatSpec with ScalaFutures {
   "Precepte" should "run/eval simple" in {
 
     def res(i: Int): Future[Int] = for {
-      i <- i.point[Future]
-      r <- if(i > 0) res(i-1) else i.point[Future]
+      i <- Applicative[Future].pure(i)
+      r <- if(i > 0) res(i-1) else Applicative[Future].pure(i)
     } yield r
 
     val ms = timeMs(res(10000))
@@ -88,8 +90,8 @@ class CostSpec extends FlatSpec with ScalaFutures {
   "Precepte" should "run/eval pre" in {
 
     def res(i: Int): Pre[Int] = for {
-      i <- Precepte(tags(s"f$i")){(_: ST[Unit]) => i.point[Future] }
-      r <- if(i>0) res(i-1) else i.point[Pre]
+      i <- Precepte(tags(s"f$i")){(_: ST[Unit]) => Applicative[Future].pure(i) }
+      r <- if(i>0) res(i-1) else Applicative[Pre].pure(i)
     } yield r
 
     // val ms0 = timeMs(res(1000).eval(nostate))    

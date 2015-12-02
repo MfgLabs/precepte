@@ -22,6 +22,8 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 
 import scala.language.implicitConversions
+import scala.language.higherKinds
+
 
 /** Some macro helpers for Precepte
   *
@@ -59,4 +61,11 @@ object Macros {
     val tuples = for(t <- ts) yield paramMacro(c)(t)
     q"Seq(..$tuples).flatten"
   }
+
+  def PreM[F[_], UM, A](f: DefaultPre[F, UM, A]#S => F[A])(implicit callee: Callee, category: Category): DefaultPre[F, UM, A] =
+    Pre(BaseTags(callee, category))(f)
+
+  def PreMP[F[_], UM, A](f: DefaultPre[F, UM, A]#S => DefaultPre[F, UM, A])(implicit callee: Callee, category: Category): DefaultPre[F, UM, A] =
+    Pre(BaseTags(callee, category)).applyP(f)
+
 }

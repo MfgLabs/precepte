@@ -25,6 +25,7 @@ import scala.concurrent.Future
 import scala.language.higherKinds
 
 import com.mfglabs.precepte._
+import corescalaz._
 import default._
 
 trait PreActionFunction[-R[_], +P[_], F[_], C] {
