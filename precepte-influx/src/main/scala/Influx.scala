@@ -24,14 +24,12 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.language.postfixOps
 
-import scalaz.~>
-
 import default._
 
 import java.util.concurrent.TimeUnit
 import org.influxdb._
 
-case class Influx[C : scalaz.Semigroup](
+case class Influx[C : MetaSemigroup](
   influxdbURL: URL,
   user: String,
   password: String,
@@ -82,7 +80,7 @@ case class Influx[C : scalaz.Semigroup](
   def monitor =
     influxDB match {
       case Success(in) =>
-        new (SF ~> Future) {
+        new (SF ~~> Future) {
           def apply[A](sf: SF[A]): Future[A] = {
             val t0 = System.nanoTime()
             val (st, f) = sf

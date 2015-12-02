@@ -38,11 +38,12 @@ import scalaz.syntax.monad._
 import scalaz._
 
 import default._
+import corescalaz._
 
 
 class PreStreamSpec extends FlatSpec with ScalaFutures {
 
-  type P[A] = Pre[Future, Unit, A]
+  type P[A] = DefaultPre[Future, Unit, A]
 
   object P {
     def apply[A](tags: BaseTags) = Precepte[BaseTags](tags)

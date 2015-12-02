@@ -1,6 +1,7 @@
 package commons
 
 import com.mfglabs.precepte._
+import corescalaz._
 import default._
 
 object Monitoring {
@@ -30,7 +31,7 @@ object Monitoring {
       "precepte_sample"
     )
 
-  lazy val logback = Logback(env)
+  lazy val logback = Logback(env, "application")
 
   type Req[A] = (MonitoringContext, Request[A])
 

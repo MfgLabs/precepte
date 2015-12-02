@@ -13,6 +13,7 @@ import views._
 import models._
 
 import com.mfglabs.precepte._
+import corescalaz._
 import com.mfglabs.precepte.default._
 import Macros.callee
 
