@@ -60,6 +60,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import com.mfglabs.precepte._
+import corescalaz._
 import default._
 
 type Pre[A] = DPre[Future, Unit, A]
@@ -138,7 +139,7 @@ libraryDependencies += "com.mfglabs" %% "precepte-logback" % precepteVersion
 Once you have that, you can start using you contextualized Logger :)
 
 ```tut:silent
-val logback = Logback(env)
+val logback = Logback(env, "demo-logger")
 
 object WithLogger extends Category("demo") {
   def apply[A](f: logback.Logger => Future[A])(implicit c: Callee) = {
@@ -214,6 +215,59 @@ Assuming logback is configured properly (see [the example logback.xml](../precep
 ```
 
 ## Graph it!
+
+Précepte basically turn your code into a algebra, and an interpreter.
+It's very easy to change the runtime a bit in order to alter the semantics of a program.
+One application of this simple but powerful idea is built-in into Précepte.
+You can very easily generate an execution graph of your program:
+
+```tut:silent
+  val ultimateAnswerWithExecutionGraph = ultimateAnswerPre.graph(Graph.empty).eval(nostate)
+  val (graph, result) = await(ultimateAnswerWithExecutionGraph)
+```
+
+The graph can then easily be turned into a graphviz representation:
+
+```tut
+graph.viz
+```
+
+Which once rendered looks like this:
+
+![rendered graph](images/graph.png)
+
+And indeed in our code, we call f1 and then f2. Let's try this with a slightly more complex example.
+Let's start by defining a bunch of async computations:
+
+```tut:silent
+def p0 = Demo(s => Future(0 -> 0))
+def p1 = Demo(s => Future(1 -> 1))
+def p2 = Demo(s => Future(2 -> 2))
+def p3 = Demo(s => Future(3 -> 3))
+def p4 = Demo(s => Future(4 -> 4))
+```
+
+We can now built a more realistic example than the previous, mixing sequential and parallel effects using monads and applicative functors:
+
+```tut:silent
+import scalaz.syntax.applicative._
+val ptest =
+      for {
+        _ <- p0
+        _ <- (p1 |@| p2 |@| p3).tupled
+        _ <- p4
+      } yield ()
+  val (demoGraph, _) = await(ptest.graph(Graph.empty).eval(nostate))
+```
+
+```tut
+demoGraph.viz
+```
+
+And again rendering this nice little graph :)
+
+![rendered graph](images/demoGraph.png)
+
 
 ## Monitoring with InfluxDB and Grafana
 

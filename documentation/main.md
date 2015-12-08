@@ -60,6 +60,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import com.mfglabs.precepte._
+import corescalaz._
 import default._
 
 type Pre[A] = DPre[Future, Unit, A]
@@ -117,7 +118,7 @@ Ok so we've added a bit of code, and finally, we're able to test the execution:
 
 ```scala
 scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@f09400f
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@7abaeaf3
 
 scala> await(eventuallyUltimateAnswer)
 res9: String = The answer to life the universe and everything is 42
@@ -141,7 +142,7 @@ libraryDependencies += "com.mfglabs" %% "precepte-logback" % precepteVersion
 Once you have that, you can start using you contextualized Logger :)
 
 ```scala
-val logback = Logback(env)
+val logback = Logback(env, "demo-logger")
 
 object WithLogger extends Category("demo") {
   def apply[A](f: logback.Logger => Future[A])(implicit c: Callee) = {
@@ -217,6 +218,83 @@ Assuming logback is configured properly (see [the example logback.xml](../precep
 ```
 
 ## Graph it!
+
+Précepte basically turn your code into a algebra, and an interpreter.
+It's very easy to change the runtime a bit in order to alter the semantics of a program.
+One application of this simple but powerful idea is built-in into Précepte.
+You can very easily generate an execution graph of your program:
+
+```scala
+  val ultimateAnswerWithExecutionGraph = ultimateAnswerPre.graph(Graph.empty).eval(nostate)
+  val (graph, result) = await(ultimateAnswerWithExecutionGraph)
+```
+
+The graph can then easily be turned into a graphviz representation:
+
+```scala
+scala> graph.viz
+res16: String =
+"
+digraph G {
+  "f1_5_0" [label = "f1"]
+  "f2_6_0" [label = "f2"]
+  "f1_5_0" -> "f2_6_0"
+}
+  "
+```
+
+Which once rendered looks like this:
+
+![rendered graph](images/graph.png)
+
+And indeed in our code, we call f1 and then f2. Let's try this with a slightly more complex example.
+Let's start by defining a bunch of async computations:
+
+```scala
+def p0 = Demo(s => Future(0 -> 0))
+def p1 = Demo(s => Future(1 -> 1))
+def p2 = Demo(s => Future(2 -> 2))
+def p3 = Demo(s => Future(3 -> 3))
+def p4 = Demo(s => Future(4 -> 4))
+```
+
+We can now built a more realistic example than the previous, mixing sequential and parallel effects using monads and applicative functors:
+
+```scala
+import scalaz.syntax.applicative._
+val ptest =
+      for {
+        _ <- p0
+        _ <- (p1 |@| p2 |@| p3).tupled
+        _ <- p4
+      } yield ()
+  val (demoGraph, _) = await(ptest.graph(Graph.empty).eval(nostate))
+```
+
+```scala
+scala> demoGraph.viz
+res17: String =
+"
+digraph G {
+  "p2_9_4" [label = "p2"]
+  "p3_8_1" [label = "p3"]
+  "p0_7_0" [label = "p0"]
+  "p4_11_0" [label = "p4"]
+  "p1_10_6" [label = "p1"]
+  "p0_7_0" -> "p2_9_4"
+  "p0_7_0" -> "p3_8_1"
+  "p1_10_6" -> "p4_11_0"
+  "p3_8_1" -> "p4_11_0"
+  "p2_9_4" -> "p4_11_0"
+  "p0_7_0" -> "p1_10_6"
+}
+  "
+```
+
+And again rendering this nice little graph :)
+
+![rendered graph](images/demoGraph.png)
+
 
 ## Monitoring with InfluxDB and Grafana
 
