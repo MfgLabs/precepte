@@ -1,6 +1,6 @@
-# Précepte core
+# Précepte
 
-The core module contains all the basic features.
+TODO: introduce Précepte and it's use cases
 
 ## Prerequisites
 
@@ -270,5 +270,67 @@ And again rendering this nice little graph :)
 
 
 ## Monitoring with InfluxDB and Grafana
+
+So far we've used Précepte to generate fancy logs, and visualize the execution of our program as a graph.
+The last use case we're going to show is the addition of monitoring to an application developed with Précepte.
+
+For the sake of demo, we'll use effect with random execution times:
+
+```tut:silent
+import scala.concurrent.duration._
+import akka.actor.ActorSystem;
+val system = ActorSystem.create("demo-system")
+
+def rnd(d: FiniteDuration)(v: (Int, Int)) = {
+  val rnd = scala.util.Random
+  val salt = rnd.nextInt(10).milliseconds
+  akka.pattern.after(d + salt, system.scheduler)(Future.successful(v))
+}
+
+def p0 = Demo(s => rnd(10 milliseconds)(0 -> 0))
+def p1 = Demo(s => rnd(20 milliseconds)(1 -> 1))
+def p2 = Demo(s => rnd(40 milliseconds)(2 -> 2))
+def p3 = Demo(s => rnd(5 milliseconds)(3 -> 3))
+def p4 = Demo(s => rnd(15 milliseconds)(4 -> 4))
+
+import scalaz.syntax.applicative._
+val demo =
+      for {
+        _ <- p0
+        _ <- (p1 |@| p2 |@| p3).tupled
+        _ <- p4
+      } yield ()
+```
+
+Now we have created the program but we've not executed it yet.
+All we have to do to push metrics into an influxdb instance is configure the influx client, and "inject" it into the execution of our program.
+
+```tut:silent
+val influx = Influx[Unit](
+    new java.net.URL("http://localhost:8086"),
+      "root",
+      "root",
+      "precepte_demo"
+    )
+
+val monitoredDemo = demo.mapSuspension(influx.monitor)
+val result =
+  for {
+    _ <- 1 to 100
+  } await(monitoredDemo.eval(nostate))
+```
+
+now if we execute the code, metrics are automatically pushed to influxdb.
+
+Using grafana and the following query:
+
+![influx query](images/query.png)
+
+We can get a very nice graph of our functions execution times.
+
+![influx graph](images/influx.png)
+
+
+
 
 ## Précepte and the Free monad.
