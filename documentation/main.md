@@ -1,11 +1,15 @@
 # Précepte
 
-TODO: introduce Précepte and it's use cases
+Précepte is a pure functional library that provides context and insight on your code execution.
+
+It can be used to have [contextualized logs](#contextualized-logs), [collect high quality metrics](#monitoring-with-influxdb-and-grafana), [generate a graph representing you program execution](#graph-it), etc.
+
+A Précepte is basically just free monad and a state monad.
 
 ## Prerequisites
 
 Using Précepte is not different from using a `Future` or any other monadic data type.
-You should understand the concepts of `Monad`, `Functor` and `Applicative`, and be familiar with Scalaz.
+You should understand the concepts of `Monad`, `Functor` and `Applicative`, and be familiar with [Scalaz](https://github.com/scalaz/scalaz) or [Cats](https://github.com/non/cats). All the examples below are using scalaz, but precepte is also fully compatible with Cats
 
 ## From Future to Précepte
 
@@ -118,7 +122,7 @@ Ok so we've added a bit of code, and finally, we're able to test the execution:
 
 ```scala
 scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@6cfc84cd
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@4191477b
 
 scala> await(eventuallyUltimateAnswer)
 res9: String = The answer to life the universe and everything is 42
@@ -263,11 +267,11 @@ We can now built a more realistic example than the previous, mixing sequential a
 ```scala
 import scalaz.syntax.applicative._
 val ptest =
-      for {
-        _ <- p0
-        _ <- (p1 |@| p2 |@| p3).tupled
-        _ <- p4
-      } yield ()
+  for {
+    _ <- p0
+    _ <- (p1 |@| p2 |@| p3).tupled
+    _ <- p4
+  } yield ()
   val (demoGraph, _) = await(ptest.graph(Graph.empty).eval(nostate))
 ```
 
@@ -322,15 +326,15 @@ def p4 = Demo(s => rnd(15 milliseconds)(4 -> 4))
 
 import scalaz.syntax.applicative._
 val demo =
-      for {
-        _ <- p0
-        _ <- (p1 |@| p2 |@| p3).tupled
-        _ <- p4
-      } yield ()
+  for {
+    _ <- p0
+    _ <- (p1 |@| p2 |@| p3).tupled
+    _ <- p4
+  } yield ()
 ```
 
 Now we have created the program but we've not executed it yet.
-All we have to do to push metrics into an influxdb instance is configure the influx client, and "inject" it into the execution of our program.
+All we have to do to push metrics into an [influxdb](https://influxdb.com/) instance is configure the influx client, and "inject" it into the execution of our program.
 
 ```scala
 val influx = Influx[Unit](
@@ -339,25 +343,26 @@ val influx = Influx[Unit](
       "root",
       "precepte_demo"
     )
-
 val monitoredDemo = demo.mapSuspension(influx.monitor)
+```
+
+now if we execute the code, metrics are automatically pushed to Influxdb.
+
+```scala
 val result =
   for {
     _ <- 1 to 100
   } await(monitoredDemo.eval(nostate))
 ```
 
-now if we execute the code, metrics are automatically pushed to influxdb.
 
-Using grafana and the following query:
+Using [Grafana](http://grafana.org/) and the following query:
 
 ![influx query](images/query.png)
 
 We can get a very nice graph of our functions execution times.
 
 ![influx graph](images/influx.png)
-
-
 
 
 ## Précepte and the Free monad.
