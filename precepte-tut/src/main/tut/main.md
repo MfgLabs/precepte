@@ -1,20 +1,45 @@
 # Précepte
 
+## Overview
+
 Précepte is a pure functional library that provides context and insight on your code execution.
 
 It can be used to have [contextualized logs](#contextualized-logs), [collect high quality metrics](#monitoring-with-influxdb-and-grafana), [generate a graph representing you program execution](#graph-it), etc.
 
 A Précepte is basically just free monad and a state monad.
 
+## Table of Content
+
+TODO: add link to doc in readme
+
 ## Prerequisites
 
 Using Précepte is not different from using a `Future` or any other monadic data type.
-You should understand the concepts of `Monad`, `Functor` and `Applicative`, and be familiar with [Scalaz](https://github.com/scalaz/scalaz) or [Cats](https://github.com/non/cats). All the examples below are using scalaz, but precepte is also fully compatible with Cats
+You should understand the concepts of `Monad`, `Functor` and `Applicative`, and be familiar with [Scalaz](https://github.com/scalaz/scalaz) or [Cats](https://github.com/non/cats). All the examples below are using Scalaz, but Précepte is also fully compatible with Cats
+
+## Using Précepte in your project
+
+Just add the following dependency in your `built.sbt`
+
+```scala
+libraryDependencies += "com.mfglabs" %% "precepte-core" % precepteVersion
+```
+
+You may also want the modules providing support for Logback, Influxdb, and Play framework:
+
+```scala
+libraryDependencies += "com.mfglabs" %% "precepte-logback" % precepteVersion
+
+libraryDependencies += "com.mfglabs" %% "precepte-influx" % precepteVersion
+
+libraryDependencies += "com.mfglabs" %% "precepte-play" % precepteVersion
+```
+
 
 ## From Future to Précepte
 
 A Précepte is always parameterized by a type `F` representing the effect.
-most of this documentation is using `Future`, since it's familiar to most Scala developers.
+This documentation is using `Future`, since it's familiar to most Scala developers.
 
 Let's say you've written the following code:
 
@@ -30,7 +55,7 @@ def f1: Future[Int] = Future.successful(42)
 def f2(s: Int): Future[String] = Future.successful(s"The answer to life the universe and everything is $s")
 ```
 
-If you were to "chain" the calls to f1 and f2, that is call f1 and feed it's return to f2, you'd be writing something like:
+If you were to "chain" the calls to `f1` and `f2`, that is call `f1` and feed it's return to `f2`, you'd be writing something like:
 
 ```tut:silent
 val ultimateAnswer: Future[String] =
@@ -101,7 +126,7 @@ val ultimateAnswerPre: Pre[String] =
 ### The state
 
 You probably have noticed a little `st` parameter sneaked into our code. This `st` is the current state. By default, Précepte will add the interesting metadata it collected in that state (Category, function name, ...). You can also use Précepte to carry a "custom" state.
-The type of the custom state is fixed in our type definition for Pre. We said it was Unit.
+The type of the custom state is fixed in our type definition for Pre. We said it was Unit (remember: `type Pre[A] = DPre[Future, Unit, A]`).
 
 Now if we want to run our code, we need to provide an initial state. Précepte will also ask you to provide information about the environment in which our application is executing.
 
@@ -133,8 +158,8 @@ TODO
 
 ## Contextualized logs
 
-Now that you have access to metadata about the executing code, you can do pretty interesting things, like hava contextualized logs.
-Précepte has a module to use Logback. all you have to to is add it into your `build.sbt` file.
+Now that you have access to metadata about the executing code, you can do pretty interesting things, like collecting contextualized logs.
+Précepte has a module to support [Logback](http://logback.qos.ch/). all you have to to is add it into your `build.sbt` file.
 
 ```scala
 libraryDependencies += "com.mfglabs" %% "precepte-logback" % precepteVersion
@@ -278,6 +303,12 @@ And again rendering this nice little graph :)
 So far we've used Précepte to generate fancy logs, and visualize the execution of our program as a graph.
 The last use case we're going to show is the addition of monitoring to an application developed with Précepte.
 
+For this feature to work, you'll need to add the influxdb module in you project dependencies:
+
+```scala
+libraryDependencies += "com.mfglabs" %% "precepte-influx" % precepteVersion
+```
+
 For the sake of demo, we'll use effect with random execution times:
 
 ```tut:silent
@@ -337,5 +368,11 @@ We can get a very nice graph of our functions execution times.
 
 ![influx graph](images/influx.png)
 
+
+TODO: list all the available tags
+
+## Using Précepte with Play Framework.
+
+TODO
 
 ## Précepte and the Free monad.

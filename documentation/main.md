@@ -9,12 +9,12 @@ A Précepte is basically just free monad and a state monad.
 ## Prerequisites
 
 Using Précepte is not different from using a `Future` or any other monadic data type.
-You should understand the concepts of `Monad`, `Functor` and `Applicative`, and be familiar with [Scalaz](https://github.com/scalaz/scalaz) or [Cats](https://github.com/non/cats). All the examples below are using scalaz, but precepte is also fully compatible with Cats
+You should understand the concepts of `Monad`, `Functor` and `Applicative`, and be familiar with [Scalaz](https://github.com/scalaz/scalaz) or [Cats](https://github.com/non/cats). All the examples below are using Scalaz, but Précepte is also fully compatible with Cats
 
 ## From Future to Précepte
 
 A Précepte is always parameterized by a type `F` representing the effect.
-most of this documentation is using `Future`, since it's familiar to most Scala developers.
+most of this documentation is using `Future`, since it's likely familiar to you.
 
 Let's say you've written the following code:
 
@@ -122,7 +122,7 @@ Ok so we've added a bit of code, and finally, we're able to test the execution:
 
 ```scala
 scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@4191477b
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@346c6962
 
 scala> await(eventuallyUltimateAnswer)
 res9: String = The answer to life the universe and everything is 42
