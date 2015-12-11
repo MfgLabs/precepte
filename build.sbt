@@ -158,7 +158,6 @@ lazy val doc =
   project.in(file("precepte-tut"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .dependsOn(core, play, influx, logback, sample, stream)
 
 lazy val root = project.in(file("."))
