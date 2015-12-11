@@ -172,8 +172,6 @@ val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
 await(eventuallyUltimateAnswer)
 ```
 
-// TODO: Précepte and the State Monad
-
 ### Error handling
 
 TODO
@@ -390,8 +388,19 @@ We can get a very nice graph of our functions execution times.
 
 ![influx graph](documentation/images/influx.png)
 
+Précepte will push the following tags in influxdb:
 
-TODO: list all the available tags
+| type  | name           | description                                        |
+|-------|----------------|----------------------------------------------------|
+| tag   | host           | Name of the host                                   |
+| tag   | environment    | Environment (Dev, Staging, Prod)                   |
+| tag   | version        | Application version                                |
+| tag   | category       | Metric category (Database, Api, etc.)              |
+| tag   | callees        | Callees (ex: /method1/method2/method3)             |
+| tag   | method         | Name of the current method (ex: method3)           |
+| field | span           | Span Id (ex: 8fe3a664-ade1-4bfb-9c28-fa4497a93979) |
+| field | path           | Full call path (ex: /5_0/7_0/12_0)                 |
+| field | execution_time | Execution time for the current method.             |
 
 ## Using Précepte with Play Framework.
 
