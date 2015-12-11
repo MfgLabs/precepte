@@ -6,9 +6,9 @@ Précepte is an opinionated purely functional & lazy API stacking some useful mo
 
 It can help you to:
 
-- [Collect contextualized logs](documentation/main.md#contextualized-logs)
-- [Collect high quality metrics](documentation/main.md#monitoring-with-influxdb-and-grafana)
-- [Generate a graph representing you program execution](documentation/main.md#graph-it)
+- [Collect contextualized logs](#contextualized-logs)
+- [Collect high quality metrics](#monitoring-with-influxdb-and-grafana)
+- [Generate a graph representing you program execution](#graph-it)
 - etc.
 
 Précepte embraces the concept that observing has a cost but let you control explicitly the balance between precision and performance without sacrifying code cleanness, FP purity or laziness.

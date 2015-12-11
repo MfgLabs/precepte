@@ -6,9 +6,9 @@ Précepte is an opinionated purely functional & lazy API stacking some useful mo
 
 It can help you to:
 
-- [Collect contextualized logs](documentation/main.md#contextualized-logs)
-- [Collect high quality metrics](documentation/main.md#monitoring-with-influxdb-and-grafana)
-- [Generate a graph representing you program execution](documentation/main.md#graph-it)
+- [Collect contextualized logs](#contextualized-logs)
+- [Collect high quality metrics](#monitoring-with-influxdb-and-grafana)
+- [Generate a graph representing you program execution](#graph-it)
 - etc.
 
 Précepte embraces the concept that observing has a cost but let you control explicitly the balance between precision and performance without sacrifying code cleanness, FP purity or laziness.
@@ -169,7 +169,7 @@ Ok so we've added a bit of code, and finally, we're able to test the execution:
 
 ```scala
 scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@196ac106
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@584b548f
 
 scala> await(eventuallyUltimateAnswer)
 res9: String = The answer to life the universe and everything is 42
