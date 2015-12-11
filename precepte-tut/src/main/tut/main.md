@@ -1,16 +1,38 @@
-# Précepte
+# Précepte, let your code be state-aware & make runtime effect observation acceptable...
 
-## Overview
+[![Join the chat at https://gitter.im/MfgLabs/precepte](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/MfgLabs/precepte?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Précepte is a pure functional library that provides context and insight on your code execution.
+Précepte is an opinionated purely functional & lazy API stacking some useful monads to help you observe the execution of your runtime effects by instrumenting your code with a managed state propagated all along your business workflow.
 
-It can be used to have [contextualized logs](#contextualized-logs), [collect high quality metrics](#monitoring-with-influxdb-and-grafana), [generate a graph representing you program execution](#graph-it), etc.
+It can help you to:
 
-A Précepte is basically just free monad and a state monad.
+- [Collect contextualized logs](documentation/main.md#contextualized-logs)
+- [Collect high quality metrics](documentation/main.md#monitoring-with-influxdb-and-grafana)
+- [Generate a graph representing you program execution](documentation/main.md#graph-it)
+- etc.
 
-## Table of Content
+Précepte embraces the concept that observing has a cost but let you control explicitly the balance between precision and performance without sacrifying code cleanness, FP purity or laziness.
 
-TODO: add link to doc in readme
+Précepte's idea is simply to make your code _state-aware_ by allowing you to obtain a State anywhere in your code.
+This state will provide you with:
+  - a context defining from where this code comes and where it is (function name, custom tags, etc..)
+  - any values you want to measure in your observation
+
+The state provided by Précepte is composed of:
+  - a managed part that is managed by Précepte and that consists in:
+      * the Span: a global ID uniquely identifying the full execution workflow
+      * the Call Path: a sequence of tuples of PId (local step ID) and Tags (defined at compile-time)
+                       accumulated by Précepte all along the execution of the workflow. This is what
+                        provides you with the place from where you come and where you are...
+
+  - an unmanaged part that is just a container in which you can put anything you want and also perform some compile-time DI.
+
+Precepte is a custom purely functional structure based on:
+  - A State Monad to represent the pure propagation of the State in the workflow
+  - A Free Monad to represent our monadic & applicative effectful workflow
+  - Some helpers to make Precepte usable with Monad Transformers
+  - Coyoneda to reduce the requirement of effects to be Functor in Free Monads
+  - some custom optimization to reduce the burden of Free Monads classic model (right associatio, map fusion, structure squashing, )
 
 ## Prerequisites
 

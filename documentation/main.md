@@ -1,20 +1,67 @@
-# Précepte
+# Précepte, let your code be state-aware & make runtime effect observation acceptable...
 
-Précepte is a pure functional library that provides context and insight on your code execution.
+[![Join the chat at https://gitter.im/MfgLabs/precepte](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/MfgLabs/precepte?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-It can be used to have [contextualized logs](#contextualized-logs), [collect high quality metrics](#monitoring-with-influxdb-and-grafana), [generate a graph representing you program execution](#graph-it), etc.
+Précepte is an opinionated purely functional & lazy API stacking some useful monads to help you observe the execution of your runtime effects by instrumenting your code with a managed state propagated all along your business workflow.
 
-A Précepte is basically just free monad and a state monad.
+It can help you to:
+
+- [Collect contextualized logs](documentation/main.md#contextualized-logs)
+- [Collect high quality metrics](documentation/main.md#monitoring-with-influxdb-and-grafana)
+- [Generate a graph representing you program execution](documentation/main.md#graph-it)
+- etc.
+
+Précepte embraces the concept that observing has a cost but let you control explicitly the balance between precision and performance without sacrifying code cleanness, FP purity or laziness.
+
+Précepte's idea is simply to make your code _state-aware_ by allowing you to obtain a State anywhere in your code.
+This state will provide you with:
+  - a context defining from where this code comes and where it is (function name, custom tags, etc..)
+  - any values you want to measure in your observation
+
+The state provided by Précepte is composed of:
+  - a managed part that is managed by Précepte and that consists in:
+      * the Span: a global ID uniquely identifying the full execution workflow
+      * the Call Path: a sequence of tuples of PId (local step ID) and Tags (defined at compile-time)
+                       accumulated by Précepte all along the execution of the workflow. This is what
+                        provides you with the place from where you come and where you are...
+
+  - an unmanaged part that is just a container in which you can put anything you want and also perform some compile-time DI.
+
+Precepte is a custom purely functional structure based on:
+  - A State Monad to represent the pure propagation of the State in the workflow
+  - A Free Monad to represent our monadic & applicative effectful workflow
+  - Some helpers to make Precepte usable with Monad Transformers
+  - Coyoneda to reduce the requirement of effects to be Functor in Free Monads
+  - some custom optimization to reduce the burden of Free Monads classic model (right associatio, map fusion, structure squashing, )
 
 ## Prerequisites
 
 Using Précepte is not different from using a `Future` or any other monadic data type.
 You should understand the concepts of `Monad`, `Functor` and `Applicative`, and be familiar with [Scalaz](https://github.com/scalaz/scalaz) or [Cats](https://github.com/non/cats). All the examples below are using Scalaz, but Précepte is also fully compatible with Cats
 
+## Using Précepte in your project
+
+Just add the following dependency in your `built.sbt`
+
+```scala
+libraryDependencies += "com.mfglabs" %% "precepte-core" % precepteVersion
+```
+
+You may also want the modules providing support for Logback, Influxdb, and Play framework:
+
+```scala
+libraryDependencies += "com.mfglabs" %% "precepte-logback" % precepteVersion
+
+libraryDependencies += "com.mfglabs" %% "precepte-influx" % precepteVersion
+
+libraryDependencies += "com.mfglabs" %% "precepte-play" % precepteVersion
+```
+
+
 ## From Future to Précepte
 
 A Précepte is always parameterized by a type `F` representing the effect.
-most of this documentation is using `Future`, since it's likely familiar to you.
+This documentation is using `Future`, since it's familiar to most Scala developers.
 
 Let's say you've written the following code:
 
@@ -29,7 +76,7 @@ def f1: Future[Int] = Future.successful(42)
 def f2(s: Int): Future[String] = Future.successful(s"The answer to life the universe and everything is $s")
 ```
 
-If you were to "chain" the calls to f1 and f2, that is call f1 and feed it's return to f2, you'd be writing something like:
+If you were to "chain" the calls to `f1` and `f2`, that is call `f1` and feed it's return to `f2`, you'd be writing something like:
 
 ```scala
 val ultimateAnswer: Future[String] =
@@ -101,7 +148,7 @@ val ultimateAnswerPre: Pre[String] =
 ### The state
 
 You probably have noticed a little `st` parameter sneaked into our code. This `st` is the current state. By default, Précepte will add the interesting metadata it collected in that state (Category, function name, ...). You can also use Précepte to carry a "custom" state.
-The type of the custom state is fixed in our type definition for Pre. We said it was Unit.
+The type of the custom state is fixed in our type definition for Pre. We said it was Unit (remember: `type Pre[A] = DPre[Future, Unit, A]`).
 
 Now if we want to run our code, we need to provide an initial state. Précepte will also ask you to provide information about the environment in which our application is executing.
 
@@ -122,7 +169,7 @@ Ok so we've added a bit of code, and finally, we're able to test the execution:
 
 ```scala
 scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@346c6962
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@2489b1d8
 
 scala> await(eventuallyUltimateAnswer)
 res9: String = The answer to life the universe and everything is 42
@@ -136,8 +183,8 @@ TODO
 
 ## Contextualized logs
 
-Now that you have access to metadata about the executing code, you can do pretty interesting things, like hava contextualized logs.
-Précepte has a module to use Logback. all you have to to is add it into your `build.sbt` file.
+Now that you have access to metadata about the executing code, you can do pretty interesting things, like collecting contextualized logs.
+Précepte has a module to support [Logback](http://logback.qos.ch/). all you have to to is add it into your `build.sbt` file.
 
 ```scala
 libraryDependencies += "com.mfglabs" %% "precepte-logback" % precepteVersion
@@ -305,6 +352,12 @@ And again rendering this nice little graph :)
 So far we've used Précepte to generate fancy logs, and visualize the execution of our program as a graph.
 The last use case we're going to show is the addition of monitoring to an application developed with Précepte.
 
+For this feature to work, you'll need to add the influxdb module in you project dependencies:
+
+```scala
+libraryDependencies += "com.mfglabs" %% "precepte-influx" % precepteVersion
+```
+
 For the sake of demo, we'll use effect with random execution times:
 
 ```scala
@@ -364,5 +417,11 @@ We can get a very nice graph of our functions execution times.
 
 ![influx graph](images/influx.png)
 
+
+TODO: list all the available tags
+
+## Using Précepte with Play Framework.
+
+TODO
 
 ## Précepte and the Free monad.
