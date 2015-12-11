@@ -1,8 +1,17 @@
 import play.PlayImport.PlayKeys._
 
+lazy val publishSettings =
+   publishTo := {
+      val s3Repo = "s3://mfg-mvn-repo"
+      if (isSnapshot.value)
+        Some("snapshots" at s3Repo + "/snapshots")
+      else
+        Some("releases" at s3Repo + "/releases")
+    }
+
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.2.0-SNAPSHOT"
+  , version := "0.3.0-SNAPSHOT"
   , scalaVersion := "2.11.7"
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
@@ -11,6 +20,7 @@ lazy val commonSettings =  Seq(
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn
+  , publishSettings
 ) ++ tutSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
 
 lazy val strictScalac =
@@ -30,20 +40,12 @@ lazy val strictScalac =
     //, "-Ywarn-unused-import"
 )
 
-lazy val publishSettings =
-   Seq(publishTo := {
-      val s3Repo = "s3://mfg-mvn-repo"
-      if (isSnapshot.value)
-        Some("snapshots" at s3Repo + "/snapshots")
-      else
-        Some("releases" at s3Repo + "/releases")
-    })
+lazy val noPublish = publishArtifact := false
 
 lazy val core =
   project.in(file("precepte-core"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .settings(
       name := "precepte-core",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
@@ -58,7 +60,6 @@ lazy val coreCats =
   project.in(file("precepte-core-cats"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .settings(
       name := "precepte-core-cats",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
@@ -74,7 +75,6 @@ lazy val coreScalaz =
   project.in(file("precepte-core-scalaz"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .settings(
       name := "precepte-core-scalaz",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
@@ -91,6 +91,7 @@ lazy val sample =
     .enablePlugins(PlayScala)
     .settings(commonSettings:_*)
     .settings(buildInfoSettings: _*)
+    .settings(noPublish:_*)
     .settings(
       sourceGenerators in Compile <+= buildInfo,
       buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
@@ -108,7 +109,6 @@ lazy val influx =
   project.in(file("precepte-influx"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .settings(
       name := "precepte-influx",
       libraryDependencies ++= Seq(
@@ -123,7 +123,6 @@ lazy val logback =
   project.in(file("precepte-logback"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .settings(
       name := "precepte-logback",
       libraryDependencies ++= Seq(
@@ -135,7 +134,6 @@ lazy val play =
   project.in(file("precepte-play"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .settings(
       libraryDependencies += "com.typesafe.play" %% "play" % "2.3.9",
       name := "precepte-play")
@@ -145,7 +143,6 @@ lazy val stream =
   project.in(file("precepte-stream"))
     .settings(commonSettings:_*)
     .settings(strictScalac)
-    .settings(publishSettings:_*)
     .settings(
       libraryDependencies ++= Seq(
           "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0"
@@ -157,10 +154,12 @@ lazy val stream =
 lazy val doc =
   project.in(file("precepte-tut"))
     .settings(commonSettings:_*)
+    .settings(noPublish:_*)
     .settings(strictScalac)
     .dependsOn(core, play, influx, logback, sample, stream)
 
 lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
+  .settings(noPublish:_*)
   .settings(name := "precepte-root")
   .aggregate(core, play, influx, logback, sample, stream, doc)
