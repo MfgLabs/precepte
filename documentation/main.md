@@ -169,7 +169,7 @@ Ok so we've added a bit of code, and finally, we're able to test the execution:
 
 ```scala
 scala> val eventuallyUltimateAnswer = ultimateAnswerPre.eval(nostate)
-eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@2489b1d8
+eventuallyUltimateAnswer: scala.concurrent.Future[String] = scala.concurrent.impl.Promise$DefaultPromise@196ac106
 
 scala> await(eventuallyUltimateAnswer)
 res9: String = The answer to life the universe and everything is 42
@@ -296,7 +296,7 @@ digraph G {
 
 Which once rendered looks like this:
 
-![rendered graph](images/graph.png)
+![rendered graph](documentation/images/graph.png)
 
 And indeed in our code, we call f1 and then f2. Let's try this with a slightly more complex example.
 Let's start by defining a bunch of async computations:
@@ -344,7 +344,7 @@ digraph G {
 
 And again rendering this nice little graph :)
 
-![rendered graph](images/demoGraph.png)
+![rendered graph](documentation/images/demoGraph.png)
 
 
 ## Monitoring with InfluxDB and Grafana
@@ -411,11 +411,11 @@ val result =
 
 Using [Grafana](http://grafana.org/) and the following query:
 
-![influx query](images/query.png)
+![influx query](documentation/images/query.png)
 
 We can get a very nice graph of our functions execution times.
 
-![influx graph](images/influx.png)
+![influx graph](documentation/images/influx.png)
 
 
 TODO: list all the available tags
