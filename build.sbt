@@ -1,17 +1,17 @@
 import play.PlayImport.PlayKeys._
 
-lazy val publishSettings =
-   publishTo := {
-      val s3Repo = "s3://mfg-mvn-repo"
-      if (isSnapshot.value)
-        Some("snapshots" at s3Repo + "/snapshots")
-      else
-        Some("releases" at s3Repo + "/releases")
-    }
+lazy val publishSettings = Seq(
+  homepage := Some(url("https://github.com/MfgLabs/precepte")),
+  licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")),
+  publishMavenStyle := true,
+  publishArtifact in packageDoc := false,
+  publishArtifact in Test := false,
+  pomIncludeRepository := { _ => false }
+)
 
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.3.0-SNAPSHOT"
+  , version := "0.3.0"
   , scalaVersion := "2.11.7"
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
@@ -20,8 +20,7 @@ lazy val commonSettings =  Seq(
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn
-  , publishSettings
-) ++ tutSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
+) ++ tutSettings ++ publishSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
 
 lazy val strictScalac =
   scalacOptions ++= Seq(
@@ -37,10 +36,16 @@ lazy val strictScalac =
     , "-Ywarn-numeric-widen"
     , "-Ywarn-value-discard"
     , "-Xfuture"
+    , "-Ylog-classpath"
     //, "-Ywarn-unused-import"
 )
 
-lazy val noPublish = publishArtifact := false
+
+lazy val noPublishSettings = Seq(
+  publish := (),
+  publishLocal := (),
+  publishArtifact := false
+)
 
 lazy val core =
   project.in(file("precepte-core"))
@@ -91,7 +96,7 @@ lazy val sample =
     .enablePlugins(PlayScala)
     .settings(commonSettings:_*)
     .settings(buildInfoSettings: _*)
-    .settings(noPublish:_*)
+    .settings(noPublishSettings:_*)
     .settings(
       sourceGenerators in Compile <+= buildInfo,
       buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
@@ -154,12 +159,12 @@ lazy val stream =
 lazy val doc =
   project.in(file("precepte-tut"))
     .settings(commonSettings:_*)
-    .settings(noPublish:_*)
+    .settings(noPublishSettings:_*)
     .settings(strictScalac)
     .dependsOn(core, play, influx, logback, sample, stream)
 
 lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
-  .settings(noPublish:_*)
+  .settings(noPublishSettings:_*)
   .settings(name := "precepte-root")
-  .aggregate(core, play, influx, logback, sample, stream, doc)
+  .aggregate(core, play, influx, logback, sample, stream, doc, coreScalaz, coreCats)
