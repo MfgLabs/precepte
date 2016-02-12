@@ -27,7 +27,7 @@ import scala.language.higherKinds
 case class CatsExt[Ta, ManagedState, UnmanagedState, F[_], A](
   p: Precepte[Ta, ManagedState, UnmanagedState, F, A]
 ) extends AnyVal {
-  final def compile[G[_]](nat: F ~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = p.compile(CatsMetaNat(nat))
+  final def compile[G[_]](to: F ~> G, from: G ~> F): Precepte[Ta, ManagedState, UnmanagedState, G, A] = p.compile(CatsMetaIso(to, from))
 
   final def mapSuspension(nat: p.SF ~> F): Precepte[Ta, ManagedState, UnmanagedState, F, A] = p.mapSuspension(CatsMetaNat(nat))
 } 
