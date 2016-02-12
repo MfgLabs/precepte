@@ -82,6 +82,10 @@ object PreStream {
 
         case ps@SubStep(sub, fmap, tags) =>
           step(ps.toStepMap)(idx)
+
+        case ps@MapSuspendSubStep(sub, f) =>
+          // TODO not enough IMHO... what to do with F?
+          step(ps.sub)(idx)
       }
 
     step(pre)(0)

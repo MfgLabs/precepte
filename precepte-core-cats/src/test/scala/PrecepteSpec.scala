@@ -57,7 +57,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   }
 
   val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
-/*
+
   "Precepte" should "run/eval simple" in {
     def f1 = Precepte(tags("simple.f1")){(_: ST[Unit]) => Applicative[Future].pure(1)}
     def f2(i: Int) = Precepte(tags("simple.f2")){(_: ST[Unit]) => Applicative[Future].pure(s"foo $i")}
@@ -509,14 +509,21 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       r <- f4(i + a._1 + a._2)
     } yield r
 
-    val nat = new cats.~>[F, Future] {
+    val nat1 = new cats.~>[F, Future] {
       def apply[A](f: F[A]): Future[A] = Applicative[Future].pure(f.a)
     }
 
-    val a0 = CatsExt(res).compile(nat).eval(nostate).futureValue
+    import scala.concurrent.Await
+    import scala.concurrent.duration._
+
+    val nat2 = new cats.~>[Future, F] {
+      def apply[A](f: Future[A]): F[A] = F(Await.result(f, 10.seconds))
+    }
+
+    val a0 = CatsExt(res).compile(nat1, nat2).eval(nostate).futureValue
     a0 should ===("6")
   }
-*/
+
 
   it should "mapSuspension" in {
     val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))

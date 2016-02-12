@@ -19,6 +19,7 @@ package precepte
 package corescalaz
 
 import scalaz.~>
+import scalaz.Isomorphism.<~>
 
 import scala.language.higherKinds
 
@@ -27,7 +28,7 @@ import scala.language.higherKinds
 case class ScalazExt[Ta, ManagedState, UnmanagedState, F[_], A](
   p: Precepte[Ta, ManagedState, UnmanagedState, F, A]
 ) extends AnyVal {
-  final def compile[G[_]](nat: F ~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = p.compile(ScalazMetaNat(nat))
+  final def compile[G[_]](iso: F <~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = p.compile(ScalazMetaIso(iso))
 
   final def mapSuspension(nat: p.SF ~> F): Precepte[Ta, ManagedState, UnmanagedState, F, A] = p.mapSuspension(ScalazMetaNat(nat))
 } 
