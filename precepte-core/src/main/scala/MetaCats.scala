@@ -44,3 +44,8 @@ trait MetaMonad[F[_]] extends MetaApplicative[F] {
 trait ~~>[F[_], G[_]] {
   def apply[A](f: F[A]): G[A]
 }
+
+trait <~~>[F[_], G[_]] {
+  def to[A](f: F[A]): G[A]
+  def from[A](f: G[A]): F[A]
+}
