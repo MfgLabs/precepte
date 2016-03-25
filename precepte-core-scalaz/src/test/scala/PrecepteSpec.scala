@@ -507,8 +507,17 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       r <- f4(i + a._1 + a._2)
     } yield r
 
-    val nat = new scalaz.~>[F, Future] {
-      def apply[A](f: F[A]): Future[A] = f.a.point[Future]
+    import scala.concurrent.Await
+    import scala.concurrent.duration._
+    import scalaz.~>
+
+    val nat = new scalaz.Isomorphism.<~>[F, Future] {
+      def to: F ~> Future = new (F~>Future) {
+        def apply[A](f: F[A]): Future[A] = f.a.point[Future]
+      }
+      def from: Future ~> F = new (Future~>F) {
+        def apply[A](f: Future[A]): F[A] = F(scala.concurrent.Await.result(f, 10.seconds))
+      }
     }
 
     val a0 = ScalazExt(res).compile(nat).eval(nostate).futureValue

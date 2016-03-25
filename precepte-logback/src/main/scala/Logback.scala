@@ -30,7 +30,6 @@ case class Logback(env: BaseEnv, loggerName: String) {
   import ch.qos.logback.classic.LoggerContext
 
   val logger = LoggerFactory.getLogger(loggerName)
-  StatusPrinter.print((LoggerFactory.getILoggerFactory).asInstanceOf[LoggerContext])
 
   val sep = "/"
 

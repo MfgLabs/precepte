@@ -59,9 +59,9 @@ package object corecats extends SubMeta {
     def apply[A](f: F[A]): G[A] = nat(f)
   }
 
-  implicit def CatsMetaIso[F[_], G[_]](implicit to: F ~> G, from: G ~> F) = new <~~>[F, G] {
-    def to[A](f: F[A]): G[A] = to(f)
-    def from[A](f: G[A]): F[A] = from(f)
+  implicit def CatsMetaIso[F[_], G[_]](implicit to0: F ~> G, from0: G ~> F) = new <~~>[F, G] {
+    def to[A](f: F[A]): G[A] = to0(f)
+    def from[A](f: G[A]): F[A] = from0(f)
   }
 
   /** allows to unapply a Precepte into a F[A] */

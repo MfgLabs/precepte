@@ -20,6 +20,7 @@ package precepte
 import scala.concurrent.Future
 
 import scalaz.{ Monad, Applicative, Functor, Unapply, Semigroup, ~>, \/, \/-, -\/, IndexedStateT, StateT, EitherT, OptionT, ListT }
+import scalaz.Isomorphism.<~>
 import scalaz.syntax.monad._
 
 import scala.language.higherKinds
@@ -56,6 +57,10 @@ package object corescalaz extends SubMeta {
     def apply[A](f: F[A]): G[A] = nat(f)
   }
 
+  implicit def ScalazMetaIso[F[_], G[_]](implicit iso: F <~> G) = new <~~>[F, G] {
+    def to[A](f: F[A]): G[A] = iso.to(f)
+    def from[A](f: G[A]): F[A] = iso.from(f)
+  }
 
   /** allows to unapply a Precepte into a F[A] */
   implicit def toClassicUnapply[M0[_[_]], Ta, MS, C, F[_], A0](implicit m: M0[({ type λ[α] = Precepte[Ta, MS, C, F, α] })#λ]) = new Unapply[M0, Precepte[Ta, MS, C, F, A0]] {
