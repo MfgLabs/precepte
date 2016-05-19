@@ -24,7 +24,7 @@ import scala.reflect.macros.{ blackbox, whitebox }
 import scala.concurrent.Future
 
 import cats.Eq
-import cats.data.{ OptionT, XorT, Xor, StreamingT }
+import cats.data.{ OptionT, XorT, Xor }
 
 import scala.language.higherKinds
 import scala.language.existentials

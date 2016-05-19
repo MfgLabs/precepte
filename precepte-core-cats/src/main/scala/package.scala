@@ -20,7 +20,7 @@ package precepte
 import scala.concurrent.Future
 
 import cats.{ Monad, Applicative, Functor, Semigroup, ~>, Unapply }
-import cats.data.{ OptionT, XorT, Xor, StreamingT }
+import cats.data.{ OptionT, XorT, Xor}
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
@@ -39,7 +39,7 @@ package object corecats extends SubMeta {
       override def flatMap[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
         m.flatMap(f)
 
-      override def ap[A, B](pa: Precepte[Ta, ManagedState, UnmanagedState, F, A])(pab: Precepte[Ta, ManagedState, UnmanagedState, F, A => B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
+      override def ap[A, B](pab: Precepte[Ta, ManagedState, UnmanagedState, F, A => B])(pa: Precepte[Ta, ManagedState, UnmanagedState, F, A]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
         Apply(pa, pab)
       }
     }
@@ -52,7 +52,7 @@ package object corecats extends SubMeta {
     override def pure[A](a: A): F[A] = mo.pure(a)
     override def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
     override def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B] = mo.flatMap(fa)(f)
-    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fa)(fab)
+    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fab)(fa)
   }
 
   implicit def CatsMetaNat[F[_], G[_]](implicit nat: F ~> G) = new ~~>[F, G] {
@@ -121,7 +121,7 @@ trait SubMeta {
   implicit def CatsMetaApplicative[F[_]](implicit mo: Applicative[F]) = new MetaApplicative[F] {
     override def pure[A](a: A): F[A] = mo.pure(a)
     override def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
-    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fa)(fab)
+    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fab)(fa)
   }
 
 }
