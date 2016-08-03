@@ -61,14 +61,12 @@ trait PreActionBuilder[+R[_], C] extends PreActionFunction[Request, R, Future, C
       }).eval(initialST))
     }
 
-  final def async(block: R[AnyContent] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[AnyContent] =
+  final def async(block: R[AnyContent] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C]): Action[AnyContent] =
     async(BodyParsers.parse.anyContent)(block)
 
-  final def async[A](bodyParser: BodyParser[A])(block: R[A] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[A] =
+  final def async[A](bodyParser: BodyParser[A])(block: R[A] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C]): Action[A] =
     Action.async(bodyParser) { r =>
-      addSpan(Precepte(default.BaseTags(callee, default.Category.Api)) {
-        invokeBlock(r, block)
-      }.eval(initialST))
+      addSpan(invokeBlock(r, block).eval(initialST))
     }
 
   protected def composeParser[A](bodyParser: BodyParser[A]): BodyParser[A] = bodyParser
