@@ -104,7 +104,7 @@ res1: String = The answer to life the universe and everything is 42
 
 All is well, but you'd really like to be able to collect insights on your code, like how fast it is. Of course you choose to use Précepte for that!
 
-Let's rewrite you code to use Précepte, and attach some metadata to it.
+Let's rewrite your code to use Précepte, and attach some metadata to it.
 
 ```scala
 import scala.concurrent.Future
