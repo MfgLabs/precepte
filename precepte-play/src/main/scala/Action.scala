@@ -25,21 +25,23 @@ import scala.concurrent.Future
 import scala.language.higherKinds
 
 import com.mfglabs.precepte._
-import corescalaz._
 import default._
 
 trait PreActionFunction[-R[_], +P[_], F[_], C] {
   self =>
   def invokeBlock[A](request: R[A], block: P[A] => DPre[F, C, Result]): DPre[F, C, Result]
 
-  protected def executionContext: scala.concurrent.ExecutionContext = play.api.libs.concurrent.Execution.defaultContext
-
-  def andThen[Q[_]](other: PreActionFunction[P, Q, F, C]): PreActionFunction[R, Q, F, C]
+  def andThen[Q[_]](other: PreActionFunction[P, Q, F, C]): PreActionFunction[R, Q, F, C] =
+    new PreActionFunction[R, Q, F, C] {
+      def invokeBlock[A](request: R[A], block: Q[A] => DPre[F, C, Result]): DPre[F, C, Result] =
+        self.invokeBlock[A](request, b => other.invokeBlock[A](b, block))
+    }
 }
 
-
-trait PreActionBuilder[+R[_], C] extends PreActionFunction[Request, R, Future, C] {
+trait PreActionSyntax[C] {
   self =>
+
+  type PrePlayAction[R[_]] = PreActionFunction[Request, R, Future, C]
 
   def initialState: C
   def version: default.Version
@@ -49,39 +51,36 @@ trait PreActionBuilder[+R[_], C] extends PreActionFunction[Request, R, Future, C
   def _env = default.BaseEnv(host, environment, version)
   def initialST = default.ST(Span.gen, _env, Vector.empty, initialState)
 
+  protected def executionContext: scala.concurrent.ExecutionContext = play.api.libs.concurrent.Execution.defaultContext
+
   private def addSpan(fr: Future[Result]) = fr.map(_.withHeaders("Span-Id" -> initialST.managed.span.value))(executionContext)
 
-  final def future(block: R[AnyContent] => Future[Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[AnyContent] =
-    future(BodyParsers.parse.anyContent)(block)
+  final def future[R[_]](fun: PrePlayAction[R])(block: R[AnyContent] => Future[Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C], callee: default.Callee): Action[AnyContent] =
+    future(BodyParsers.parse.anyContent)(fun)(block)
 
-  final def future[A](bodyParser: BodyParser[A])(block: R[A] => Future[Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C], callee: default.Callee): Action[A] =
+  final def future[R[_], A](bodyParser: BodyParser[A])(fun: PrePlayAction[R])(block: R[A] => Future[Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C], callee: default.Callee): Action[A] =
     Action.async(bodyParser) { r =>
-      addSpan(invokeBlock(r, { p: R[A] =>
+      addSpan(fun.invokeBlock(r, { p: R[A] =>
         Precepte(default.BaseTags(callee, default.Category.Api)) { st: ST[C] => block(p) }
       }).eval(initialST))
     }
 
-  final def async(block: R[AnyContent] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C]): Action[AnyContent] =
-    async(BodyParsers.parse.anyContent)(block)
+  final def async[R[_]](fun: PrePlayAction[R])(block: R[AnyContent] => DPre[Future, C, Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C]): Action[AnyContent] =
+    async(BodyParsers.parse.anyContent)(fun)(block)
 
-  final def async[A](bodyParser: BodyParser[A])(block: R[A] => DPre[Future, C, Result])(implicit fu: scalaz.Monad[Future], semi: scalaz.Semigroup[C]): Action[A] =
+  final def async[R[_], A](bodyParser: BodyParser[A])(fun: PrePlayAction[R])(block: R[A] => DPre[Future, C, Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C]): Action[A] =
     Action.async(bodyParser) { r =>
-      addSpan(invokeBlock(r, block).eval(initialST))
+      addSpan(fun.invokeBlock(r, block).eval(initialST))
     }
-
-  protected def composeParser[A](bodyParser: BodyParser[A]): BodyParser[A] = bodyParser
-
-  // TODO: composition with play action builder ?
-  override def andThen[Q[_]](other: PreActionFunction[R, Q, Future, C]): PreActionBuilder[Q, C] = new PreActionBuilder[Q, C] {
-    def initialState = self.initialState
-    def version = self.version
-    def environment = self.environment
-    def host = self.host
-
-    def invokeBlock[A](request: Request[A], block: Q[A] => DPre[Future, C, Result]): DPre[Future, C, Result] =
-      self.invokeBlock[A](request, b => other.invokeBlock[A](b, block))
-
-    override protected def composeParser[A](bodyParser: BodyParser[A]): BodyParser[A] =
-      self.composeParser(bodyParser)
-  }
 }
+
+object PreActionSyntax {
+  def apply[C](st: C, v: default.Version, e: default.Environment, h: default.Host) =
+    new PreActionSyntax[C] {
+      def initialState = st
+      def version = v
+      def environment = e
+      def host = h
+    }
+}
+

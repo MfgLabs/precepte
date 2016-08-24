@@ -11,7 +11,7 @@ lazy val publishSettings = Seq(
 
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.3.2"
+  , version := "0.4.0"
   , scalaVersion := "2.11.8"
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
@@ -36,7 +36,7 @@ lazy val strictScalac =
     , "-Ywarn-numeric-widen"
     , "-Ywarn-value-discard"
     , "-Xfuture"
-    , "-Ylog-classpath"
+    // , "-Ylog-classpath"
     //, "-Ywarn-unused-import"
 )
 
@@ -142,7 +142,7 @@ lazy val play =
     .settings(
       libraryDependencies += "com.typesafe.play" %% "play" % "2.3.9",
       name := "precepte-play")
-    .dependsOn(coreScalaz, influx)
+    .dependsOn(core)
 
 lazy val stream =
   project.in(file("precepte-stream"))

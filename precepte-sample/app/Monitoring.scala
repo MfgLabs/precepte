@@ -36,12 +36,7 @@ object Monitoring {
   type Req[A] = (MonitoringContext, Request[A])
 
   def TimedAction(implicit callee: Callee) =
-    new PreActionBuilder[Req, Unit] {
-      def initialState = ()
-      def version = env.version
-      def environment = env.environment
-      def host = env.host
-
+    new PreActionFunction[Request, Req, Future, Unit] {
       def invokeBlock[A](request: Request[A], block: ((MonitoringContext, Request[A])) => DPre[Future, Unit, Result]) =
         Pre(BaseTags(callee, Category.Api)) { (st: ST[Unit]) => Future.successful(st) } // XXX: does not make sense at the graph level
           .flatMap{ st => block(MonitoringContext(st) -> request) }
