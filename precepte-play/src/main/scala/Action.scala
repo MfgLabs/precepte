@@ -53,16 +53,17 @@ trait PreActionSyntax[C] {
 
   protected def executionContext: scala.concurrent.ExecutionContext = play.api.libs.concurrent.Execution.defaultContext
 
-  private def addSpan(fr: Future[Result]) = fr.map(_.withHeaders("Span-Id" -> initialST.managed.span.value))(executionContext)
+  private def addSpan[T](st: default.ST[T])(fr: Future[Result]) = fr.map(_.withHeaders("Span-Id" -> st.managed.span.value))(executionContext)
 
   final def future[R[_]](fun: PrePlayAction[R])(block: R[AnyContent] => Future[Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C], callee: default.Callee): Action[AnyContent] =
     future(BodyParsers.parse.anyContent)(fun)(block)
 
   final def future[R[_], A](bodyParser: BodyParser[A])(fun: PrePlayAction[R])(block: R[A] => Future[Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C], callee: default.Callee): Action[A] =
     Action.async(bodyParser) { r =>
-      addSpan(fun.invokeBlock(r, { p: R[A] =>
+      val st = initialST
+      addSpan(st)(fun.invokeBlock(r, { p: R[A] =>
         Precepte(default.BaseTags(callee, default.Category.Api)) { st: ST[C] => block(p) }
-      }).eval(initialST))
+      }).eval(st))
     }
 
   final def async[R[_]](fun: PrePlayAction[R])(block: R[AnyContent] => DPre[Future, C, Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C]): Action[AnyContent] =
@@ -70,7 +71,8 @@ trait PreActionSyntax[C] {
 
   final def async[R[_], A](bodyParser: BodyParser[A])(fun: PrePlayAction[R])(block: R[A] => DPre[Future, C, Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C]): Action[A] =
     Action.async(bodyParser) { r =>
-      addSpan(fun.invokeBlock(r, block).eval(initialST))
+      val st = initialST
+      addSpan(st)(fun.invokeBlock(r, block).eval(st))
     }
 }
 
