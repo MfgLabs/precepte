@@ -33,7 +33,8 @@ case class Influx[C : MetaSemigroup](
   influxdbURL: URL,
   user: String,
   password: String,
-  dbName: String
+  dbName: String,
+  retentionPolicy: String
 )(implicit ex: ExecutionContext) {
 
   import scala.util.{ Try, Failure, Success }
@@ -87,7 +88,7 @@ case class Influx[C : MetaSemigroup](
             f.map { r =>
               val t1 = System.nanoTime()
               val serie = toSerie(t0, t1, System.currentTimeMillis(), st)
-              in.write(dbName, "default", serie)
+              in.write(dbName, retentionPolicy, serie)
               r
             }
           }

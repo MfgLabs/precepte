@@ -28,7 +28,8 @@ object Monitoring {
     new java.net.URL("http://localhost:8086"),
       "root",
       "root",
-      "precepte_sample"
+      "precepte_sample",
+      "autogen"
     )
 
   lazy val logback = Logback(env, "application")
