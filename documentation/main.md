@@ -32,7 +32,7 @@ Precepte is a custom purely functional structure based on:
   - A Free Monad to represent our monadic & applicative effectful workflow
   - Some helpers to make Precepte usable with Monad Transformers
   - Coyoneda to reduce the requirement of effects to be Functor in Free Monads
-  - some custom optimization to reduce the burden of Free Monads classic model (right associatio, map fusion, structure squashing, )
+  - some custom optimizations to reduce the burden of Free Monads classic model (right association, map fusion, structure squashing)
 
 ## Prerequisites
 
