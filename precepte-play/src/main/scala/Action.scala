@@ -48,6 +48,17 @@ trait PreActionSyntax[C] {
   def environment: default.Environment
   def host: default.Host
 
+  def _transform: (Future[Result] => Future[Result])
+
+  def transform(f: Future[Result] => Future[Result]) =
+    new PreActionSyntax[C] {
+      def initialState = self.initialState
+      def version = self.version
+      def environment = self.environment
+      def host = self.host
+      def _transform = self._transform andThen f
+    }
+
   def _env = default.BaseEnv(host, environment, version)
   def initialST = default.ST(Span.gen, _env, Vector.empty, initialState)
 
@@ -61,9 +72,10 @@ trait PreActionSyntax[C] {
   final def future[R[_], A](bodyParser: BodyParser[A])(fun: PrePlayAction[R])(block: R[A] => Future[Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C], callee: default.Callee): Action[A] =
     Action.async(bodyParser) { r =>
       val st = initialST
-      addSpan(st)(fun.invokeBlock(r, { p: R[A] =>
+      val f = addSpan(st)(fun.invokeBlock(r, { p: R[A] =>
         Precepte(default.BaseTags(callee, default.Category.Api)) { st: ST[C] => block(p) }
       }).eval(st))
+      _transform(f)
     }
 
   final def async[R[_]](fun: PrePlayAction[R])(block: R[AnyContent] => DPre[Future, C, Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C]): Action[AnyContent] =
@@ -72,7 +84,8 @@ trait PreActionSyntax[C] {
   final def async[R[_], A](bodyParser: BodyParser[A])(fun: PrePlayAction[R])(block: R[A] => DPre[Future, C, Result])(implicit fu: MetaMonad[Future], semi: MetaSemigroup[C]): Action[A] =
     Action.async(bodyParser) { r =>
       val st = initialST
-      addSpan(st)(fun.invokeBlock(r, block).eval(st))
+      val f = addSpan(st)(fun.invokeBlock(r, block).eval(st))
+      _transform(f)
     }
 }
 
@@ -83,6 +96,8 @@ object PreActionSyntax {
       def version = v
       def environment = e
       def host = h
+
+      def _transform = identity
     }
 }
 
