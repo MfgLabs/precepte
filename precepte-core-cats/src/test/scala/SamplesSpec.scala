@@ -157,7 +157,7 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
     /** a Sample managing in a monadic flow */
     def pay0(id: Long, amount: Double): DefaultPre[Future, Ctx, PayResult] =
       // PreMP is a macro oriented helper that extracts the name of the function and the category from scope
-      PreMP { s: ST[Ctx] => 
+      PreMP { s: ST[Ctx] =>
         (for {
           stuff <-  s.um.db.findById(id).unify(s)
           r     <-  stuff match {
@@ -202,7 +202,7 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
     val (graph, r) = p.graph(Graph.empty).eval(s0).futureValue
 
     // copy that string into http://www.webgraphviz.com/ and see you graph execution
-    println(s"${graph.viz}")
+    // println(s"${graph.viz}")
 
     r should ===(Paid(12345L, 23.45))
   }

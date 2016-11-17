@@ -440,27 +440,27 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         }
       }.eval(nostate).futureValue
 
-    println("=== s ===")
-    println(s.viz)
+    // println("=== s ===")
+    // println(s.viz)
 
-    println("=== (p1 |@| p2) ===")
+    // println("=== (p1 |@| p2) ===")
     val (s1, _) = (p1 |@| p2).tupled.graph(Graph.empty).eval(nostate).futureValue
-    println(s1.viz)
+    // println(s1.viz)
 
-    println("=== s2 ===")
+    // println("=== s2 ===")
     val (s2, _) = Precepte(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
-    println(s2.viz)
+    // println(s2.viz)
 
-    println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
+    // println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
     val ptest =
       for {
         _ <- (p1 |@| p2 |@| p3).tupled
         _ <- p4
       } yield ()
     val (s3, _) = ptest.graph(Graph.empty).eval(nostate).futureValue
-    println(s3.viz)
+    // println(s3.viz)
 
-    println("=== pX ===")
+    // println("=== pX ===")
     val px =
       for {
       _ <- p0
@@ -470,26 +470,25 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     } yield ()
 
     val (sx, _) = px.graph(Graph.empty).eval(nostate).futureValue
-    println(sx.viz)
+    // println(sx.viz)
 
-    println("=== psubap ===")
-    // val psubap = Precepte(tags("sub"))((p1 |@| p2).tupled)
+    // println("=== psubap ===")
     val psubap = Precepte(tags("sub"))(p1.map(identity))
     val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
-    println(ssubap.viz)
+    // println(ssubap.viz)
 
-    println("=== psubap2 ===")
+    // println("=== psubap2 ===")
     val (ssubap2, _) =
       p8
         .graph(Graph.empty)
         .eval(nostate)
         .futureValue
-    println(ssubap2.viz)
+    // println(ssubap2.viz)
 
-    println("=== simple ===")
+    // println("=== simple ===")
     val (sp1, _) =
       Precepte(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
-    println(sp1.viz)
+    // println(sp1.viz)
 
     1 should ===(1)
   }
@@ -553,6 +552,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     type SF[T] = (ST[Int], Future[T])
 
+    var countCalls = 0
+
     object Mon extends (SF ~> Future) {
       def apply[A](f: SF[A]): Future[A] = {
         val t0 = System.nanoTime()
@@ -561,6 +562,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         f._2.map { a =>
           val t1 = System.nanoTime()
           val duration = t1 - t0
+          countCalls = countCalls + 1
           // TODO: Store measure and test result
           a
         }
@@ -574,6 +576,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     val res = ScalazExt(p8).mapSuspension(Mon).eval(nostate).futureValue
     res should ===(())
+    countCalls should ===(18)
   }
 
 }
