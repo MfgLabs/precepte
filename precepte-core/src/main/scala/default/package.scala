@@ -44,7 +44,7 @@ package object default extends HK {
         value
       )
 
-    def apply[C](managed: MS, unmanaged: C): ST[C] = 
+    def apply[C](managed: MS, unmanaged: C): ST[C] =
       PState[BaseTags, MS, C] (
         managed,
         unmanaged
@@ -65,8 +65,9 @@ package object default extends HK {
 
   implicit def toNode[C]  = new ToNode[ST[C]] {
     def toNode(s: ST[C]): Node = {
-      val id = s.managed.path.last.tags.callee.value + "_" + s.managed.path.last.id.value
-      Leaf(id, s.managed.path.last.tags.callee.value)
+      val l = s.managed.path.last
+      val id = l.tags.callee.value + "_" + l.id.value
+      Leaf(id, l.tags.callee.value)
     }
   }
 

@@ -141,6 +141,30 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
   @tailrec private [precepte] final def resume(idx: Int)(state: S)
     (implicit fu: MetaMonad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: MetaSemigroup[UnmanagedState])
     : ResumeStep[Ta, ManagedState, UnmanagedState, F, A] = {
+
+    def resumeSub[I](s: SubStep[Ta, ManagedState, UnmanagedState, F, I, A]) =
+      s match {
+        case ss@SubStep(sub, map, tags) =>
+          def up(s: S) = upd.appendTags(s, tags, idx)
+          val mf =
+            (f: F[(S, I)]) => fu.map(f){ case (s, i) =>
+              map(up(state), s, i)
+            }
+          val s0 = up(state) // use the updated state in the execution of the underlying function
+          FXSStep(sub(s0), mf, up) // pass up so that the precepte returned by this function can also use the updated state
+      }
+
+    // def resumeSusp(s: MapSuspendSubStep[Ta, ManagedState, UnmanagedState, F, S, A]): ResumeStep[Ta, ManagedState, UnmanagedState, F, A] =
+    //   s match {
+    //     case MapSuspendSubStep(sub, nat) =>
+    //       val mf = (f: F[(S, A)]) =>
+    //         fu.flatMap(f) { case (s, a) =>
+    //           val f0 = nat((s, fu.pure(a)))
+    //           fu.map(f0)(s -> _)
+    //         }
+    //       FXSStep(sub, mf, identity)
+    //   }
+
     this match {
 
       case Return(a) =>
@@ -158,18 +182,22 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         ApplyStep(pa, pf, (a: A) => Return(a))
 
       case sub@SubStep(_, _, _) =>
-        sub.toStepMap.resume(idx)(state)
+        resumeSub(sub)
+        // sub.toStepMap.resume(idx)(state)
 
-      case MapSuspendSubStep(sub, f) =>
-        sub.toStepMap.mapSuspension(f).resume(idx)(state)
+      case ms@MapSuspendSubStep(sub, f) =>
+        throw new NotImplementedError("189")
+        // sub.toStepMap.mapSuspension(f).resume(idx)(state)
 
       case mf@SMap(sub, pf) =>
         sub match {
           case sub@SubStep(_, _, _) =>
-            sub.toStepMap.map(pf).resume(idx)(state)
+            throw new NotImplementedError("195")
+            // sub.toStepMap.map(pf).resume(idx)(state)
 
           case MapSuspendSubStep(sub2, f2) =>
-            sub2.toStepMap.mapSuspension(f2).map(pf).resume(idx)(state)
+            throw new NotImplementedError("199")
+            // sub2.toStepMap.mapSuspension(f2).map(pf).resume(idx)(state)
 
           case Return(a) =>
             ReturnStep(pf(a), state)
@@ -200,10 +228,12 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             next(a).resume(idx)(state)
 
           case sub@SubStep(_, _, _) =>
-            sub.toStepMap.flatMap(next).resume(idx)(state)
+            throw new NotImplementedError("231")
+            // sub.toStepMap.flatMap(next).resume(idx)(state)
 
           case MapSuspendSubStep(sub2, f2) =>
-            sub2.toStepMap.mapSuspension(f2).flatMap(next).resume(idx)(state)
+            throw new NotImplementedError("235")
+            // sub2.toStepMap.mapSuspension(f2).flatMap(next).resume(idx)(state)
 
           case Suspend(fa) =>
             FMStep(fu.map(fa)(a => state -> a), next)
@@ -296,12 +326,21 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
                   ){ case (s3, b) =>
                     mo.map(stepRun0(next(b), s3, idx)){ case (s4, a4) => (s4, f1(f0(a4))) }
                   }
+
+                case fx@FXSStep(pi, mf, up) =>
+                  throw new NotImplementedError("331")
+                  // mo.map(mf(stepRun0(pi, s))) { case (s, c) =>
+                  //   s -> (f0 andThen f1)(c)
+                  // }
               }
             }
 
             // depth is already 2 as we are in a mapfusionstep
             fusionStep(p0, f0, f1, s0, 2)
 
+          case fx@FXSStep(pi, mf, up) =>
+            val state0 = up(state)
+            mf(stepRun0(pi, state0))
         }
       }
 
@@ -636,6 +675,16 @@ private [precepte] case class ApplyStep[Ta, ManagedState, UnmanagedState, F[_], 
 , pf: Precepte[Ta, ManagedState, UnmanagedState, F, A => B]
 , next: B => Precepte[Ta, ManagedState, UnmanagedState, F, C]
 ) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, C]
+
+
+private [precepte] case class FXSStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
+  pi: Precepte[Ta, ManagedState, UnmanagedState, F, I]
+, mf: F[(Precepte[Ta, ManagedState, UnmanagedState, F, I]#S, I)] => F[(Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)]
+, up: Precepte[Ta, ManagedState, UnmanagedState, F, I]#S => Precepte[Ta, ManagedState, UnmanagedState, F, I]#S
+) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A] {
+  type _I = I
+}
+
 
 trait Implicits {
 

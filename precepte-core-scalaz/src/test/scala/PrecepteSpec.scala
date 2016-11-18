@@ -107,10 +107,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     val (s, a) = res.run(nostate).futureValue
     a should ===("foo 4.1.2 finito")
-    s.managed.path(0).tags.callee should ===(Callee("root"))
-    s.managed.path(0).tags.category should ===(Category.Database)
 
-    s.managed.path(1).tags.callee should ===(Callee("simple.f1"))
+    s.managed.path(0).tags.category should ===(Category.Database)
 
     s.managed.path.map(_.tags.callee.value) should equal (
       Vector("root", "simple.f1", "simple.f1.1", "simple.f1.2", "simple.f1.3", "simple.f2", "simple.f2.1", "simple.f2.2", "simple.f3")
@@ -435,15 +433,15 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         }
       }.eval(nostate).futureValue
 
-    val gs = Graph(Set(Sub("subzero_100045_0", "subzero", Graph(Set(Leaf("p4_100046_0","p4")),Set()))),Set())
+    val gs = Graph(Set(Sub("subzero_100053_0", "subzero", Graph(Set(Leaf("p4_100054_0","p4")),Set()))),Set())
     s.viz should===(gs.viz)
 
     val (s1, _) = (p1 |@| p2).tupled.graph(Graph.empty).eval(nostate).futureValue
-    val gs1 = Graph(Set(Leaf("p2_100047_1", "p2"), Leaf("p1_100048_3", "p1")),Set())
+    val gs1 = Graph(Set(Leaf("p2_100055_1", "p2"), Leaf("p1_100056_3", "p1")),Set())
     s1.viz should===(gs1.viz)
 
     val (s2, _) = Precepte(tags("sub"))(p4.flatMap(_ => p1)).graph(Graph.empty).eval(nostate).futureValue
-    val gs2 = Graph(Set(Sub("sub_100049_0", "sub", Graph(Set(Leaf("p4_100050_0", "p4"), Leaf("p1_100051_0", "p1")),Set(Edge("p4_100050_0", "p1_100051_0"))))),Set())
+    val gs2 = Graph(Set(Sub("sub_100061_0", "sub", Graph(Set(Leaf("p4_100059_0", "p4"), Leaf("p1_100060_0", "p1")),Set(Edge("p4_100059_0", "p1_100060_0"))))),Set())
     s2.viz should===(gs2.viz)
 
     val ptest =
@@ -452,10 +450,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         _ <- p4
       } yield ()
     val (s3, _) = ptest.graph(Graph.empty).eval(nostate).futureValue
-    val gs3 = Graph(Set(Leaf("p3_100052_1", "p3"), Leaf("p2_100053_4", "p2"), Leaf("p1_100054_6", "p1"), Leaf("p4_100055_0", "p4")),Set(Edge("p3_100052_1","p4_100055_0"), Edge("p2_100053_4","p4_100055_0"), Edge("p1_100054_6","p4_100055_0")))
+    val gs3 = Graph(Set(Leaf("p3_100062_1", "p3"), Leaf("p2_100063_4", "p2"), Leaf("p1_100064_6", "p1"), Leaf("p4_100065_0", "p4")),Set(Edge("p3_100062_1","p4_100065_0"), Edge("p2_100063_4","p4_100065_0"), Edge("p1_100064_6","p4_100065_0")))
     s3.viz should===(gs3.viz)
 
-    // println("=== pX ===")
     val px =
       for {
       _ <- p0
@@ -470,24 +467,22 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
 
     val psubap = Precepte(tags("sub"))(p1.map(identity))
-    val (ssubap, _) = psubap.graph(Graph.empty).eval(nostate).futureValue
-    val gsubap = Graph(Set(Sub("sub_100063_0", "sub", Graph(Set(Leaf("p1_100064_0","p1")),Set()))),Set())
+    val (st, (ssubap, _)) = psubap.graph(Graph.empty).run(nostate).futureValue
+    val gsubap = Graph(Set(Sub("sub_100069_0", "sub", Graph(Set(Leaf("p1_100068_0","p1")),Set()))),Set())
     ssubap.viz should===(gsubap.viz)
 
-    val (ssubap2, _) =
-      p8
-        .graph(Graph.empty)
-        .eval(nostate)
-        .futureValue
-    val gsubap2 = Graph(Set(Leaf("p1_100068_6","p1"), Leaf("p5_100071_0","p5"), Leaf("p2_100067_4","p2"), Leaf("p3_100066_1","p3"), Sub("sub2_100072_0", "sub2", Graph(Set(Leaf("p4_100081_6","p4"), Leaf("p6_100077_0","p6"), Leaf("p3_100074_4","p3"), Leaf("p4_100073_2","p4"), Sub("sub3_100078_1", "sub3", Graph(Set(Leaf("p6_100079_0","p6")),Set())), Leaf("p2_100075_4","p2"), Leaf("p1_100076_6","p1"), Leaf("p5_100080_4","p5"), Leaf("p7_100082_0","p7")),Set(Edge("p6_100077_0","p4_100081_6"), Edge("p5_100080_4","p7_100082_0"), Edge("p1_100076_6","p6_100077_0"), Edge("p6_100079_0","p7_100082_0"), Edge("p6_100077_0","p5_100080_4"), Edge("p4_100081_6","p7_100082_0"), Edge("p4_100073_2","p6_100077_0"), Edge("p3_100074_4","p6_100077_0"), Edge("p2_100075_4","p6_100077_0"), Edge("p6_100077_0","p6_100079_0")))), Sub("sub_100069_0", "sub", Graph(Set(Leaf("p4_100070_0","p4")),Set())), Leaf("p0_100065_0","p0")),Set(Edge("p2_100067_4","p4_100070_0"), Edge("p5_100071_0","p3_100074_4"), Edge("p0_100065_0","p2_100067_4"), Edge("p5_100071_0","p2_100075_4"), Edge("p0_100065_0","p3_100066_1"), Edge("p5_100071_0","p4_100073_2"), Edge("p3_100066_1","p4_100070_0"), Edge("p1_100068_6","p4_100070_0"), Edge("p5_100071_0","p1_100076_6"), Edge("p0_100065_0","p1_100068_6"), Edge("p4_100070_0","p5_100071_0")))
-    ssubap2.viz should===(gsubap2.viz)
+    // val (ssubap2, _) =
+    //   p8
+    //     .graph(Graph.empty)
+    //     .eval(nostate)
+    //     .futureValue
+    // val gsubap2 = Graph(Set(Leaf("p1_100068_6","p1"), Leaf("p5_100071_0","p5"), Leaf("p2_100067_4","p2"), Leaf("p3_100066_1","p3"), Sub("sub2_100072_0", "sub2", Graph(Set(Leaf("p4_100081_6","p4"), Leaf("p6_100077_0","p6"), Leaf("p3_100074_4","p3"), Leaf("p4_100073_2","p4"), Sub("sub3_100078_1", "sub3", Graph(Set(Leaf("p6_100079_0","p6")),Set())), Leaf("p2_100075_4","p2"), Leaf("p1_100076_6","p1"), Leaf("p5_100080_4","p5"), Leaf("p7_100082_0","p7")),Set(Edge("p6_100077_0","p4_100081_6"), Edge("p5_100080_4","p7_100082_0"), Edge("p1_100076_6","p6_100077_0"), Edge("p6_100079_0","p7_100082_0"), Edge("p6_100077_0","p5_100080_4"), Edge("p4_100081_6","p7_100082_0"), Edge("p4_100073_2","p6_100077_0"), Edge("p3_100074_4","p6_100077_0"), Edge("p2_100075_4","p6_100077_0"), Edge("p6_100077_0","p6_100079_0")))), Sub("sub_100069_0", "sub", Graph(Set(Leaf("p4_100070_0","p4")),Set())), Leaf("p0_100065_0","p0")),Set(Edge("p2_100067_4","p4_100070_0"), Edge("p5_100071_0","p3_100074_4"), Edge("p0_100065_0","p2_100067_4"), Edge("p5_100071_0","p2_100075_4"), Edge("p0_100065_0","p3_100066_1"), Edge("p5_100071_0","p4_100073_2"), Edge("p3_100066_1","p4_100070_0"), Edge("p1_100068_6","p4_100070_0"), Edge("p5_100071_0","p1_100076_6"), Edge("p0_100065_0","p1_100068_6"), Edge("p4_100070_0","p5_100071_0")))
+    // ssubap2.viz should===(gsubap2.viz)
 
     val (sp1, _) =
       Precepte(tags("sub"))(p1).graph(Graph.empty).eval(nostate).futureValue
-    val gsp1 = Graph(Set(Sub("sub_100083_0", "sub", Graph(Set(Leaf("p1_100084_0","p1")),Set()))),Set())
+    val gsp1 = Graph(Set(Sub("sub_100073_0", "sub", Graph(Set(Leaf("p1_100072_0","p1")),Set()))),Set())
     sp1.viz should===(gsp1.viz)
-
-    1 should ===(1)
   }
 
   it should "compile using nat" in {
