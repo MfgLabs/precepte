@@ -513,59 +513,59 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   }
 
 
-  // it should "mapSuspension" in {
-  //   val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
-  //   val p1 = Precepte(tags("p1")).applyU((s: ST[Int]) => Future(1 -> 1))
-  //   val p2 = Precepte(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
-  //   val p3 = Precepte(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
-  //   val p4 = Precepte(tags("p4")).applyU((s: ST[Int]) => Future(4 -> 4))
-  //   val p5 = Precepte(tags("p5")).applyU((s: ST[Int]) => Future(5 -> 5))
-  //   val p6 = Precepte(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
-  //   val p7 = Precepte(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
+  it should "mapSuspension" in {
+    val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
+    val p1 = Precepte(tags("p1")).applyU((s: ST[Int]) => Future(1 -> 1))
+    val p2 = Precepte(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))
+    val p3 = Precepte(tags("p3")).applyU((s: ST[Int]) => Future(3 -> 3))
+    val p4 = Precepte(tags("p4")).applyU((s: ST[Int]) => Future(4 -> 4))
+    val p5 = Precepte(tags("p5")).applyU((s: ST[Int]) => Future(5 -> 5))
+    val p6 = Precepte(tags("p6")).applyU((s: ST[Int]) => Future(6 -> 6))
+    val p7 = Precepte(tags("p7")).applyU((s: ST[Int]) => Future(7 -> 7))
 
-  //   val p8 =
-  //     for {
-  //       _ <- p0
-  //       _ <- (p1 |@| p2 |@| p3).tupled
-  //       _ <- Precepte(tags("sub"))(p4)
-  //       _ <- p5
-  //       _ <- Precepte(tags("sub2"))(for {
-  //           _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
-  //           _ <- p6
-  //           _ <- (p4 |@| p5 |@| Precepte(tags("sub3"))(p6)).tupled
-  //           _ <- p7
-  //         } yield ())
-  //     } yield ()
+    val p8 =
+      for {
+        _ <- p0
+        _ <- (p1 |@| p2 |@| p3).tupled
+        _ <- Precepte(tags("sub"))(p4)
+        _ <- p5
+        _ <- Precepte(tags("sub2"))(for {
+            _ <- (p1 |@| p2 |@| p3 |@| p4).tupled
+            _ <- p6
+            _ <- (p4 |@| p5 |@| Precepte(tags("sub3"))(p6)).tupled
+            _ <- p7
+          } yield ())
+      } yield ()
 
-  //   import scalaz.~>
+    import scalaz.~>
 
-  //   type SF[T] = (ST[Int], Future[T])
+    type SF[T] = (ST[Int], Future[T])
 
-  //   var countCalls = 0
+    var countCalls = 0
 
-  //   object Mon extends (SF ~> Future) {
-  //     def apply[A](f: SF[A]): Future[A] = {
-  //       val t0 = System.nanoTime()
-  //       val path = f._1.managed.path
-  //       val method = path.last.tags.callee.value
-  //       f._2.map { a =>
-  //         val t1 = System.nanoTime()
-  //         val duration = t1 - t0
-  //         countCalls = countCalls + 1
-  //         // TODO: Store measure and test result
-  //         a
-  //       }
-  //     }
-  //   }
+    object Mon extends (SF ~> Future) {
+      def apply[A](f: SF[A]): Future[A] = {
+        val t0 = System.nanoTime()
+        val path = f._1.managed.path
+        val method = path.last.tags.callee.value
+        f._2.map { a =>
+          val t1 = System.nanoTime()
+          val duration = t1 - t0
+          countCalls = countCalls + 1
+          // TODO: Store measure and test result
+          a
+        }
+      }
+    }
 
-  //   implicit val intSG = new scalaz.Semigroup[Int] {
-  //     def append(f1: Int, f2: => Int) = f1 + f2
-  //   }
-  //   def nostate = ST(Span.gen, env, Vector.empty, 0)
+    implicit val intSG = new scalaz.Semigroup[Int] {
+      def append(f1: Int, f2: => Int) = f1 + f2
+    }
+    def nostate = ST(Span.gen, env, Vector.empty, 0)
 
-  //   val res = ScalazExt(p8).mapSuspension(Mon).eval(nostate).futureValue
-  //   res should ===(())
-  //   countCalls should ===(18)
-  // }
+    val res = ScalazExt(p8).mapSuspension(Mon).eval(nostate).futureValue
+    res should ===(())
+    countCalls should ===(18)
+  }
 
 }
