@@ -173,17 +173,11 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case sub@SubStep(_, _, _) =>
         resumeSub(sub)
 
-      case ms@MapSuspendSubStep(sub, f) =>
-        throw new NotImplementedError("189")
-
       case mf@SMap(sub, pf) =>
         sub match {
           case sub@SubStep(_, _, _) =>
             val r = resumeSub(sub)
             NextStep(r, (i: mf._I) => Return(pf(i)))
-
-          case MapSuspendSubStep(sub2, f2) =>
-            throw new NotImplementedError("199")
 
           case Return(a) =>
             ReturnStep(pf(a), state)
@@ -218,9 +212,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           case sub@SubStep(_, _, _) =>
             val r = resumeSub(sub)
             NextStep(r, next)
-
-          case MapSuspendSubStep(sub2, f2) =>
-            throw new NotImplementedError("235")
 
           case Suspend(fa) =>
             val fs = FStep(fu.map(fa)(a => state -> a))
@@ -353,10 +344,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         case Suspend(fa) =>
           Suspend(fa).map(g0 -> _)
 
-        case MapSuspendSubStep(sub, f) =>
-          throw new NotImplementedError("372")
-          // MapSuspendSubStep(sub.graph(g0).asInstanceOf[SubStep[Ta, ManagedState, UnmanagedState, F, sub._I, (Graph, A)]], f)
-
         case ps@SubStep(sub, fmap, tags) =>
           SubStep(
             s => sub(s).graph(Graph.empty),
@@ -406,20 +393,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         Suspend(fa)
 
       case SubStep(sub, fmap, tags) =>
-        MapSuspendSubStep(SubStep(s => sub(s).mapSuspension(f), fmap, tags), f)
-
-      case MapSuspendSubStep(sub, f2) =>
-        throw new NotImplementedError("427")
-        // val f3 = new (SF ~~> F) {
-        //   def apply[B](sfb: (S, F[B])): F[B] = {
-        //     val (s, fb) = sfb
-        //     f(s -> f2(s -> fb))
-        //   }
-        // }
-        // MapSuspendSubStep(
-        //   sub.mapSuspension(f).asInstanceOf[SubStep[Ta, ManagedState, UnmanagedState, F, sub._I, A]],
-        //   f3
-        // )
+        val sub0 = (s: S) => sub(s).mapSuspension(f)
+        SubStep(sub0, fmap, tags)
 
       case StepMap(fst, fmap, tags)  =>
         StepMap(s => f(s -> fst(s)), fmap, tags)
@@ -436,27 +411,12 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
     /** translates your effect into another one using a natural transformation */
     final def compile[G[_]](iso: F <~~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = this match {
-
       case Return(a) => Return(a)
 
       case Suspend(fa) => Suspend(iso.to(fa))
 
       case ps@SubStep(sub, fmap, tags) =>
         SubStep(s => sub(s).compile(iso), fmap, tags)
-
-      case MapSuspendSubStep(sub, f2) =>
-        throw new NotImplementedError("463")
-        // type SG[B] = (S, G[B])
-        // val f3 = new (SG ~~> G) {
-        //   def apply[B](sgb: SG[B]): G[B] = {
-        //     val (s, gb) = sgb
-        //     iso.to(f2(s -> iso.from(gb)))
-        //   }
-        // }
-        // MapSuspendSubStep(
-        //   sub.compile(iso).asInstanceOf[SubStep[Ta, ManagedState, UnmanagedState, G, sub._I, A]],
-        //   f3
-        // )
 
       case sm@StepMap(fst, fmap, tags)  =>
         def fst2 = (s:S) => iso.to(fst(s))
@@ -486,21 +446,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           (s2.mapUnmanaged(s => to(s)), i2)
         }
         SubStep(s => sub(s.mapUnmanaged(s => from(s))).xmapState(to, from), fmap2, tags)
-
-      case MapSuspendSubStep(sub, f) =>
-        throw new NotImplementedError("506")
-        // type S2F[B] = (Precepte[Ta, ManagedState, UnmanagedState2, F, A]#S, F[B])
-        // val f2 = new (S2F ~~> F) {
-        //   def apply[B](s2fb: S2F[B]): F[B] = {
-        //     val (s2, fb) = s2fb
-        //     val s = s2.mapUnmanaged(from(_))
-        //     f(s -> fb)
-        //   }
-        // }
-        // MapSuspendSubStep(
-        //   sub.xmapState(to, from).asInstanceOf[SubStep[Ta, ManagedState, UnmanagedState2, F, sub._I, A]],
-        //   f2
-        // )
 
       case sm@StepMap(fst, fmap, tags)  =>
         def fst2 = (s:Precepte[Ta, ManagedState, UnmanagedState2, F, A]#S) => fst(s.mapUnmanaged(s => from(s)))
@@ -532,11 +477,6 @@ private [precepte] case class SMap[Ta, ManagedState, UnmanagedState, F[_], I, A]
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
   type _I = I
 }
-
-private [precepte] case class MapSuspendSubStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
-  sub: SubStep[Ta, ManagedState, UnmanagedState, F, I, A],
-  nat: ({ type l[T] = (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, F[T]) })#l ~~> F
-) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 
 private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I, A](
   sub: Precepte[Ta, ManagedState, UnmanagedState, F, A]#S => Precepte[Ta, ManagedState, UnmanagedState, F, I]

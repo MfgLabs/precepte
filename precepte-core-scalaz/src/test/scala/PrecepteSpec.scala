@@ -539,19 +539,19 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     import scalaz.~>
 
+    val calls = new scala.collection.mutable.ArrayBuffer[String]()
+
     type SF[T] = (ST[Int], Future[T])
-
-    var countCalls = 0
-
     object Mon extends (SF ~> Future) {
       def apply[A](f: SF[A]): Future[A] = {
         val t0 = System.nanoTime()
         val path = f._1.managed.path
         val method = path.last.tags.callee.value
+        val p = path.map(_.tags.callee.value).mkString(" / ")
+        calls += p
         f._2.map { a =>
           val t1 = System.nanoTime()
           val duration = t1 - t0
-          countCalls = countCalls + 1
           // TODO: Store measure and test result
           a
         }
@@ -563,9 +563,28 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     }
     def nostate = ST(Span.gen, env, Vector.empty, 0)
 
+    val cs =
+      List(
+        "p0",
+        "p0 / p3",
+        "p0 / p2",
+        "p0 / p1",
+        "p0 / p3 / sub / p4",
+        "p0 / p3 / sub / p4 / p5",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p4",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p3",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p2",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p1",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p4 / p6",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p4 / p6 / sub3 / p6",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p4 / p6 / p5",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p4 / p6 / p4",
+        "p0 / p3 / sub / p4 / p5 / sub2 / p4 / p6 / sub3 / p6 / p7"
+      )
+
     val res = ScalazExt(p8).mapSuspension(Mon).eval(nostate).futureValue
     res should ===(())
-    countCalls should ===(18)
+    calls.toList should ===(cs)
   }
 
 }
