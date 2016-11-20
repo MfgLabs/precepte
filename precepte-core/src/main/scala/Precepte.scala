@@ -193,7 +193,10 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             })
 
           case SMap(sub2, pf2) =>
-            MapFusionStep(sub2, pf2, pf, state)
+            // Optimize the structure by directly merging 2 SMap
+            // into one that chains functions
+            val sm = SMap(sub, pf2 andThen pf)
+            sm.resume(idx)(state)
 
           case f@Flatmap(sub2, next2) =>
             sub2.fastFlatMap(z => next2(z).map(pf)).resume(idx)(state)
@@ -271,53 +274,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
                 val s = upd.updateUnmanaged(s0, S.combine(s0.unmanaged, s1.unmanaged))
                 (s, f(a))
             }
-
-          case mfs@MapFusionStep(p0, f0, f1, s0) =>
-            // @tailrec
-            def fusionStep[C, I, D](p: PX[C], f0: C => I, f1: I => D, s: S, depth: Int): F[(S, D)] = {
-              p.resume(0)(s) match {
-
-                case ReturnStep(a, s) => mo.map(mo.pure(s -> a)){ case (s2, a2) => (s2, f1(f0(a2))) }
-
-                case mm@MapFusionStep(p1, f2, f3, s1) =>
-                  if(depth >= maxDepth) {
-                    mo.map(stepRun0(p1, s1)){ case (s1, a1) =>
-                      (s1, f1(f0(f3(f2(a1)))))
-                    }
-                  } else {
-                    fusionStep(p1, f0.compose(f3).compose(f2), f1, s, depth + 2)
-                  }
-
-                case FStep(fsa0) => mo.map(fsa0){ case (s1, a1) =>
-                  s1 -> f1(f0(a1))
-                }
-
-                case ApplyStep(pa, pf) =>
-                  mo.map2(
-                    stepRun0(pa, state, idx + 1),
-                    stepRun0(pf, state, idx + 2)
-                  ){
-                    case ((s1, a), (s2, f)) =>
-                      val s = upd.updateUnmanaged(s0, S.combine(s1.unmanaged, s2.unmanaged))
-                      (s, (f andThen f0 andThen f1)(a))
-                  }
-
-                case fx@FXSStep(pi, mf, up) =>
-                  throw new NotImplementedError("331")
-                  // mo.map(mf(stepRun0(pi, s))) { case (s, c) =>
-                  //   s -> (f0 andThen f1)(c)
-                  // }
-
-                case n@NextStep(step, next) =>
-                  val f = (f0 andThen f1)
-                  mo.map(stepRunResume(n, s0)) { case (s, a) =>
-                    (s, f(a))
-                  }
-              }
-            }
-
-            // depth is already 2 as we are in a mapfusionstep
-            fusionStep(p0, f0, f1, s0, 2)
 
           case fx@FXSStep(pi, mf, up) =>
             val state0 = up(state)
@@ -580,15 +536,6 @@ private [precepte] case class ReturnStep[Ta, ManagedState, UnmanagedState, F[_],
 private [precepte] case class FStep[Ta, ManagedState, UnmanagedState, F[_], A](
   v: F[(Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)]
 ) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, A]
-
-private [precepte] case class MapFusionStep[Ta, ManagedState, UnmanagedState, F[_], A, I, B](
-  v: Precepte[Ta, ManagedState, UnmanagedState, F, A]
-, f1: A => I
-, f2: I => B
-, state: Precepte[Ta, ManagedState, UnmanagedState, F, B]#S
-) extends ResumeStep[Ta, ManagedState, UnmanagedState, F, B] {
-  type _I = I
-}
 
 private [precepte] case class ApplyStep[Ta, ManagedState, UnmanagedState, F[_], A, B](
   pa: Precepte[Ta, ManagedState, UnmanagedState, F, A]
