@@ -195,8 +195,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           case SMap(sub2, pf2) =>
             // Optimize the structure by directly merging 2 SMap
             // into one that chains functions
-            val sm = SMap(sub, pf2 andThen pf)
-            sm.resume(idx)(state)
+            SMap(sub, pf2 andThen pf).resume(idx)(state)
 
           case f@Flatmap(sub2, next2) =>
             sub2.fastFlatMap(z => next2(z).map(pf)).resume(idx)(state)
