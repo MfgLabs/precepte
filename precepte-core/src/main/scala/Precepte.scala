@@ -243,7 +243,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       }
     }
 
-
     final def run0
       (state: S, idx: Int = 0, maxDepth: Int = 100)
       (implicit mo: MetaMonad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: MetaSemigroup[UnmanagedState])
@@ -422,7 +421,9 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     }
   }
 
-
+/**
+  * PRECEPTE DSL
+  */
 private [precepte] case class Return[Ta, ManagedState, UnmanagedState, F[_], A](a: A) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 private [precepte] case class Suspend[Ta, ManagedState, UnmanagedState, F[_], A](a: F[A]) extends Precepte[Ta, ManagedState, UnmanagedState, F, A]
 
@@ -441,23 +442,6 @@ private [precepte] case class SubStep[Ta, ManagedState, UnmanagedState, F[_], I,
 ) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
   type _I = I
 }
-
-object Precepte extends Implicits {
-
-  def apply[Ta](_tags: Ta) =
-    new PrecepteBuilder[Ta] {
-      val tags = _tags
-    }
-
-  def liftF[Ta, M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
-    Suspend(fa)
-
-  def pure[Ta, M, U, F[_], A](a: A): Precepte[Ta, M, U, F, A] = Return(a)
-}
-
-/**
-  * PRECEPTE DSL
-  */
 
 /** A Step followed by a Map (mixes Step + Coyoneda) */
 private [precepte] case class StepMap[Ta, ManagedState, UnmanagedState, F[_], I, A](
@@ -482,7 +466,17 @@ private [precepte] case class Apply[Ta, ManagedState, UnmanagedState, F[_], A, B
   type _A = A
 }
 
+object Precepte extends Implicits {
+  def apply[Ta](_tags: Ta) =
+    new PrecepteBuilder[Ta] {
+      val tags = _tags
+    }
 
+  def liftF[Ta, M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
+    Suspend(fa)
+
+  def pure[Ta, M, U, F[_], A](a: A): Precepte[Ta, M, U, F, A] = Return(a)
+}
 
 
 trait PrecepteBuilder[Ta] {
