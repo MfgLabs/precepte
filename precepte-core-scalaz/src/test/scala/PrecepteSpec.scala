@@ -587,4 +587,35 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     calls.toList should ===(cs)
   }
 
+  it should "chain mapSuspension without crashing" in {
+    import corescalaz._
+
+    val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
+
+    type SF[T] = (ST[Int], Future[T])
+    object Id extends (SF ~~> Future) {
+      def apply[A](sf: SF[A]): Future[A] = {
+        val (s, f) = sf
+        f
+      }
+    }
+
+    implicit val intSG = new scalaz.Semigroup[Int] {
+      def append(f1: Int, f2: => Int) = f1 + f2
+    }
+
+    def nostate = ST(Span.gen, env, Vector.empty, 0)
+
+    val res = p0
+      .mapSuspension(Id)
+      .mapSuspension(Id)
+      .mapSuspension(Id)
+      .mapSuspension(Id)
+      .mapSuspension(Id)
+      .eval(nostate)
+      .futureValue
+
+    res should ===(0)
+  }
+
 }
