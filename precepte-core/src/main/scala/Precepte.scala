@@ -31,7 +31,7 @@ private[precepte] final class Compose1[T1, R] private (val fs: Vector[(Any => An
     val (fl, dl) = gs.last
     val (f, d) = fd
     if(d + dl > MAX_DEPTH) {
-      gs :+ fd
+      fd +: gs
     } else {
       val nf = (a: Any) => f(fl(a))
       gs.init :+ ((nf, d + dl))
@@ -42,7 +42,7 @@ private[precepte] final class Compose1[T1, R] private (val fs: Vector[(Any => An
     val (fl, dl) = gs.head
     val (f, d) = fd
     if(d + dl > MAX_DEPTH) {
-      fd +: gs
+      gs :+ fd
     } else {
       val nf = (a: Any) => fl(f(a))
       ((nf, d + dl)) +: gs.init
