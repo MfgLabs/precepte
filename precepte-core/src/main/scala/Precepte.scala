@@ -23,11 +23,11 @@ import scala.annotation.tailrec
 /**
 * Stack safe function composition
 */
-private[precepte] final class Compose1[T1, R] private (val fs: Array[(Any => Any, Int)]) extends (T1 => R) {
+private[precepte] final class Compose1[T1, R] private (val fs: Vector[(Any => Any, Int)]) extends (T1 => R) {
 
   val MAX_DEPTH = 1000
 
-  private def append(gs: Array[(Any => Any, Int)], fd: (Any => Any, Int)) = {
+  private def append(gs: Vector[(Any => Any, Int)], fd: (Any => Any, Int)) = {
     val (fl, dl) = gs.last
     val (f, d) = fd
     if(d + dl > MAX_DEPTH) {
@@ -38,7 +38,7 @@ private[precepte] final class Compose1[T1, R] private (val fs: Array[(Any => Any
     }
   }
 
-  private def prepend(fd: (Any => Any, Int), gs: Array[(Any => Any, Int)]) = {
+  private def prepend(fd: (Any => Any, Int), gs: Vector[(Any => Any, Int)]) = {
     val (fl, dl) = gs.head
     val (f, d) = fd
     if(d + dl > MAX_DEPTH) {
@@ -49,7 +49,7 @@ private[precepte] final class Compose1[T1, R] private (val fs: Array[(Any => Any
     }
   }
 
-  private def concat(hs: Array[(Any => Any, Int)], ts: Array[(Any => Any, Int)]) =
+  private def concat(hs: Vector[(Any => Any, Int)], ts: Vector[(Any => Any, Int)]) =
     hs.init ++ prepend(hs.last, ts)
 
   @inline private def build = (i0: T1) => {
@@ -88,7 +88,7 @@ object Compose1 {
   def apply[T1, R](f0: T1 => R): T1 => R =
     f0 match {
       case Compose1(_) => f0
-      case f => new Compose1(Array((f.asInstanceOf[Any => Any], 1)))
+      case f => new Compose1(Vector((f.asInstanceOf[Any => Any], 1)))
     }
 
   def unapply[T1, R](c: Compose1[T1, R]) =
