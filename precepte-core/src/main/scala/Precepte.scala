@@ -174,37 +174,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         resumeSub(sub)
 
       case mf@SMap(sub, pf) =>
-        sub match {
-          case sub@SubStep(_, _, _) =>
-            val r = resumeSub(sub)
-            NextStep(r, (i: mf._I) => Return(pf(i)))
-
-          case Return(a) =>
-            ReturnStep(pf(a), state)
-
-          case Suspend(fa) =>
-            FStep(fu.map(fa)(a => state -> pf(a)))
-
-          case StepMap(fst, fmap, tags) =>
-            val state0 = upd.appendTags(state, tags, idx)
-            FStep(fu.map(fst(state0)){ a =>
-              val (s1, a1) = fmap(state0, a)
-              s1 -> pf(a1)
-            })
-
-          case SMap(sub2, pf2) =>
-            // Optimize the structure by directly merging 2 SMap
-            // into one that chains functions
-            SMap(sub, pf2 andThen pf).resume(idx)(state)
-
-          case f@Flatmap(sub2, next2) =>
-            sub2.fastFlatMap(z => next2(z).map(pf)).resume(idx)(state)
-
-          case Apply(pa, pfa) =>
-            val n: mf._I => Precepte[Ta, ManagedState, UnmanagedState, F, A] = i => Return(pf(i))
-            val ap = ApplyStep(pa, pfa)
-            NextStep(ap, n)
-        }
+        sub.fastFlatMap(z => Return(pf(z))).resume(idx)(state)
 
       case f@Flatmap(sub, next) =>
         sub match {

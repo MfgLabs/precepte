@@ -62,27 +62,27 @@ class CostSpec extends FlatSpec with ScalaFutures {
     val bef = System.nanoTime
     f.futureValue
     val aft = System.nanoTime
-    
+
     (aft - bef) / 1000000.0
   }
 
-  "Precepte" should "run/eval simple" in {
+  // "Precepte" should "run/eval simple" in {
 
-    def res(i: Int): Future[Int] = for {
-      i <- i.point[Future]
-      r <- if(i > 0) res(i-1) else i.point[Future]
-    } yield r
+  //   def res(i: Int): Future[Int] = for {
+  //     i <- i.point[Future]
+  //     r <- if(i > 0) res(i-1) else i.point[Future]
+  //   } yield r
 
-    val ms = timeMs(res(10000))
-    println(s"Future(10000) -> duration: $ms ms")
+  //   val ms = timeMs(res(10000))
+  //   println(s"Future(10000) -> duration: $ms ms")
 
-    val ms2 = timeMs(res(100000))
-    println(s"Future(100000) -> duration: $ms2 ms")
+  //   val ms2 = timeMs(res(100000))
+  //   println(s"Future(100000) -> duration: $ms2 ms")
 
-    val ms3 = timeMs(res(1000000))
-    println(s"Future(100000) -> duration: $ms3 ms")
+  //   val ms3 = timeMs(res(1000000))
+  //   println(s"Future(100000) -> duration: $ms3 ms")
 
-  }
+  // }
 
 
   "Precepte" should "run/eval pre" in {
@@ -92,16 +92,16 @@ class CostSpec extends FlatSpec with ScalaFutures {
       r <- if(i>0) res(i-1) else i.point[Pre]
     } yield r
 
-    // val ms0 = timeMs(res(1000).eval(nostate))    
-    // println(s"Pre(1000) -> duration: $ms0 ms")
+  //   // val ms0 = timeMs(res(1000).eval(nostate))
+  //   // println(s"Pre(1000) -> duration: $ms0 ms")
 
-    val ms = timeMs(res(10000).eval(nostate))    
-    println(s"Pre(10000) -> duration: $ms ms")
+    // val ms = timeMs(res(10000).eval(nostate))
+    // println(s"Pre(10000) -> duration: $ms ms")
 
     val ms2 = timeMs(res(100000).eval(nostate))
     println(s"Pre(100000) -> duration: $ms2 ms")
 
-    val ms3 = timeMs(res(1000000).eval(nostate))
-    println(s"Pre(1000000) -> duration: $ms3 ms")
+  //   val ms3 = timeMs(res(1000000).eval(nostate))
+  //   println(s"Pre(1000000) -> duration: $ms3 ms")
   }
 }
