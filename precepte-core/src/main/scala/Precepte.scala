@@ -23,18 +23,26 @@ import scala.annotation.tailrec
 /**
 * Stack safe function composition
 */
-private[precepte] class Compose1[T1, R] private (val fs: Array[Any => Any]) extends (T1 => R) {
+private[precepte] class Compose1[T1, R] private (val fs: Array[(Any => Any, Int)]) extends (T1 => R) {
+
+  val MAX_DEPTH = 1000
+
+  @inline private def add(fd: (Any => Any, Int), gs: Array[(Any => Any, Int)]) = {
+    val (fl, dl) = gs.last
+    val (f, d) = fd
+    if(d + dl > MAX_DEPTH) {
+      gs :+ fd
+    } else {
+      val nf = (a: Any) => fl(f(a))
+      gs.init :+ ((nf, d + dl))
+    }
+  }
 
   @inline private def build = (i0: T1) => {
     var i = i0.asInstanceOf[Any]
     var j = 0
-    val fs2 =
-      if(fs.length > 5000)
-        fs.grouped(2000).map(_.reduce(_ andThen _)).toArray
-      else
-        fs
-    while(j < fs2.length) {
-      val f = fs2(j)
+    while(j < fs.length) {
+      val (f, _) = fs(j)
       i = f(i)
       j += 1
     }
@@ -43,15 +51,15 @@ private[precepte] class Compose1[T1, R] private (val fs: Array[Any => Any]) exte
 
   override def compose[A](g: A => T1): A => R =
     g match {
-      case Compose1(gfs) => new Compose1(gfs ++ fs)
-      case _ => new Compose1(g.asInstanceOf[Any => Any] +: fs)
+      case Compose1(gfs) =>
+        new Compose1(gfs ++ fs)
+      case _ =>
+        val fd = (g.asInstanceOf[Any => Any], 1)
+        new Compose1(add(fd, fs))
     }
 
   override def andThen[A](g: R => A): T1 => A =
-    g match {
-      case Compose1(gfs) => new Compose1(fs ++ gfs)
-      case _ => new Compose1(fs :+ g.asInstanceOf[Any => Any])
-    }
+    g compose this
 
   def apply(a: T1): R = build(a)
 }
@@ -61,7 +69,7 @@ object Compose1 {
     (f0, f1) match {
       case (f00 @ Compose1(_), f01) => f00 andThen f01
       case (f00, f01 @ Compose1(_)) => f01 compose f00
-      case (f00, f01) => new Compose1(Array(f00.asInstanceOf[Any => Any], f01.asInstanceOf[Any => Any]))
+      case (f00, f01) => new Compose1(Array(f00.asInstanceOf[Any => Any] -> 1, f01.asInstanceOf[Any => Any] -> 1))
     }
 
   def unapply[T1, R](c: Compose1[T1, R]) =
@@ -250,7 +258,6 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
           case SMap(sub2, f2) =>
             sub2.fastFlatMap(Compose1(f2, next)).resume(idx)(state)
-            // sub2.fastFlatMap(z => next(f2(z))).resume(idx)(state)
 
           case f@Flatmap(sub2, next2) =>
             sub2.fastFlatMap(z => next2(z).fastFlatMap(next)).resume(idx)(state)
