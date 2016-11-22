@@ -21,6 +21,54 @@ import scala.language.higherKinds
 import scala.annotation.tailrec
 
 /**
+* Stack safe function composition
+*/
+private[precepte] class Compose1[T1, R] private (val fs: Array[Any => Any]) extends (T1 => R) {
+
+  @inline private def build = (i0: T1) => {
+    var i = i0.asInstanceOf[Any]
+    var j = 0
+    val fs2 =
+      if(fs.length > 5000)
+        fs.grouped(2000).map(_.reduce(_ andThen _)).toArray
+      else
+        fs
+    while(j < fs2.length) {
+      val f = fs2(j)
+      i = f(i)
+      j += 1
+    }
+    i.asInstanceOf[R]
+  }
+
+  override def compose[A](g: A => T1): A => R =
+    g match {
+      case Compose1(gfs) => new Compose1(gfs ++ fs)
+      case _ => new Compose1(g.asInstanceOf[Any => Any] +: fs)
+    }
+
+  override def andThen[A](g: R => A): T1 => A =
+    g match {
+      case Compose1(gfs) => new Compose1(fs ++ gfs)
+      case _ => new Compose1(fs :+ g.asInstanceOf[Any => Any])
+    }
+
+  def apply(a: T1): R = build(a)
+}
+
+object Compose1 {
+  def apply[T1, B, R](f0: T1 => B, f1: B => R): T1 => R =
+    (f0, f1) match {
+      case (f00 @ Compose1(_), f01) => f00 andThen f01
+      case (f00, f01 @ Compose1(_)) => f01 compose f00
+      case (f00, f01) => new Compose1(Array(f00.asInstanceOf[Any => Any], f01.asInstanceOf[Any => Any]))
+    }
+
+  def unapply[T1, R](c: Compose1[T1, R]) =
+    Option(c.fs)
+}
+
+/**
   * Precepte, let your code be state-aware and make runtime effect observation acceptable...
   *
   * Precepte is an opinionated purely functional & lazy API stacking some useful Metamonads to help you observe the execution of your runtime effects
@@ -118,14 +166,15 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     ): Precepte[Ta, ManagedState, UnmanagedState, F, D] = p match {
       case Return(a) => f(a)
 
-      case fm@SMap(sub, pf) =>
+      case fm @ SMap(sub, pf) =>
         if(d < maxDepth) {
-          step(sub, (a: fm._I) => f(pf(a)), d + 1)
+          step(sub, Compose1(pf, f), d + 1)
+          // step(sub, (a: fm._I) => f(pf(a)), d + 1)
         } else {
           sub.flatMap(a => f(pf(a)))
         }
 
-      case fm@Flatmap(sub, next) =>
+      case fm @ Flatmap(sub, next) =>
         if(d < maxDepth) {
           step(sub, (a: fm._I) => step(next(a), f, d + 1) , d + 1)
         } else {
@@ -200,7 +249,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             NextStep(fs, next)
 
           case SMap(sub2, f2) =>
-            sub2.fastFlatMap(z => next(f2(z))).resume(idx)(state)
+            sub2.fastFlatMap(Compose1(f2, next)).resume(idx)(state)
+            // sub2.fastFlatMap(z => next(f2(z))).resume(idx)(state)
 
           case f@Flatmap(sub2, next2) =>
             sub2.fastFlatMap(z => next2(z).fastFlatMap(next)).resume(idx)(state)
