@@ -145,27 +145,15 @@ lazy val play =
       name := "precepte-play")
     .dependsOn(core)
 
-lazy val stream =
-  project.in(file("precepte-stream"))
-    .settings(commonSettings:_*)
-    .settings(strictScalac)
-    .settings(
-      libraryDependencies ++= Seq(
-          "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0"
-        , "org.scalatest"     %%  "scalatest"                  % "2.2.1"  % "test"
-      ),
-      name := "precepte-stream")
-    .dependsOn(coreScalaz)
-
 lazy val doc =
   project.in(file("precepte-tut"))
     .settings(commonSettings:_*)
     .settings(noPublishSettings:_*)
     .settings(strictScalac)
-    .dependsOn(core, play, influx, logback, sample, stream)
+    .dependsOn(core, play, influx, logback, sample)
 
 lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
   .settings(noPublishSettings:_*)
   .settings(name := "precepte-root")
-  .aggregate(core, play, influx, logback, sample, stream, doc, coreScalaz, coreCats)
+  .aggregate(core, play, influx, logback, sample, doc, coreScalaz, coreCats)
