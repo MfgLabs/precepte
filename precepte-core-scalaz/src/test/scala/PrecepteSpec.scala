@@ -54,8 +54,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     def append(f1: Unit, f2: => Unit) = ()
   }
 
-  val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
-
   "Precepte" should "run/eval simple" in {
     def f1 = Precepte(tags("simple.f1")){(_: ST[Unit]) => 1.point[Future]}
     def f2(i: Int) = Precepte(tags("simple.f2")){(_: ST[Unit]) => s"foo $i".point[Future]}
