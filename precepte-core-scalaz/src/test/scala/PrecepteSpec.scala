@@ -629,7 +629,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     val f2 =
     sub.map(addOne).map(addOne).map(addOne)
     val res = f2.eval(nostate).futureValue
-    // res should ===(3)
+    res should ===(4)
   }
 
 }
