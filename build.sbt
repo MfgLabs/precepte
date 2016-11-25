@@ -55,7 +55,7 @@ lazy val core =
       name := "precepte-core",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "com.chuusai"     %% "shapeless"        % "2.2.4"
+          "com.chuusai"     %% "shapeless"        % "2.3.0"
         , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
@@ -69,7 +69,7 @@ lazy val coreCats =
       name := "precepte-core-cats",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "org.typelevel"   %% "cats"             % "0.5.0"
+          "org.typelevel"   %% "cats"             % "0.7.2"
         , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
       )
     )
@@ -140,7 +140,7 @@ lazy val play =
     .settings(commonSettings:_*)
     .settings(strictScalac)
     .settings(
-      libraryDependencies += "com.typesafe.play" %% "play" % "2.3.9",
+      libraryDependencies += "com.typesafe.play" %% "play" % "2.5.10",
       name := "precepte-play")
     .dependsOn(core)
 

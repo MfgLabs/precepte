@@ -37,11 +37,11 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import cats.Applicative
-  import cats.std.future._
+  import cats.instances.future._
   import cats.syntax.flatMap._
   import cats.syntax.apply._
-  import cats.data.{XorT, StreamingT}
-
+  import cats.data.XorT
+  import cats.syntax.cartesian._
   import default._
 
   type Pre[A] = DefaultPre[Future, Unit, A]

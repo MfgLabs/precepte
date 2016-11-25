@@ -36,8 +36,14 @@ package object corecats extends SubMeta {
         Return(a)
       override def map[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
         m.map(f)
+       override def tailRecM[A, B](a: A)(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, Either[A,B]]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
+         f(a).flatMap {
+           case Left(result) => tailRecM(result)(f)
+           case Right(result) => pure(result)
+         }
+       }
       override def flatMap[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-        m.flatMap(f)
+       m.flatMap(f)
 
       override def ap[A, B](pab: Precepte[Ta, ManagedState, UnmanagedState, F, A => B])(pa: Precepte[Ta, ManagedState, UnmanagedState, F, A]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
         Apply(pa, pab)

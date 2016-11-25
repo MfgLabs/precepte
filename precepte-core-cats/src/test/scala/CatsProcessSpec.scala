@@ -21,11 +21,11 @@ class CatsProcessSpec extends FlatSpec with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import cats.Applicative
-  import cats.std.future._
+  import cats.instances.future._
   import cats.syntax.flatMap._
   import cats.syntax.apply._
-  import cats.data.{XorT, StreamingT}
-
+  import cats.data.XorT
+  import cats.syntax.cartesian._
   import default._
 
   type Pre[A] = DefaultPre[Future, Int, A]
@@ -43,7 +43,7 @@ class CatsProcessSpec extends FlatSpec with ScalaFutures {
       for {
         _ <-  Pre(tags("cats")){ s:ST[Int] => Future(0) }
         _ <-  Pre(tags("can be")){ s:ST[Int] => Future(1) }
-        _ <-  (    
+        _ <-  (
               Pre(tags("persian")){ s: ST[Int] => Future(2) }
               |@| Pre(tags("main coon")){ s: ST[Int] => Future(3) }
               |@| Pre(tags("siamese")){ s: ST[Int] => Future(4) }
@@ -56,7 +56,7 @@ class CatsProcessSpec extends FlatSpec with ScalaFutures {
         _ <-  Pre(tags("but")){ s: ST[Int] => Future(10) }
         _ <-  Pre(tags("none is")){ s: ST[Int] => Future(11) }
         _ <-  Pre(tags("as")){ s: ST[Int] => Future(12) }
-        _ <-  (    
+        _ <-  (
               Pre(tags("purely")){ s: ST[Int] => Future(13) }
               |@| Pre(tags("functional")){ s: ST[Int] => Future(14) }
               |@| Pre(tags("typesafe")){ s: ST[Int] => Future(15) }
