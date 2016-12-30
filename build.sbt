@@ -56,8 +56,8 @@ lazy val core =
       name := "precepte-core",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "com.chuusai"     %% "shapeless"        % "2.2.4"
-        , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
+          "com.chuusai"     %% "shapeless"        % "2.3.2"
+        , "org.scalatest"   %  "scalatest_2.11"   % "3.0.1"   % "test"
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
     )
@@ -71,7 +71,7 @@ lazy val coreCats =
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
           "org.spire-math"  %% "cats"             % "0.3.0"
-        , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
+        , "org.scalatest"   %  "scalatest_2.11"   % "3.0.1"   % "test"
       )
     )
     .dependsOn(core)
@@ -85,8 +85,8 @@ lazy val coreScalaz =
       name := "precepte-core-scalaz",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "org.scalaz"      %% "scalaz-core"      % "7.1.0"
-        , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
+          "org.scalaz"      %% "scalaz-core"      % "7.2.8"
+        , "org.scalatest"   %  "scalatest_2.11"   % "3.0.1"   % "test"
       )
     )
     .dependsOn(core)
@@ -129,8 +129,8 @@ lazy val logback =
     .settings(
       name := "precepte-logback",
       libraryDependencies ++= Seq(
-        "ch.qos.logback" % "logback-classic" % "1.1.2",
-        "net.logstash.logback" % "logstash-logback-encoder" % "4.2"))
+        "ch.qos.logback" % "logback-classic" % "1.1.8",
+        "net.logstash.logback" % "logstash-logback-encoder" % "4.8"))
     .dependsOn(core)
 
 lazy val play =
