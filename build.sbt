@@ -1,4 +1,4 @@
-import play.PlayImport.PlayKeys._
+// import play.PlayImport.PlayKeys._
 
 lazy val publishSettings = Seq(
   homepage := Some(url("https://github.com/MfgLabs/precepte")),
@@ -91,26 +91,6 @@ lazy val coreScalaz =
     )
     .dependsOn(core)
 
-
-lazy val sample =
-  project.in(file("precepte-sample"))
-    .enablePlugins(PlayScala)
-    .settings(commonSettings:_*)
-    .settings(buildInfoSettings: _*)
-    .settings(noPublishSettings:_*)
-    .settings(
-      sourceGenerators in Compile <+= buildInfo,
-      buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
-      buildInfoPackage := organization.value)
-    .settings(
-      name := "precepte-sample",
-      libraryDependencies ++= Seq(
-        jdbc,
-        anorm,
-        ws,
-        "org.specs2" %% "specs2" % "2.4.9"))
-    .dependsOn(coreScalaz, influx, logback, play)
-
 lazy val influx =
   project.in(file("precepte-influx"))
     .settings(commonSettings:_*)
@@ -138,7 +118,7 @@ lazy val play =
     .settings(commonSettings:_*)
     .settings(strictScalac)
     .settings(
-      libraryDependencies += "com.typesafe.play" %% "play" % "2.3.9",
+      libraryDependencies += "com.typesafe.play" %% "play" % "2.5.10",
       name := "precepte-play")
     .dependsOn(core)
 
@@ -147,10 +127,10 @@ lazy val doc =
     .settings(commonSettings:_*)
     .settings(noPublishSettings:_*)
     .settings(strictScalac)
-    .dependsOn(core, play, influx, logback, sample)
+    .dependsOn(core, play, influx, logback)
 
 lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
   .settings(noPublishSettings:_*)
   .settings(name := "precepte-root")
-  .aggregate(core, play, influx, logback, sample, doc, coreScalaz, coreCats)
+  .aggregate(core, play, influx, logback, doc, coreScalaz, coreCats)
