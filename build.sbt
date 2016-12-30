@@ -20,7 +20,7 @@ lazy val commonSettings =  Seq(
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn
-  , addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.0")
+  , addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
 ) ++ tutSettings ++ publishSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
 
 lazy val strictScalac =
@@ -70,7 +70,7 @@ lazy val coreCats =
       name := "precepte-core-cats",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "org.spire-math"  %% "cats"             % "0.2.0"
+          "org.spire-math"  %% "cats"             % "0.3.0"
         , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
       )
     )
@@ -118,10 +118,7 @@ lazy val influx =
     .settings(
       name := "precepte-influx",
       libraryDependencies ++= Seq(
-        // influx deps
-        "com.google.guava" % "guava" % "18.0",
-        "com.squareup.retrofit" % "retrofit" % "1.9.0",
-        "com.squareup.okhttp" % "okhttp" % "2.4.0"
+        "org.influxdb" % "influxdb-java" % "2.5"
       ))
     .dependsOn(core)
 

@@ -71,9 +71,9 @@ case class Influx[C : MetaSemigroup](
       .tag("category", category)
       .tag("callees", callees)
       .tag("method", method)
-      .field("span", st.managed.span.value)
-      .field("path", p)
-      .field("execution_time", duration)
+      .addField("span", st.managed.span.value)
+      .addField("path", p)
+      .addField("execution_time", duration)
       .build()
   }
 
