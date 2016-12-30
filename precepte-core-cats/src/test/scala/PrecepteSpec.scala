@@ -576,4 +576,36 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     res should ===(())
   }
 
+  it should "mapF" in {
+    val success = Applicative[Pre].pure("YOUPI")
+    val ex = new RuntimeException("opps")
+    val fail = Future.failed[String](ex)
+    val failure = Precepte(tags("fail"))((_: ST[Unit]) => fail)
+
+    val p1 =
+      for {
+        s0 <- success
+        s1 <- success
+        s2 <- success
+      } yield s"$s0 $s1 $s2"
+
+    p1.eval(nostate).futureValue should ===("YOUPI YOUPI YOUPI")
+
+    val reco1 =
+      for {
+        s <- p1
+        r <- failure.mapF{ (s, fut) => fut.recover{ case e => "YOLO" } }
+      } yield s"$s $r"
+
+    reco1.eval(nostate).futureValue should ===("YOUPI YOUPI YOUPI YOLO")
+
+    val reco2 =
+      (for {
+        s <- p1
+        r <- failure
+      } yield s"$s $r").mapF{ (s, fut) => fut.recover{ case e => "YOLO" } }
+
+    reco2.eval(nostate).futureValue should ===("YOLO")
+  }
+
 }

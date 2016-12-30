@@ -217,7 +217,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     (implicit fu: MetaMonad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: MetaSemigroup[UnmanagedState])
     : ResumeStep[Ta, ManagedState, UnmanagedState, F, A] = {
 
-    def resumeSub[I, A0](s: SubStep[Ta, ManagedState, UnmanagedState, F, I, A0]) =
+    @inline def resumeSub[I, A0](s: SubStep[Ta, ManagedState, UnmanagedState, F, I, A0]) =
       s match {
         case ss@SubStep(sub, map, tags) =>
           def up(s: S) = upd.appendTags(s, tags, idx)
@@ -227,6 +227,15 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             }
           val s0 = up(state) // use the updated state in the execution of the underlying function
           FXSStep(sub(s0), mf, up) // pass up so that the precepte returned by this function can also use the updated state
+      }
+
+    @inline def resumeMapF[I, B](mf: MapF[Ta, ManagedState, UnmanagedState, F, I, B]): ResumeStep[Ta, ManagedState, UnmanagedState, F, B] =
+      mf match { case MapF(sub, f) =>
+        val f2:  F[(S, mf._I)] => F[(S, B)] =  { fi =>
+          val r = f(state, fu.map(fi)(_._2))
+          fu.map(r)(state -> _)
+        }
+        FXSStep(sub, f2, identity)
       }
 
     this match {
@@ -251,13 +260,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case mf@SMap(sub, pf) =>
         sub.fastFlatMap(z => Return(pf(z))).resume(idx)(state)
 
-      case mf @ MapF(sub, f, to, from) =>
-        def f2:  F[(S, mf._I)] => F[(S, A)] =  { fi =>
-          val ffrom = fu.map(fi){ case (s, i) => s.mapUnmanaged(from) -> i }
-          val applied = f(ffrom)
-          fu.map(applied){ case (s, a) => s.mapUnmanaged(to) -> a }
-        }
-        FXSStep(sub, f2, identity)
+      case mf @ MapF(_, _) =>
+        resumeMapF(mf)
 
       case f@Flatmap(sub, next) =>
         sub match {
@@ -292,14 +296,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             val ap = ApplyStep(pa, pfa)
             NextStep(ap, next)
 
-          case mf @ MapF(sub, f0, to, from) =>
-            val f2:  F[(S, mf._I)] => F[(S, f._I)] =  { fi =>
-              val ffrom = fu.map(fi){ case (s, i) => s.mapUnmanaged(from) -> i }
-              val applied = f0(ffrom)
-              fu.map(applied){ case (s, a) => s.mapUnmanaged(to) -> a }
-            }
-            def fx = FXSStep(sub, f2, identity[S])
-            NextStep(fx, next)
+          case mf @ MapF(_, _) =>
+            NextStep(resumeMapF(mf), next)
         }
       }
     }
@@ -399,16 +397,16 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
             f _
           })
 
-        case mf @ MapF(sub, f0, to, from) =>
+        case mf @ MapF(sub, f0) =>
           for {
             _gi <- sub.graph(g0)
             (g, i) = _gi
-            a <- MapF(Return[Ta, ManagedState, UnmanagedState, F, mf._I](i), f0, to, from)
+            a <- MapF(Return[Ta, ManagedState, UnmanagedState, F, mf._I](i), f0)
           } yield (g, a)
       }
 
-    final def mapF[B](f: F[(S, A)] => F[(S, B)]): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-      MapF(this, f, identity[UnmanagedState], identity[UnmanagedState])
+    final def mapF[B](f: (S, F[A]) => F[B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
+      MapF(this, f)
 
     type SF[T] = (S, F[T])
     final def mapSuspension(f: SF ~~> F): Precepte[Ta, ManagedState, UnmanagedState, F, A] = this match {
@@ -434,8 +432,8 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case Apply(pa, pfa) =>
         Apply(pa.mapSuspension(f), pfa.mapSuspension(f))
 
-      case MapF(sub, f0, to, from) =>
-        MapF(sub.mapSuspension(f), f0, to, from)
+      case MapF(sub, f0) =>
+        MapF(sub.mapSuspension(f), f0)
     }
 
     /** translates your effect into another one using a natural transformation */
@@ -460,8 +458,12 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case Apply(pa, pfa) =>
         Apply(pa.compile(iso), pfa.compile(iso))
 
-      case mf @ MapF(sub, f0, to, from) =>
-        MapF[Ta, ManagedState, mf._U, UnmanagedState, G, mf._I, A](sub.compile(iso), gi => iso.to(f0(iso.from(gi))), to, from)
+      case mf @ MapF(sub, f0) =>
+        def f: (S, G[mf._I]) => G[A] = { (s, gi) =>
+          val ga = f0(s, iso.from(gi))
+          iso.to(ga)
+        }
+        MapF(sub.compile(iso), f)
     }
 
     final def xmapState[UnmanagedState2](to0: UnmanagedState => UnmanagedState2, from0: UnmanagedState): Precepte[Ta, ManagedState, UnmanagedState2, F, A] =
@@ -496,8 +498,11 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       case Apply(pa, pfa) =>
         Apply(pa.xmapState(to, from), pfa.xmapState(to, from))
 
-      case MapF(sub, f0, toS, fromS) =>
-        MapF(sub.xmapState(to, from), f0, toS andThen to, from andThen fromS)
+      case mf @ MapF(sub, f0) =>
+        def f: (Precepte[Ta, ManagedState, UnmanagedState2, F, A]#S, F[mf._I]) => F[A] =  { (u2, fi) =>
+          f0(u2.mapUnmanaged(from), fi)
+        }
+        MapF(sub.xmapState(to, from), f)
     }
   }
 
@@ -551,14 +556,11 @@ private [precepte] case class Apply[Ta, ManagedState, UnmanagedState, F[_], A, B
 * I'm not too satisfied with the implementation but I can't come up with anything better
 * and the method is absolutely needed in some cases.
 */
-private [precepte] case class MapF[Ta, ManagedState, UnmanagedState, UnmanagedState2, F[_], I, A](
-  sub: Precepte[Ta, ManagedState, UnmanagedState2, F, I]
-, f: F[(Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, I)] => F[(Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, A)]
-, to: UnmanagedState => UnmanagedState2
-, from: UnmanagedState2 => UnmanagedState
-) extends Precepte[Ta, ManagedState, UnmanagedState2, F, A] {
+private [precepte] case class MapF[Ta, ManagedState, UnmanagedState, F[_], I, A](
+  sub: Precepte[Ta, ManagedState, UnmanagedState, F, I]
+, f: (Precepte[Ta, ManagedState, UnmanagedState, F, A]#S, F[I]) => F[A]
+) extends Precepte[Ta, ManagedState, UnmanagedState, F, A] {
   type _I = I
-  type _U = UnmanagedState
 }
 
 object Precepte extends Implicits {
