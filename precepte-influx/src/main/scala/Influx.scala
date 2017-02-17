@@ -33,7 +33,8 @@ case class Influx[C : MetaSemigroup](
   influxdbURL: URL,
   user: String,
   password: String,
-  dbName: String
+  dbName: String,
+  retentionPolicy: String
 )(implicit ex: ExecutionContext) {
 
   import scala.util.{ Try, Failure, Success }
@@ -69,7 +70,7 @@ case class Influx[C : MetaSemigroup](
       .tag("environment", st.managed.env.environment.value)
       .tag("version", st.managed.env.version.value)
       .tag("category", category)
-      .tag("callees", callees)
+      // .tag("callees", callees)
       .tag("method", method)
       .field("span", st.managed.span.value)
       .field("path", p)
@@ -87,7 +88,7 @@ case class Influx[C : MetaSemigroup](
             f.map { r =>
               val t1 = System.nanoTime()
               val serie = toSerie(t0, t1, System.currentTimeMillis(), st)
-              in.write(dbName, "default", serie)
+              in.write(dbName, retentionPolicy, serie)
               r
             }
           }
