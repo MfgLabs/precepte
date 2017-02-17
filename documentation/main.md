@@ -385,19 +385,20 @@ val demo =
 ```
 
 Now we have created the program but we've not executed it yet.
-All we have to do to push metrics into an [influxdb](https://influxdb.com/) instance is configure the influx client, and "inject" it into the execution of our program.
+All we have to do to push metrics into an [influxdb](https://influxdb.com/) instance is configure the influx client, and "inject" it into the execution of our program. Since InfluxDB v1.0, the automatically created retention policy (when database is created) is named `autogen`. In previous versions, its name was `default`. In the following, the default `autogen` retention policy is used.
 
 ```scala
 val influx = Influx[Unit](
     new java.net.URL("http://localhost:8086"),
       "root",
       "root",
-      "precepte_demo"
+      "precepte_demo",
+      "autogen"
     )
 val monitoredDemo = demo.mapSuspension(influx.monitor)
 ```
 
-now if we execute the code, metrics are automatically pushed to Influxdb.
+Now if we execute the code, metrics are automatically pushed to InfluxDB.
 
 ```scala
 val result =
