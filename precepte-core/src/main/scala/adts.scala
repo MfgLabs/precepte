@@ -17,17 +17,14 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
-import scala.language.higherKinds
-
-
 /** A typed group of tags */
 trait Tags
 object NoTags extends Tags
 
 /** The state gathering all data concerning current execution context
-  * 
+  *
   * @param managed the state containing the context from where it comes & where it is and managed by Precepte
-  * @param unmanaged the container where you can put anything you want to manage your state 
+  * @param unmanaged the container where you can put anything you want to manage your state
   */
 case class PState[Ta, ManagedState, UnmanagedState](
   managed: ManagedState,

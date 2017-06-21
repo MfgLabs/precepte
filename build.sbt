@@ -12,7 +12,8 @@ lazy val publishSettings = Seq(
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
   , version := "0.4.4"
-  , scalaVersion := "2.11.8"
+  , scalaVersion := "2.12.2"
+  , crossScalaVersions := Seq("2.11.11", "2.12.2")
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
     , "Oncue Bintray Repo" at "http://dl.bintray.com/oncue/releases"
@@ -20,7 +21,7 @@ lazy val commonSettings =  Seq(
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn
-) ++ tutSettings ++ publishSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
+) ++ publishSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
 
 lazy val strictScalac =
   scalacOptions ++= Seq(
@@ -55,7 +56,7 @@ lazy val core =
       name := "precepte-core",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "com.chuusai"     %% "shapeless"        % "2.2.4"
+          "com.chuusai"     %% "shapeless"        % "2.3.2"
         , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
@@ -158,6 +159,7 @@ lazy val stream =
 
 lazy val doc =
   project.in(file("precepte-tut"))
+    .enablePlugins(TutPlugin)
     .settings(commonSettings:_*)
     .settings(noPublishSettings:_*)
     .settings(strictScalac)

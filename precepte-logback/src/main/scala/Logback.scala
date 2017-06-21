@@ -17,8 +17,6 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
-import scala.language.higherKinds
-
 import default._
 import scala.collection.immutable.{ Map => ScMap }
 
@@ -26,8 +24,6 @@ case class Logback(env: BaseEnv, loggerName: String) {
 
   import net.logstash.logback.marker.Markers._
   import org.slf4j.LoggerFactory
-  import ch.qos.logback.core.util.StatusPrinter
-  import ch.qos.logback.classic.LoggerContext
 
   val logger = LoggerFactory.getLogger(loggerName)
 

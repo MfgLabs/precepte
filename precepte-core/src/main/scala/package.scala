@@ -16,12 +16,6 @@ limitations under the License.
 
 package com.mfglabs
 
-import scala.language.higherKinds
-import scala.language.implicitConversions
-
-import com.mfglabs.precepte._
-
-
 package object precepte {
   /** A shorter but nicer name in the code :D */
   val Pre = Precepte

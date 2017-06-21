@@ -18,11 +18,8 @@ package com.mfglabs
 package precepte
 
 import java.net.URL
-import scala.language.higherKinds
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.language.postfixOps
 
 import default._
 
@@ -58,8 +55,8 @@ case class Influx[C : MetaSemigroup](
 
     val method = path.last.tags.callee.value
 
-    val callees: String =
-      path.map(_.tags.callee.value).mkString(sep, sep, "")
+    // val callees: String =
+    //   path.map(_.tags.callee.value).mkString(sep, sep, "")
 
     val category =
       path.last.tags.category.value

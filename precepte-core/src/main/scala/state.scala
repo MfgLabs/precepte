@@ -18,10 +18,8 @@ package com.mfglabs
 package precepte
 
 import shapeless._
-import shapeless.ops.hlist.{ Selector, ToCoproduct }
-import shapeless.ops.coproduct.{ Basis }
+import shapeless.ops.hlist.Selector
 
-import scala.language.implicitConversions
 import scala.language.higherKinds
 
 trait SubList[Super <: HList, S <: HList] extends DepFn1[Super] with Serializable {
@@ -48,7 +46,7 @@ trait SubListable[Super, Subsub] extends DepFn1[Super] with Serializable {
 object SubListable {
 
   implicit def sublistable[Super, Subsub, SuperHL <: HList, SubHL <: HList](
-    implicit 
+    implicit
       genSuper: Generic.Aux[Super, SuperHL],
       genSub: Generic.Aux[Subsub, SubHL],
       subList: SubList[SuperHL, SubHL]
@@ -61,7 +59,7 @@ object SubListable {
 package object state {
 
   implicit class UnifyStateUnit[Ta, MS, F[_], A](val p: Precepte[Ta, MS, Unit, F, A]) extends AnyVal {
-    def unify[UMS2, R <: HList](pivot: PState[Ta, MS, UMS2]): Precepte[Ta, MS, UMS2, F, A] = {      
+    def unify[UMS2, R <: HList](pivot: PState[Ta, MS, UMS2]): Precepte[Ta, MS, UMS2, F, A] = {
       p.xmapState[UMS2]((_:Unit) => pivot.um, (_:UMS2) => ())
     }
 

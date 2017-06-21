@@ -21,7 +21,6 @@ package default
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 
-import scala.language.implicitConversions
 import scala.language.higherKinds
 
 

@@ -18,7 +18,6 @@ package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-import scala.language.implicitConversions
 
 
 trait *->*[F0[_]] {}
@@ -58,7 +57,7 @@ trait HK {
 
   /**
     * Finds the right Monad Transformer (OptionT, ListT, EitherT) wrapped in a precepte using HasHoist typeclass
-    * and lifts the Precepte into a MonadTransformer instance. 
+    * and lifts the Precepte into a MonadTransformer instance.
     */
   def trans[Ta, ManagedState, UnmanagedState, F[_], G[_]: *->*, A](
     m: Precepte[Ta, ManagedState, UnmanagedState, F, G[A]]
