@@ -44,7 +44,7 @@ case class Influx[C : MetaSemigroup](
 
   type SF[T] = (ST[C], Future[T])
 
-  private def toSerie(startTime: Long, endTime: Long, now: Long, st: ST[C]) = {
+  private def toSerie(startTime: Long, endTime: Long, now: Long, st: ST[C], error: Option[Throwable]) = {
     val duration = endTime - startTime
     val sep = "/"
     val path = st.managed.path
@@ -61,7 +61,7 @@ case class Influx[C : MetaSemigroup](
     val category =
       path.last.tags.category.value
 
-    dto.Point.measurement("response_times")
+    val builder = dto.Point.measurement("response_times")
       .time(now, TimeUnit.MILLISECONDS)
       .tag("host", st.managed.env.host.value)
       .tag("environment", st.managed.env.environment.value)
@@ -72,7 +72,12 @@ case class Influx[C : MetaSemigroup](
       .field("span", st.managed.span.value)
       .field("path", p)
       .field("execution_time", duration)
-      .build()
+
+    error.foreach { e =>
+      builder.field("error", s"${e.getClass.getName}: ${e.getMessage}")
+    }
+
+    builder.build()
   }
 
   def monitor =
@@ -82,11 +87,10 @@ case class Influx[C : MetaSemigroup](
           def apply[A](sf: SF[A]): Future[A] = {
             val t0 = System.nanoTime()
             val (st, f) = sf
-            f.map { r =>
+            f.andThen { case r =>
               val t1 = System.nanoTime()
-              val serie = toSerie(t0, t1, System.currentTimeMillis(), st)
+              val serie = toSerie(t0, t1, System.currentTimeMillis(), st, r.failed.toOption)
               in.write(dbName, retentionPolicy, serie)
-              r
             }
           }
         }
