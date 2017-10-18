@@ -86,6 +86,7 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
     p.runForeach{ case (s, a) =>
       println(s"s:$s a:$a")
       a should ===("foo-1-1" -> "foo-1-2")
+      ()
     }.futureValue
 
   }

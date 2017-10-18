@@ -55,8 +55,8 @@ lazy val core =
       name := "precepte-core",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "com.chuusai"     %% "shapeless"        % "2.3.2"
-        , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
+          "com.chuusai"     %% "shapeless"    % "2.3.3"
+        , "org.scalatest"   %%  "scalatest"   % "3.0.5"   % "test"
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
     )
@@ -69,8 +69,8 @@ lazy val coreCats =
       name := "precepte-core-cats",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "org.spire-math"  %% "cats"             % "0.2.0"
-        , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
+          "org.typelevel"   %% "cats-core"   % "0.9.0"
+        , "org.scalatest"   %% "scalatest"   % "3.0.5"   % "test"
       )
     )
     .dependsOn(core)
@@ -84,8 +84,8 @@ lazy val coreScalaz =
       name := "precepte-core-scalaz",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "org.scalaz"      %% "scalaz-core"      % "7.1.0"
-        , "org.scalatest"   %  "scalatest_2.11"   % "2.2.1"   % "test"
+          "org.scalaz"      %% "scalaz-core"  % "7.2.24"
+        , "org.scalatest"   %%  "scalatest"   % "3.0.5"   % "test"
       )
     )
     .dependsOn(core)
@@ -118,9 +118,9 @@ lazy val influx =
       name := "precepte-influx",
       libraryDependencies ++= Seq(
         // influx deps
-        "com.google.guava" % "guava" % "18.0",
-        "com.squareup.retrofit" % "retrofit" % "1.9.0",
-        "com.squareup.okhttp" % "okhttp" % "2.4.0"
+        "com.google.guava" % "guava" % "23.2-jre",
+        "com.squareup.retrofit2" % "retrofit" % "2.3.0",
+        "com.squareup.okhttp3" % "okhttp" % "3.9.0"
       ))
     .dependsOn(core)
 
@@ -131,8 +131,8 @@ lazy val logback =
     .settings(
       name := "precepte-logback",
       libraryDependencies ++= Seq(
-        "ch.qos.logback" % "logback-classic" % "1.1.2",
-        "net.logstash.logback" % "logstash-logback-encoder" % "4.2"))
+        "ch.qos.logback" % "logback-classic" % "1.2.3",
+        "net.logstash.logback" % "logstash-logback-encoder" % "4.11"))
     .dependsOn(core)
 
 lazy val play =
@@ -140,7 +140,7 @@ lazy val play =
     .settings(commonSettings:_*)
     .settings(strictScalac)
     .settings(
-      libraryDependencies += "com.typesafe.play" %% "play" % "2.3.9",
+      libraryDependencies += "com.typesafe.play" %% "play" % "2.5.18" % Provided,
       name := "precepte-play")
     .dependsOn(core)
 
@@ -151,7 +151,7 @@ lazy val stream =
     .settings(
       libraryDependencies ++= Seq(
           "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0"
-        , "org.scalatest"     %%  "scalatest"                  % "2.2.1"  % "test"
+        , "org.scalatest"     %%  "scalatest"                  % "3.0.5"  % "test"
       ),
       name := "precepte-stream")
     .dependsOn(coreScalaz)

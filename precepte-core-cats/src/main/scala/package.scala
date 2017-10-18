@@ -19,8 +19,9 @@ package precepte
 
 import scala.concurrent.Future
 
-import cats.{ Monad, Applicative, Functor, Semigroup, ~>, Unapply }
-import cats.data.{ OptionT, XorT, Xor, StreamingT }
+import cats.{ Monad, Applicative, Functor, ~>, Unapply }
+import cats.kernel.Semigroup
+import cats.data.{ OptionT, EitherT }
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
@@ -39,8 +40,14 @@ package object corecats extends SubMeta {
       override def flatMap[A, B](m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
         m.flatMap(f)
 
-      override def ap[A, B](pa: Precepte[Ta, ManagedState, UnmanagedState, F, A])(pab: Precepte[Ta, ManagedState, UnmanagedState, F, A => B]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
+      override def ap[A, B](pab: Precepte[Ta, ManagedState, UnmanagedState, F, A => B])(pa: Precepte[Ta, ManagedState, UnmanagedState, F, A]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
         Apply(pa, pab)
+      }
+      override def tailRecM[A, B](a: A)(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, Either[A,B]]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
+        f(a).flatMap {
+          case Left(result) => tailRecM(result)(f)
+          case Right(result) => pure(result)
+        }
       }
     }
 
@@ -52,7 +59,7 @@ package object corecats extends SubMeta {
     override def pure[A](a: A): F[A] = mo.pure(a)
     override def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
     override def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B] = mo.flatMap(fa)(f)
-    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fa)(fab)
+    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fab)(fa)
   }
 
   implicit def CatsMetaNat[F[_], G[_]](implicit nat: F ~> G) = new ~~>[F, G] {
@@ -91,7 +98,6 @@ package object corecats extends SubMeta {
     def subst = nosi.subst
   }
 
-
   implicit object optionHasHoist extends HasHoist[Option] {
     type T[F[_], A] = OptionT[F, A]
     def lift[F[_], A](f: F[Option[A]]): OptionT[F, A] = OptionT(f)
@@ -102,12 +108,12 @@ package object corecats extends SubMeta {
   //   def lift[F[_], A](f: F[StreamingT[A]]): StreamingT[F, A] = StreamingT.wait(f)
   // }
 
-  implicit def xorHasHoist[A]: HasHoist.Aux[({ type λ[α] = Xor[A, α] })#λ, ({ type λ[F[_], B] = XorT[F, A, B] })#λ] = new XorHasHoist[A]
+  implicit def xorHasHoist[A]: HasHoist.Aux[({ type λ[α] = Either[A, α] })#λ, ({ type λ[F[_], B] = EitherT[F, A, B] })#λ] = new XorHasHoist[A]
 
-  def future[Ta, M, U, A](ta: Ta)(λ: Precepte[Ta, M, U, Future, A]#S => Future[A])(implicit func: Functor[Future], ec: scala.concurrent.ExecutionContext): Precepte[Ta, M, U, Future, Xor[Throwable, A]] =
+  def future[Ta, M, U, A](ta: Ta)(λ: Precepte[Ta, M, U, Future, A]#S => Future[A])(implicit func: Functor[Future], ec: scala.concurrent.ExecutionContext): Precepte[Ta, M, U, Future, Either[Throwable, A]] =
     Precepte(ta){ pa =>
-      func.map(λ(pa))(Xor.Right(_))
-        .recover{ case e => Xor.Left(e) }
+      func.map(λ(pa))(Right(_))
+        .recover{ case e => Left(e) }
     }
 
 }
@@ -121,7 +127,7 @@ trait SubMeta {
   implicit def CatsMetaApplicative[F[_]](implicit mo: Applicative[F]) = new MetaApplicative[F] {
     override def pure[A](a: A): F[A] = mo.pure(a)
     override def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
-    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fa)(fab)
+    override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fab)(fa)
   }
 
 }

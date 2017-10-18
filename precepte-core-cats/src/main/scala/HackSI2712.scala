@@ -24,15 +24,15 @@ import scala.reflect.macros.{ blackbox, whitebox }
 import scala.concurrent.Future
 
 import cats.Eq
-import cats.data.{ OptionT, XorT, Xor, StreamingT }
+import cats.data.{ OptionT, EitherT }
 
 import scala.language.higherKinds
 import scala.language.existentials
 
 
-class XorHasHoist[A] extends HasHoist[({ type λ[α] = Xor[A, α] })#λ] {
-  type T[F[_], B] = XorT[F, A, B]
-  def lift[F[_], B](f: F[Xor[A, B]]): XorT[F, A, B] = XorT.apply(f)
+class XorHasHoist[A] extends HasHoist[({ type λ[α] = Either[A, α] })#λ] {
+  type T[F[_], B] = EitherT[F, A, B]
+  def lift[F[_], B](f: F[Either[A, B]]): EitherT[F, A, B] = EitherT.apply(f)
 }
 
 /** The horrible cludge to go around SI-2712 */

@@ -37,10 +37,11 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import cats.Applicative
-  import cats.std.future._
+  import cats.instances.future._
   import cats.syntax.flatMap._
   import cats.syntax.apply._
-  import cats.data.{XorT, StreamingT}
+  import cats.implicits.{catsSyntaxCartesian, catsSyntaxUCartesian}
+  import cats.data.EitherT
 
   import default._
 
@@ -178,26 +179,25 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
 
   it should "EitherT" in {
-    import cats.data.Xor
     // import cata.data.EitherT.eitherTFunctor
 
-    val f1: Pre[Xor[String, String]] =
-      Precepte(tags("f1"))(_ => Applicative[Future].pure(Xor.Right("foo")))
-    val f2: Pre[Xor[String, Int]] =
-      Precepte(tags("f2"))(_ => Applicative[Future].pure(Xor.Right(1)))
-    val f3: Pre[Xor[String, String]] =
-      Precepte(tags("f3"))(_ => Applicative[Future].pure(Xor.Left("Error")))
+    val f1: Pre[Either[String, String]] =
+      Precepte(tags("f1"))(_ => Applicative[Future].pure(Right("foo")))
+    val f2: Pre[Either[String, Int]] =
+      Precepte(tags("f2"))(_ => Applicative[Future].pure(Right(1)))
+    val f3: Pre[Either[String, String]] =
+      Precepte(tags("f3"))(_ => Applicative[Future].pure(Left("Error")))
 
-    type Foo[A] = XorT[Future, String, A]
+    type Foo[A] = EitherT[Future, String, A]
 
     val res = for {
       e1 <- trans(f1)
       e2 <- trans(f2)
     } yield (e1, e2)
 
-    res.value.eval(nostate).futureValue should ===(Xor.Right("foo" -> 1))
+    res.value.eval(nostate).futureValue should ===(Right("foo" -> 1))
 
-    val error = Xor.Left("Error")
+    val error = Left("Error")
     val res2 = for {
       e1 <- trans(f1)
       e2 <- trans(f3)

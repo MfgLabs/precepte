@@ -35,11 +35,10 @@ class CostSpec extends FlatSpec with ScalaFutures {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
-  import cats.std.future._
+  import cats.instances.future._
   import cats.Applicative
   import cats.syntax.flatMap._
   import cats.syntax.apply._
-  import cats.data.XorT
 
   import default._
 
@@ -64,7 +63,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
     val bef = System.nanoTime
     f.futureValue
     val aft = System.nanoTime
-    
+
     (aft - bef) / 1000000.0
   }
 
@@ -94,10 +93,10 @@ class CostSpec extends FlatSpec with ScalaFutures {
       r <- if(i>0) res(i-1) else Applicative[Pre].pure(i)
     } yield r
 
-    // val ms0 = timeMs(res(1000).eval(nostate))    
+    // val ms0 = timeMs(res(1000).eval(nostate))
     // println(s"Pre(1000) -> duration: $ms0 ms")
 
-    val ms = timeMs(res(10000).eval(nostate))    
+    val ms = timeMs(res(10000).eval(nostate))
     println(s"Pre(10000) -> duration: $ms ms")
 
     val ms2 = timeMs(res(100000).eval(nostate))

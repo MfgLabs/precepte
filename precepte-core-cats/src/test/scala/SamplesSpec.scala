@@ -35,8 +35,8 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
-  import cats.std.future._
-  import cats.std.option._
+  import cats.instances.future._
+  import cats.instances.option._
   import cats.Applicative
   import cats.data.OptionT
   import cats.syntax.flatMap._
@@ -157,7 +157,7 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
     /** a Sample managing in a monadic flow */
     def pay0(id: Long, amount: Double): DefaultPre[Future, Ctx, PayResult] =
       // PreMP is a macro oriented helper that extracts the name of the function and the category from scope
-      PreMP { s: ST[Ctx] => 
+      PreMP { s: ST[Ctx] =>
         (for {
           stuff <-  s.um.db.findById(id).unify(s)
           r     <-  stuff match {
