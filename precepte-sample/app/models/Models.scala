@@ -22,8 +22,8 @@ import scalaz.std.scalaFuture._
 import Macros._
 
 
-case class Company(id: Pk[Long] = NotAssigned, name: String)
-case class Computer(id: Pk[Long] = NotAssigned, name: String, introduced: Option[Date], discontinued: Option[Date], companyId: Option[Long])
+case class Company(id: Option[Long] = None, name: String)
+case class Computer(id: Option[Long] = None, name: String, introduced: Option[Date], discontinued: Option[Date], companyId: Option[Long])
 
 /**
  * Helper for pagination.
@@ -46,7 +46,7 @@ object Computer {
    * Parse a Computer from a ResultSet
    */
   val simple = {
-    get[Pk[Long]]("computer.id") ~
+    get[Option[Long]]("computer.id") ~
     get[String]("computer.name") ~
     get[Option[Date]]("computer.introduced") ~
     get[Option[Date]]("computer.discontinued") ~
@@ -209,7 +209,7 @@ object Company {
    * Parse a Company from a ResultSet
    */
   val simple = {
-    get[Pk[Long]]("company.id") ~
+    get[Option[Long]]("company.id") ~
     get[String]("company.name") map {
       case id~name => Company(id, name)
     }
