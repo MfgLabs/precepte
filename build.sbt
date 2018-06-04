@@ -67,7 +67,7 @@ lazy val coreCats =
       name := "precepte-core-cats",
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
       libraryDependencies ++= Seq(
-          "org.typelevel"   %% "cats-core"   % "0.9.0"
+          "org.typelevel"   %% "cats-core"   % "1.0.1"
         , "org.scalatest"   %% "scalatest"   % "3.0.5"   % "test"
       )
     )

@@ -19,7 +19,7 @@ package precepte
 
 import scala.concurrent.Future
 
-import cats.{ Monad, Applicative, Functor, ~>, Unapply }
+import cats.{ Monad, Applicative, Functor, ~> }
 import cats.kernel.Semigroup
 import cats.data.{ OptionT, EitherT }
 import cats.syntax.apply._
@@ -69,33 +69,6 @@ package object corecats extends SubMeta {
   implicit def CatsMetaIso[F[_], G[_]](implicit to0: F ~> G, from0: G ~> F) = new <~~>[F, G] {
     def to[A](f: F[A]): G[A] = to0(f)
     def from[A](f: G[A]): F[A] = from0(f)
-  }
-
-  /** allows to unapply a Precepte into a F[A] */
-  implicit def toClassicUnapply[M0[_[_]], Ta, MS, C, F[_], A0](implicit m: M0[({ type λ[α] = Precepte[Ta, MS, C, F, α] })#λ]) =
-    new Unapply[M0, Precepte[Ta, MS, C, F, A0]] {
-      type M[x] = Precepte[Ta, MS, C, F, x]
-      type A = A0
-
-      def TC = m
-
-      def subst: Precepte[Ta, MS, C, F, A0] => M[A] = m0 => m0
-    }
-
-  /**
-    * A custom typeclass allowing to go around higher-kind type unification issues in scalac when using Monad Transformers + Precepte
-    */
-  implicit def toTCUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
-    implicit
-      una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],
-      nosi: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A0]
-  ) = new Unapply[M, TCA] {
-    type M[x] = nosi.T[x]
-    type A = A0
-
-    def TC = nosi.MTC
-
-    def subst = nosi.subst
   }
 
   implicit object optionHasHoist extends HasHoist[Option] {
