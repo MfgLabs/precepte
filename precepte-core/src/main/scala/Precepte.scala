@@ -110,7 +110,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
     * or
     * Not tail rec
     */
-  private def fastFlatMap[B](f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B], maxDepth: Int = 500): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
+  private [precepte] def fastFlatMap[B](f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B], maxDepth: Int = 500): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
     def step[C, D](
       p: Precepte[Ta, ManagedState, UnmanagedState, F, C],
       f: C => Precepte[Ta, ManagedState, UnmanagedState, F, D],

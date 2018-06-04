@@ -44,7 +44,7 @@ package object corecats extends SubMeta {
         Apply(pa, pab)
       }
       override def tailRecM[A, B](a: A)(f: A => Precepte[Ta, ManagedState, UnmanagedState, F, Either[A,B]]): Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
-        f(a).flatMap {
+        f(a).fastFlatMap {
           case Left(result) => tailRecM(result)(f)
           case Right(result) => pure(result)
         }
