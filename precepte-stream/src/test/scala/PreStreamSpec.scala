@@ -81,7 +81,7 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
     a should ===("foo-1-1" -> "foo-1-2")
 
     val flow = PreStream.toFlow(res)
-    val p = scaladsl.Source(() => Iterator(nostate, nostate)).via(flow)
+    val p = scaladsl.Source.fromIterator(() => Iterator(nostate, nostate)).via(flow)
 
     p.runForeach{ case (s, a) =>
       println(s"s:$s a:$a")

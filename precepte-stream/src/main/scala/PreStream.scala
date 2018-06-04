@@ -19,7 +19,8 @@ package precepte
 
 import scalaz.{Monad, Semigroup}
 import scala.concurrent.{Future, ExecutionContext}
-import akka.stream.ActorMaterializer
+import akka.NotUsed
+import akka.stream.{ActorMaterializer, FlowShape}
 import akka.stream.scaladsl._
 import akka.stream.stage._
 
@@ -32,10 +33,10 @@ object PreStream {
   // can be NOT tail rec
   def toFlow[T, M, U, A](pre: P[T, M, U, A], parallelism: Int = 1)(
     implicit m: Monad[Future], ex: ExecutionContext, upd: PStateUpdater[T, M, U], sU: Semigroup[U]
-  ): Flow[PState[T, M, U], (PState[T, M, U], A), Unit] = {
+  ): Flow[PState[T, M, U], (PState[T, M, U], A), NotUsed] = {
     type PS = PState[T, M, U]
 
-    def step[B](p: P[T, M, U, B])(idx: Int): Flow[PS, (PS, B), Unit] =
+    def step[B](p: P[T, M, U, B])(idx: Int): Flow[PS, (PS, B), NotUsed] =
       p match {
         case Return(a) =>
           Flow[PS].mapAsync(parallelism){ state => Future.successful(state -> a) }
@@ -57,18 +58,18 @@ object PreStream {
           }
 
         case Flatmap(sub, next) =>
-          step(sub)(idx).map { case (state, a) =>
+          step(sub)(idx).flatMapConcat { case (state, a) =>
             Source.single(state).via(step(next(a))(idx))
-          }.flatten(FlattenStrategy.concat)
+          }
 
         case ap@Apply(pa, pf) =>
-          Flow() { implicit b =>
-            import FlowGraph.Implicits._
+          import GraphDSL.Implicits._
 
+          Flow.fromGraph(GraphDSL.create() { implicit b =>
             val bcast = b.add(Broadcast[PS](2))
 
-            val ga: Flow[PS, (PS, ap._A), Unit] = step(pa)(idx + 1)
-            val gf: Flow[PS, (PS, ap._A => B), Unit] = step(pf)(idx + 2)
+            val ga: Flow[PS, (PS, ap._A), NotUsed] = step(pa)(idx + 1)
+            val gf: Flow[PS, (PS, ap._A => B), NotUsed] = step(pf)(idx + 2)
 
             val zip = b.add(ZipWith[(PS, ap._A), (PS, ap._A => B), (PS, B)] { case ((ps0, _a), (ps1, f)) =>
               val ps = upd.updateUnmanaged(ps0, sU.append(ps0.unmanaged, ps1.unmanaged))
@@ -77,8 +78,9 @@ object PreStream {
 
             bcast.out(0) ~> ga ~> zip.in0
             bcast.out(1) ~> gf ~> zip.in1
-            (bcast.in, zip.out)
-          }
+
+            FlowShape(bcast.in, zip.out)
+          })
 
         case ps@SubStep(sub, fmap, tags) =>
           step(ps.toStepMap)(idx)

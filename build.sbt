@@ -150,8 +150,8 @@ lazy val stream =
     .settings(strictScalac)
     .settings(
       libraryDependencies ++= Seq(
-          "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0"
-        , "org.scalatest"     %%  "scalatest"                  % "3.0.5"  % "test"
+          "com.typesafe.akka" %% "akka-stream" % "2.5.12"
+        , "org.scalatest"     %%  "scalatest"  % "3.0.5"  % "test"
       ),
       name := "precepte-stream")
     .dependsOn(coreScalaz)
