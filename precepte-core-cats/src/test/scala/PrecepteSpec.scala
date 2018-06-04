@@ -405,7 +405,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     def nostate = ST(Span.gen, env, Vector.empty, 0)
 
-    type Pre[A] = DefaultPre[Future, Int, A]
+    // type Pre[A] = DefaultPre[Future, Int, A]
 
     // object Pre extends DefaultPreBuilder[Future, Int, Pre]
 
@@ -421,13 +421,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     val p8 =
       for {
       _ <- p0
-      _ <- catsSyntaxTuple3Semigroupal[Pre, Int, Int, Int]((p1, p2, p3)).tupled
+      _ <- (p1, p2, p3).tupled
       _ <- Precepte(tags("sub"))(p4)
       _ <- p5
       _ <- Precepte(tags("sub2"))(for {
-          _ <- catsSyntaxTuple4Semigroupal[Pre, Int, Int, Int, Int]((p1, p2, p3, p4)).tupled
+          _ <- (p1, p2, p3, p4).tupled
           _ <- p6
-          _ <- catsSyntaxTuple3Semigroupal[Pre, Int, Int, Int]((p4, p5, Precepte(tags("sub3"))(p6))).tupled
+          _ <- (p4, p5, Precepte(tags("sub3"))(p6)).tupled
           _ <- p7
         } yield ())
     } yield ()
@@ -446,7 +446,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     println(s.viz)
 
     println("=== (p1 |@| p2) ===")
-    val (s1, _) = catsSyntaxTuple2Semigroupal[Pre, Int, Int]((p1, p2)).tupled.graph(Graph.empty).eval(nostate).futureValue
+    val (s1, _) = (p1, p2).tupled.graph(Graph.empty).eval(nostate).futureValue
     println(s1.viz)
 
     println("=== s2 ===")
@@ -456,7 +456,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     println("=== (p1 |@| p2 |@| p3) flatMap p4 ===")
     val ptest =
       for {
-        _ <- catsSyntaxTuple3Semigroupal[Pre, Int, Int, Int]((p1, p2, p3)).tupled
+        _ <- (p1, p2, p3).tupled
         _ <- p4
       } yield ()
     val (s3, _) = ptest.graph(Graph.empty).eval(nostate).futureValue
@@ -466,7 +466,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     val px =
       for {
       _ <- p0
-      _ <- catsSyntaxTuple3Semigroupal[Pre, Int, Int, Int]((p1, p2, p3)).tupled
+      _ <- (p1, p2, p3).tupled
       _ <- Precepte(tags("sub"))(p4)
       _ <- p5
     } yield ()
@@ -498,7 +498,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
   it should "compile using nat" in {
     case class F[A](a: A)
-    type PreF[A] = DefaultPre[F, Unit, A]
 
     def f1 = Precepte(tags("f1")){ (_: ST[Unit]) => F(1) }
     def f2 = Precepte(tags("f2")){ (_: ST[Unit]) => F(2) }
@@ -507,7 +506,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     val res = for {
       i <- f1
-      a <- catsSyntaxTuple2Semigroupal[PreF, Int, Int]((f2, f3)).tupled
+      a <- (f2, f3).tupled
       r <- f4(i + a._1 + a._2)
     } yield r
 
@@ -542,13 +541,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     val p8 =
       for {
         _ <- p0
-        _ <- catsSyntaxTuple3Semigroupal[Pre, Int, Int, Int]((p1, p2, p3)).tupled
+        _ <- (p1, p2, p3).tupled
         _ <- Precepte(tags("sub"))(p4)
         _ <- p5
         _ <- Precepte(tags("sub2"))(for {
-            _ <- catsSyntaxTuple4Semigroupal[Pre, Int, Int, Int, Int]((p1, p2, p3, p4)).tupled
+            _ <- (p1, p2, p3, p4).tupled
             _ <- p6
-            _ <- catsSyntaxTuple3Semigroupal[Pre, Int, Int, Int]((p4, p5, Precepte(tags("sub3"))(p6))).tupled
+            _ <- (p4, p5, Precepte(tags("sub3"))(p6)).tupled
             _ <- p7
           } yield ())
       } yield ()

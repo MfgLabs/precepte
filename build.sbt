@@ -34,6 +34,7 @@ lazy val strictScalac =
     , "-Ywarn-numeric-widen"
     , "-Ywarn-value-discard"
     , "-Xfuture"
+    , "-Ypartial-unification"
     // , "-Ylog-classpath"
     //, "-Ywarn-unused-import"
 )
