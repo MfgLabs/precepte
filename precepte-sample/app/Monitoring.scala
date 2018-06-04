@@ -21,8 +21,9 @@ object Monitoring {
 
   val env = BaseEnv(
     Host(java.net.InetAddress.getLocalHost().getHostName()),
-    Environment.Dev,
-    Version(com.mfglabs.BuildInfo.version))
+    com.mfglabs.precepte.default.Environment.Dev,
+    Version(com.mfglabs.BuildInfo.version)
+  )
 
   val influx = Influx(
     new java.net.URL("http://localhost:8086"),

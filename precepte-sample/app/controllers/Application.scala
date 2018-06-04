@@ -19,26 +19,30 @@ import Macros.callee
 
 import commons.Monitoring._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scalaz.std.scalaFuture._
 import scalaz.std.option._
+import scala.concurrent.ExecutionContext
 
-trait Commons {
+trait Commons extends PreActionSyntax[Unit] {
   import commons.Monitoring.env
-  private def initialState = ()
-  private def version = env.version
-  private def environment = env.environment
-  private def host = env.host
 
-  val syntax = PreActionSyntax(initialState, version, environment, host)
+  def initialState = ()
+  def version = env.version
+  def environment = env.environment
+  def host = env.host
 }
 
 /**
  * Manage a database of computers
  */
-object Application extends Controller with Commons {
+class Application(
+  val controllerComponent : play.api.mvc.ControllerComponents,
+  companyDB               : models.CompanyDB,
+  computerDB              : models.ComputerDB
+)(implicit val executionContext: ExecutionContext) extends AbstractController(controllerComponent) with Commons {
 
-  import syntax._
+  implicit def messages(implicit request: RequestHeader): play.api.i18n.Messages =
+    controllerComponent.messagesApi.preferred(request)
 
   /**
    * This result directly redirect to the application home.
@@ -78,7 +82,7 @@ object Application extends Controller with Commons {
   def list(page: Int, orderBy: Int, filter: String) = async(TimedAction) { req =>
     implicit val r = req._2
     for {
-      cs <- Computer.list(page = page, orderBy = orderBy, filter = ("%"+filter+"%"))
+      cs <- computerDB.list(page = page, orderBy = orderBy, filter = ("%"+filter+"%"))
     } yield Ok(html.list(cs, orderBy, filter))
   }
 
@@ -87,10 +91,12 @@ object Application extends Controller with Commons {
    *
    * @param id Id of the computer to edit
    */
-  def edit(id: Long) = async(TimedAction) { _ =>
+  def edit(id: Long) = async(TimedAction) { req =>
+    implicit val r = req._2
+
     (for {
-      computer <- trans(Computer.findById(id))
-      options <- trans(Company.options.lift[Option])
+      computer <- trans(computerDB.findById(id))
+      options <- trans(companyDB.options.lift[Option])
     } yield {
       Ok(html.editForm(id, computerForm.fill(computer), options))
     }).run.map(_.getOrElse(NotFound))
@@ -106,20 +112,21 @@ object Application extends Controller with Commons {
     computerForm.bindFromRequest.fold(
       formWithErrors =>
         for {
-          options <- Company.options
+          options <- companyDB.options
         } yield BadRequest(html.editForm(id, formWithErrors, options)),
       computer =>
         for {
-          _ <- Computer.update(id, computer)
+          _ <- computerDB.update(id, computer)
         } yield Home.flashing("success" -> "Computer %s has been updated".format(computer.name)))
   }
 
   /**
    * Display the 'new computer form'.
    */
-  def create = async(TimedAction) { _ =>
+  def create = async(TimedAction) { req =>
+    implicit val r = req._2
     for {
-      options <- Company.options
+      options <- companyDB.options
     } yield Ok(html.createForm(computerForm, options))
   }
 
@@ -131,11 +138,11 @@ object Application extends Controller with Commons {
     computerForm.bindFromRequest.fold(
       formWithErrors =>
         for {
-          options <- Company.options
+          options <- companyDB.options
         } yield BadRequest(html.createForm(formWithErrors, options)),
       computer => {
         for {
-          _ <- Computer.insert(computer)
+          _ <- computerDB.insert(computer)
         } yield Home.flashing("success" -> "Computer %s has been created".format(computer.name))
       }
     )
@@ -146,7 +153,7 @@ object Application extends Controller with Commons {
    */
   def delete(id: Long) = async(TimedAction) { _ =>
     for {
-      _ <- Computer.delete(id)
+      _ <- computerDB.delete(id)
     } yield Home.flashing("success" -> "Computer has been deleted")
   }
 

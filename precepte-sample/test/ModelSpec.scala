@@ -5,8 +5,10 @@ import org.junit.runner._
 import play.api.test._
 import play.api.test.Helpers._
 
-@RunWith(classOf[JUnitRunner])
-class ModelSpec extends PlaySpecification {
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+
+class ModelSpec extends Specification {
 
   import models._
   import commons.Monitoring._
@@ -19,7 +21,7 @@ class ModelSpec extends PlaySpecification {
   import com.mfglabs.precepte._
   import default._
   import corescalaz._
-  
+
   import scala.concurrent.ExecutionContext.Implicits.global
   import scalaz.std.scalaFuture._
 
@@ -29,39 +31,30 @@ class ModelSpec extends PlaySpecification {
 
   "Computer model" should {
 
-    "be retrieved by id" in {
-      running(FakeApplication(additionalConfiguration = inMemoryDatabase())) {
+    "be retrieved by id" in new WithApplication {
+      val Some(macintosh) = Await.result(Services.computerDB.findById(21).eval(nostate), Duration.Inf)
 
-        val Some(macintosh) = await(Computer.findById(21).eval(nostate))
-
-        macintosh.name must equalTo("Macintosh")
-        macintosh.introduced must beSome.which(dateIs(_, "1984-01-24"))
-
-      }
+      macintosh.name must equalTo("Macintosh")
+      macintosh.introduced must beSome.which(dateIs(_, "1984-01-24"))
     }
 
-    "be listed along its companies" in {
-      running(FakeApplication(additionalConfiguration = inMemoryDatabase())) {
+    "be listed along its companies" in new WithApplication {
+      val computers =  Await.result(Services.computerDB.list().eval(nostate), Duration.Inf)
 
-        val computers =  await(Computer.list().eval(nostate))
-
-        computers.total must equalTo(574)
-        computers.items must have length(10)
-
-      }
+      computers.total must equalTo(574)
+      computers.items must have length(10)
     }
 
-    "be updated if needed" in {
-      running(FakeApplication(additionalConfiguration = inMemoryDatabase())) {
+    "be updated if needed" in new WithApplication {
+      Await.result(
+        Services.computerDB.update(21, Computer(name="The Macintosh", introduced=None, discontinued=None, companyId=Some(1))).eval(nostate),
+        Duration.Inf
+      )
 
-        await(Computer.update(21, Computer(name="The Macintosh", introduced=None, discontinued=None, companyId=Some(1))).eval(nostate))
+      val Some(macintosh) = Await.result(Services.computerDB.findById(21).eval(nostate), Duration.Inf)
 
-        val Some(macintosh) = await(Computer.findById(21).eval(nostate))
-
-        macintosh.name must equalTo("The Macintosh")
-        macintosh.introduced must beNone
-
-      }
+      macintosh.name must equalTo("The Macintosh")
+      macintosh.introduced must beNone
     }
 
   }

@@ -38,32 +38,9 @@ object Models {
     Pre(BaseTags(callee, Category.Database)) { (st: ST[Unit]) => f(st) }
 }
 
-object Computer {
-
-  // -- Parsers
-
-  /**
-   * Parse a Computer from a ResultSet
-   */
-  val simple = {
-    get[Option[Long]]("computer.id") ~
-    get[String]("computer.name") ~
-    get[Option[Date]]("computer.introduced") ~
-    get[Option[Date]]("computer.discontinued") ~
-    get[Option[Long]]("computer.company_id") map {
-      case id ~ name ~ introduced ~ discontinued ~ companyId => Computer(id, name, introduced, discontinued, companyId)
-    }
-  }
-
-  /**
-   * Parse a (Computer,Company) from a ResultSet
-   */
-  val withCompany = Computer.simple ~ (Company.simple ?) map {
-    case computer ~ company => (computer,company)
-  }
-
-  // -- Queries
-
+class ComputerDB(
+  db: play.api.db.Database
+) {
   /**
    * Retrieve a computer from the id.
    */
@@ -73,8 +50,8 @@ object Computer {
       import ctx._
       logger.debug(s"Finding computer with id", Macros.param(id))
       Future.successful {
-        DB.withConnection { implicit connection =>
-          SQL("select * from computer where id = {id}").on('id -> id).as(Computer.simple.singleOpt)
+        db.withConnection { implicit connection =>
+          SQL("select * from computer where id = {id}").on('id -> id).as(ComputerDB.simple.singleOpt)
         }
       }
     }
@@ -95,7 +72,7 @@ object Computer {
       Future.successful {
         val offest = pageSize * page
 
-        DB.withConnection { implicit connection =>
+        db.withConnection { implicit connection =>
 
           val computers = SQL(
             """
@@ -110,7 +87,7 @@ object Computer {
             'offset -> offest,
             'filter -> filter,
             'orderBy -> orderBy
-          ).as(Computer.withCompany *)
+          ).as(ComputerDB.withCompany *)
 
           val totalRows = SQL(
             """
@@ -139,7 +116,7 @@ object Computer {
     import ctx._
     logger.info(s"updating computer with id", Macros.params(id, computer))
     Future.successful {
-      DB.withConnection { implicit connection =>
+      db.withConnection { implicit connection =>
         SQL(
           """
             update computer
@@ -167,7 +144,7 @@ object Computer {
     import ctx._
     logger.info(s"inserting computer", Macros.param(computer))
     Future.successful {
-      DB.withConnection { implicit connection =>
+      db.withConnection { implicit connection =>
         SQL(
           """
             insert into computer values (
@@ -195,16 +172,53 @@ object Computer {
     import ctx._
     logger.info(s"deleting computer", Macros.param(id))
     Future.successful {
-      DB.withConnection { implicit connection =>
+      db.withConnection { implicit connection =>
         SQL("delete from computer where id = {id}").on('id -> id).executeUpdate()
+      }
+    }
+  }
+}
+
+object ComputerDB {
+  /**
+   * Parse a Computer from a ResultSet
+   */
+  val simple = {
+    get[Option[Long]]("computer.id") ~
+    get[String]("computer.name") ~
+    get[Option[Date]]("computer.introduced") ~
+    get[Option[Date]]("computer.discontinued") ~
+    get[Option[Long]]("computer.company_id") map {
+      case id ~ name ~ introduced ~ discontinued ~ companyId => Computer(id, name, introduced, discontinued, companyId)
+    }
+  }
+
+  /**
+   * Parse a (Computer,Company) from a ResultSet
+   */
+  val withCompany = ComputerDB.simple ~ (CompanyDB.simple ?) map {
+    case computer ~ company => (computer,company)
+  }
+}
+
+class CompanyDB(db: play.api.db.Database) {
+  /**
+   * Construct the Map[String,String] needed to fill a select options set.
+   */
+  def options = Models.Timed { (st: ST[Unit]) =>
+    val ctx = MonitoringContext(st)
+    import ctx._
+    logger.debug("Listing options")
+    Future.successful {
+      db.withConnection { implicit connection =>
+        SQL("select * from company order by name").as(CompanyDB.simple *).map(c => c.id.toString -> c.name)
       }
     }
   }
 
 }
 
-object Company {
-
+object CompanyDB {
   /**
    * Parse a Company from a ResultSet
    */
@@ -214,20 +228,4 @@ object Company {
       case id~name => Company(id, name)
     }
   }
-
-  /**
-   * Construct the Map[String,String] needed to fill a select options set.
-   */
-  def options = Models.Timed { (st: ST[Unit]) =>
-    val ctx = MonitoringContext(st)
-    import ctx._
-    logger.debug("Listing options")
-    Future.successful {
-      DB.withConnection { implicit connection =>
-        SQL("select * from company order by name").as(Company.simple *).map(c => c.id.toString -> c.name)
-      }
-    }
-  }
-
 }
-

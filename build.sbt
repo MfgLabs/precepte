@@ -1,5 +1,3 @@
-import play.PlayImport.PlayKeys._
-
 lazy val publishSettings = Seq(
   homepage := Some(url("https://github.com/MfgLabs/precepte")),
   licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")),
@@ -105,9 +103,13 @@ lazy val sample =
       name := "precepte-sample",
       libraryDependencies ++= Seq(
         jdbc,
-        anorm,
+        evolutions,
         ws,
-        "org.specs2" %% "specs2" % "2.4.9"))
+        "com.h2database" % "h2" % "1.4.192",
+        "com.typesafe.play" %% "anorm" % "2.5.1",
+        "org.specs2" %% "specs2" % "2.4.9"
+      )
+    )
     .dependsOn(coreScalaz, influx, logback, play)
 
 lazy val influx =
@@ -118,9 +120,9 @@ lazy val influx =
       name := "precepte-influx",
       libraryDependencies ++= Seq(
         // influx deps
-        "com.google.guava" % "guava" % "23.2-jre",
-        "com.squareup.retrofit2" % "retrofit" % "2.3.0",
-        "com.squareup.okhttp3" % "okhttp" % "3.9.0"
+        "com.google.guava" % "guava" % "18.0",
+        "com.squareup.retrofit" % "retrofit" % "1.9.0",
+        "com.squareup.okhttp" % "okhttp" % "2.4.0"
       ))
     .dependsOn(core)
 
@@ -140,7 +142,7 @@ lazy val play =
     .settings(commonSettings:_*)
     .settings(strictScalac)
     .settings(
-      libraryDependencies += "com.typesafe.play" %% "play" % "2.5.18" % Provided,
+      libraryDependencies += "com.typesafe.play" %% "play" % "2.6.15" % Provided,
       name := "precepte-play")
     .dependsOn(core)
 
