@@ -1,15 +1,6 @@
-import org.specs2.execute._
-import org.specs2.mutable._
-import org.specs2.runner._
-
-import play.api._
 import play.api.test._
-import play.api.test.Helpers._
 
-class ApplicationSpec extends Specification {
-
-  import models._
-
+class ApplicationSpec extends PlaySpecification {
   // -- Date helpers
 
   def dateIs(date: java.util.Date, str: String) = new java.text.SimpleDateFormat("yyyy-MM-dd").format(date) == str

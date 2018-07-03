@@ -20,9 +20,8 @@ package precepte
 import scalaz.{Monad, Semigroup}
 import scala.concurrent.{Future, ExecutionContext}
 import akka.NotUsed
-import akka.stream.{ActorMaterializer, FlowShape}
+import akka.stream.FlowShape
 import akka.stream.scaladsl._
-import akka.stream.stage._
 
 import corescalaz._
 
@@ -52,7 +51,7 @@ object PreStream {
             }
           }
 
-        case mf@SMap(sub, pf) =>
+        case SMap(sub, pf) =>
           step(sub)(idx).map { case (state, a) =>
             state -> pf(a)
           }
@@ -82,12 +81,12 @@ object PreStream {
             FlowShape(bcast.in, zip.out)
           })
 
-        case ps@SubStep(sub, fmap, tags) =>
+        case ps@SubStep(_, _, _) =>
           step(ps.toStepMap)(idx)
 
-        case ps@MapSuspendSubStep(sub, f) =>
+        case MapSuspendSubStep(sub, _) =>
           // TODO not enough IMHO... what to do with F?
-          step(ps.sub)(idx)
+          step(sub)(idx)
       }
 
     step(pre)(0)

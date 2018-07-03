@@ -20,14 +20,9 @@ package corecats
 
 import org.scalatest._
 import Matchers._
-import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{ Millis, Seconds, Span => TSpan }
-
-import scala.language.higherKinds
-
 
 class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
@@ -38,11 +33,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   import scala.concurrent.Future
   import cats.Applicative
   import cats.instances.future._
-  import cats.syntax.flatMap._
   import cats.syntax.apply._
-  import cats.syntax._
-  import cats.data.EitherT
-
+  
   import default._
 
   type Pre[A] = DefaultPre[Future, Unit, A]
@@ -187,8 +179,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       Precepte(tags("f2"))(_ => Applicative[Future].pure(Right(1)))
     val f3: Pre[Either[String, String]] =
       Precepte(tags("f3"))(_ => Applicative[Future].pure(Left("Error")))
-
-    type Foo[A] = EitherT[Future, String, A]
 
     val res = for {
       e1 <- trans(f1)
@@ -375,7 +365,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     import cats.data.OptionT
     // import cats.syntax.monadFilter._
     // import cats._
-    import scala.language.implicitConversions
 
     val f1 = Applicative[Pre].pure(Option(1))
 
@@ -527,8 +516,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
 
   it should "mapSuspension" in {
-    type Pre[A] = DefaultPre[Future, Int, A]
-
     val p0 = Precepte(tags("p0")).applyU((s: ST[Int]) => Future(0 -> 0))
     val p1 = Precepte(tags("p1")).applyU((s: ST[Int]) => Future(1 -> 1))
     val p2 = Precepte(tags("p2")).applyU((s: ST[Int]) => Future(2 -> 2))

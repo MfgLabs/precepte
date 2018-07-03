@@ -17,14 +17,11 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
-import play.api._
-import play.api.mvc.{ BodyParser, BodyParsers, PlayBodyParsers, Result, Request, Action, AnyContent }
-import play.api.mvc.Results._
+import play.api.mvc.{ BodyParser, Result, Request, Action, AnyContent }
 
 import scala.concurrent.Future
 import scala.language.higherKinds
 
-import com.mfglabs.precepte._
 import default._
 
 trait PreActionFunction[-R[_], +P[_], F[_], C] {

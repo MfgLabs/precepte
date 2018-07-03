@@ -1,13 +1,8 @@
 package models
 
-import java.util.{Date}
-
-import play.api.db._
-import play.api.Play.current
-
+import java.util.Date
 import anorm._
 import anorm.SqlParser._
-
 import scala.language.postfixOps
 import scala.concurrent.Future
 
@@ -15,12 +10,7 @@ import com.mfglabs.precepte._
 import default._
 import commons.Monitoring
 import Monitoring._
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scalaz.std.scalaFuture._
-
 import Macros._
-
 
 case class Company(id: Option[Long] = None, name: String)
 case class Computer(id: Option[Long] = None, name: String, introduced: Option[Date], discontinued: Option[Date], companyId: Option[Long])
@@ -34,11 +24,11 @@ case class Page[A](items: Seq[A], page: Int, offset: Long, total: Long) {
 }
 
 object Models {
-  def Timed[A](f: ST[Unit] => Future[A])(implicit fu: scalaz.Functor[Future], callee: Callee): DPre[Future, Unit, A] =
+  def Timed[A](f: ST[Unit] => Future[A])(implicit callee: Callee): DPre[Future, Unit, A] =
     Pre(BaseTags(callee, Category.Database)) { (st: ST[Unit]) => f(st) }
 }
 
-class ComputerDB(
+class ComputerDB (
   db: play.api.db.Database
 ) {
   /**
@@ -99,7 +89,7 @@ class ComputerDB(
             'filter -> filter
           ).as(scalar[Long].single)
 
-          Page(computers, page, offest, totalRows)
+          Page(computers, page, offest.toLong, totalRows)
         }
       }
 
@@ -201,7 +191,7 @@ object ComputerDB {
   }
 }
 
-class CompanyDB(db: play.api.db.Database) {
+class CompanyDB (db: play.api.db.Database) {
   /**
    * Construct the Map[String,String] needed to fill a select options set.
    */
@@ -211,7 +201,9 @@ class CompanyDB(db: play.api.db.Database) {
     logger.debug("Listing options")
     Future.successful {
       db.withConnection { implicit connection =>
-        SQL("select * from company order by name").as(CompanyDB.simple *).map(c => c.id.toString -> c.name)
+        SQL("select * from company order by name").as(CompanyDB.simple *)
+          .filter(_.id.isDefined)
+          .map(c => c.id.get.toString -> c.name)
       }
     }
   }

@@ -66,7 +66,7 @@ case class Graph(nodes: Set[Node], edges: Set[Edge]) {
     }
 
   def +(n: Node) = n match {
-    case Sub(id, value, g) =>
+    case Sub(_, _, g) =>
       val ns = nodes + n
       val es = edges ++
         (for {

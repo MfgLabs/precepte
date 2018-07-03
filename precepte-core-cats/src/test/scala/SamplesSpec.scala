@@ -20,13 +20,9 @@ package corecats
 
 import org.scalatest._
 import Matchers._
-import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Millis, Seconds, Span => TSpan}
-
-import scala.language.higherKinds
 
 class SamplesSpec extends FlatSpec with ScalaFutures {
 
@@ -36,12 +32,8 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import cats.instances.future._
-  import cats.instances.option._
   import cats.Applicative
-  import cats.data.OptionT
-  import cats.syntax.flatMap._
-  import cats.syntax.apply._
-
+  
   import default._
   import default.Macros._
 
@@ -147,8 +139,6 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
   }
 
   object ApiController {
-    import scala.language.implicitConversions
-
     // PreMP uses this implicit category to build Précepte in this scope
     implicit val category = Category.Api
 

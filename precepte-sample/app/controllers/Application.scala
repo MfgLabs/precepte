@@ -2,12 +2,9 @@ package controllers
 
 import scala.concurrent.Future
 
-import play.api._
 import play.api.mvc._
 import play.api.data._
 import play.api.data.Forms._
-
-import anorm._
 
 import views._
 import models._
@@ -35,7 +32,7 @@ trait Commons extends PreActionSyntax[Unit] {
 /**
  * Manage a database of computers
  */
-class Application(
+class Application (
   val controllerComponent : play.api.mvc.ControllerComponents,
   companyDB               : models.CompanyDB,
   computerDB              : models.ComputerDB

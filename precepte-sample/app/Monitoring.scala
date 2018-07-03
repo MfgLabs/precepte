@@ -6,15 +6,9 @@ import default._
 
 object Monitoring {
   import scala.concurrent.Future
-  import play.api.Play.current
   import scala.concurrent.ExecutionContext.Implicits.global
-
-  import play.api.{ Logger => PLog, _ }
   import play.api.mvc._
-  import play.api.mvc.Results._
-
-  import play.api.libs.json._
-
+  
   implicit val unitSG = new scalaz.Semigroup[Unit] {
     def append(f1: Unit, f2: => Unit) = ()
   }
@@ -42,7 +36,8 @@ object Monitoring {
       def invokeBlock[A](request: Request[A], block: ((MonitoringContext, Request[A])) => DPre[Future, Unit, Result]) =
         Pre(BaseTags(callee, Category.Api)) { (st: ST[Unit]) => Future.successful(st) } // XXX: does not make sense at the graph level
           .flatMap{ st => block(MonitoringContext(st) -> request) }
-          .mapSuspension(influx.monitor)
+          // TODO: enable InfluxDB on Travis CI
+          //.mapSuspension(influx.monitor)
     }
 
   case class MonitoringContext(span: Span, path: default.Call.Path[BaseTags]) {

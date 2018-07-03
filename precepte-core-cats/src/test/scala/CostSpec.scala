@@ -20,13 +20,9 @@ package corecats
 
 import org.scalatest._
 import Matchers._
-import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Millis, Seconds, Span => TSpan}
-
-import scala.language.higherKinds
 
 class CostSpec extends FlatSpec with ScalaFutures {
 
@@ -37,9 +33,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
   import scala.concurrent.Future
   import cats.instances.future._
   import cats.Applicative
-  import cats.syntax.flatMap._
-  import cats.syntax.apply._
-
+  
   import default._
 
   type Pre[A] = DefaultPre[Future, Unit, A]

@@ -18,16 +18,12 @@ package com.mfglabs
 package precepte
 package corescalaz
 
-import scala.annotation.{ StaticAnnotation, tailrec }
-import scala.reflect.api.Universe
-import scala.reflect.macros.{ blackbox, whitebox }
-import scala.concurrent.Future
+import scala.reflect.macros.whitebox
 
-import scalaz.Leibniz.{===, refl}
-import scalaz.{ EitherT, \/, Unapply }
+import scalaz.Leibniz.===
+import scalaz.{ EitherT, \/}
 
 import scala.language.higherKinds
-import scala.language.existentials
 
 class EitherHasHoist[A] extends HasHoist[({ type λ[α] = A \/ α })#λ] {
   type T[F[_], B] = EitherT[F, A, B]

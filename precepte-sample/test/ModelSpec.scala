@@ -1,9 +1,4 @@
 import org.specs2.mutable._
-import org.specs2.runner._
-import org.junit.runner._
-
-import play.api.test._
-import play.api.test.Helpers._
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -25,9 +20,13 @@ class ModelSpec extends Specification {
   import scala.concurrent.ExecutionContext.Implicits.global
   import scalaz.std.scalaFuture._
 
-  val env = BaseEnv(Host("localhost"), Environment.Dev, Version("1.0"))
-  private def tags(n: String) = BaseTags(Callee(n), Category.Database)
-  def nostate = ST(Span.gen, env, Vector.empty, ())
+  def nostate: ST[Unit] =
+    ST(
+      Span.gen,
+      BaseEnv(Host("localhost"), Environment.Dev, Version("1.0")),
+      Vector.empty,
+      ()
+    )
 
   "Computer model" should {
 

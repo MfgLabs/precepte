@@ -18,16 +18,11 @@ package com.mfglabs
 package precepte
 package corecats
 
-import scala.annotation.{ StaticAnnotation, tailrec }
-import scala.reflect.api.Universe
-import scala.reflect.macros.{ blackbox, whitebox }
-import scala.concurrent.Future
+import scala.reflect.macros.whitebox
 
-import cats.Eq
-import cats.data.{ OptionT, EitherT }
+import cats.data.EitherT
 
 import scala.language.higherKinds
-import scala.language.existentials
 
 
 class XorHasHoist[A] extends HasHoist[({ type λ[α] = Either[A, α] })#λ] {

@@ -20,14 +20,9 @@ package corescalaz
 
 import org.scalatest._
 import Matchers._
-import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{ Millis, Seconds, Span => TSpan }
-
-import scala.language.higherKinds
-
 
 class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
@@ -38,8 +33,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   import scala.concurrent.Future
   import scalaz.std.scalaFuture._
   import scalaz.syntax.monad._
-  import scalaz.EitherT
-
+  
   import default._
 
   type Pre[A] = DefaultPre[Future, Unit, A]
@@ -178,16 +172,13 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
   it should "EitherT" in {
     import scalaz.{ \/ , \/-, -\/}
-    import EitherT.eitherTFunctor
-
+    
     val f1: Pre[String \/ String] =
       Precepte(tags("f1"))(_ => \/-("foo").point[Future])
     val f2: Pre[String \/ Int] =
       Precepte(tags("f2"))(_ => \/-(1).point[Future])
     val f3: Pre[String \/ String] =
       Precepte(tags("f3"))(_ => -\/("Error").point[Future])
-
-    type Foo[A] = EitherT[Future, String, A]
 
     val res = for {
       e1 <- trans(f1)
@@ -370,11 +361,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
   it should "not break type inference" in {
     import scalaz.syntax.monadPlus._
-    import scalaz.syntax.Ops
     import scalaz.OptionT._
-    import scalaz._
-    import scala.language.implicitConversions
-
+    
     val f1 = Option(1).point[Pre]
 
     optionT(f1).withFilter(_ => true).withFilter(_ => true).run.eval(nostate).futureValue should ===(Some(1))
@@ -507,7 +495,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       r <- f4(i + a._1 + a._2)
     } yield r
 
-    import scala.concurrent.Await
     import scala.concurrent.duration._
     import scalaz.~>
 
@@ -554,17 +541,9 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     type SF[T] = (ST[Int], Future[T])
 
     object Mon extends (SF ~> Future) {
-      def apply[A](f: SF[A]): Future[A] = {
-        val t0 = System.nanoTime()
-        val path = f._1.managed.path
-        val method = path.last.tags.callee.value
-        f._2.map { a =>
-          val t1 = System.nanoTime()
-          val duration = t1 - t0
-          // TODO: Store measure and test result
-          a
-        }
-      }
+      def apply[A](f: SF[A]): Future[A] =
+        // TODO: Store measure and test result
+        f._2
     }
 
     implicit val intSG = new scalaz.Semigroup[Int] {

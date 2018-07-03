@@ -19,12 +19,10 @@ package precepte
 
 import scala.concurrent.Future
 
-import scalaz.{ Monad, Applicative, Functor, Unapply, Semigroup, ~>, \/, \/-, -\/, IndexedStateT, StateT, EitherT, OptionT, ListT }
+import scalaz.{ Monad, Applicative, Functor, Unapply, Semigroup, ~>, \/, \/-, -\/, EitherT, OptionT, ListT }
 import scalaz.Isomorphism.<~>
-import scalaz.syntax.monad._
 
 import scala.language.higherKinds
-import scala.annotation.tailrec
 
 package object corescalaz extends SubMeta {
 
@@ -77,7 +75,7 @@ package object corescalaz extends SubMeta {
     */
   implicit def toTCUnapply[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A0](
     implicit
-      una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0],
+      una2: PrecepteUnapply[TCA, TC, F, Ta, MS, UMS, A0], //TODO: remove this
       nosi: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A0]
   ) = new Unapply[M, TCA] {
     type M[x] = nosi.T[x]

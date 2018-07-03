@@ -20,13 +20,9 @@ package corescalaz
 
 import org.scalatest._
 import Matchers._
-import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Millis, Seconds, Span => TSpan}
-
-import scala.language.higherKinds
 
 class CostSpec extends FlatSpec with ScalaFutures {
 
@@ -37,8 +33,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
   import scala.concurrent.Future
   import scalaz.std.scalaFuture._
   import scalaz.syntax.monad._
-  import scalaz.EitherT
-
+  
   import default._
 
   type Pre[A] = DefaultPre[Future, Unit, A]

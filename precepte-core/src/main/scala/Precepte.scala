@@ -187,14 +187,14 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           case SMap(sub2, pf2) =>
             MapFusionStep(sub2, pf2, pf, state)
 
-          case f@Flatmap(sub2, next2) =>
+          case Flatmap(sub2, next2) =>
             sub2.fastFlatMap(z => next2(z).map(pf)).resume(idx)(state)
 
           case Apply(pa, pfa) =>
             ApplyStep(pa, pfa, (i: mf._I) => Return(pf(i)))
         }
 
-      case f@Flatmap(sub, next) =>
+      case Flatmap(sub, next) =>
         sub match {
           case Return(a) =>
             next(a).resume(idx)(state)
@@ -219,7 +219,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           case SMap(sub2, f2) =>
             sub2.fastFlatMap(z => next(f2(z))).resume(idx)(state)
 
-          case f@Flatmap(sub2, next2) =>
+          case Flatmap(sub2, next2) =>
             sub2.fastFlatMap(z => next2(z).fastFlatMap(next)).resume(idx)(state)
 
           case Apply(pa, pfa) =>
@@ -259,14 +259,14 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
               stepRun0(next(b), s0, idx)
             }
 
-          case mfs@MapFusionStep(p0, f0, f1, s0) =>
+          case MapFusionStep(p0, f0, f1, s0) =>
             // @tailrec
             def fusionStep[C, I, D](p: PX[C], f0: C => I, f1: I => D, s: S, depth: Int): F[(S, D)] = {
               p.resume(0)(s) match {
 
                 case ReturnStep(a, s) => mo.map(mo.pure(s -> a)){ case (s2, a2) => (s2, f1(f0(a2))) }
 
-                case mm@MapFusionStep(p1, f2, f3, s1) =>
+                case MapFusionStep(p1, f2, f3, s1) =>
                   if(depth >= maxDepth) {
                     mo.map(stepRun0(p1, s1)){ case (s1, a1) =>
                       (s1, f1(f0(f3(f2(a1)))))
@@ -408,7 +408,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
 
       case Suspend(fa) => Suspend(iso.to(fa))
 
-      case ps@SubStep(sub, fmap, tags) =>
+      case SubStep(sub, fmap, tags) =>
         SubStep(s => sub(s).compile(iso), fmap, tags)
 
       case MapSuspendSubStep(sub, f2) =>
@@ -424,7 +424,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
           f3
         )
 
-      case sm@StepMap(fst, fmap, tags)  =>
+      case StepMap(fst, fmap, tags)  =>
         def fst2 = (s:S) => iso.to(fst(s))
         StepMap(fst2, fmap, tags)
 

@@ -3,14 +3,9 @@ package precepte
 package corecats
 
 import org.scalatest._
-import Matchers._
-import Inspectors._
 
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Millis, Seconds, Span => TSpan}
-
-import scala.language.higherKinds
 
 class CatsProcessSpec extends FlatSpec with ScalaFutures {
 
@@ -19,13 +14,9 @@ class CatsProcessSpec extends FlatSpec with ScalaFutures {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
-  import cats.Applicative
   import cats.instances.future._
-  import cats.syntax.flatMap._
   import cats.syntax.apply._
-  import cats.syntax._
-  import cats.data.EitherT
-
+  
   import default._
 
   type Pre[A] = DefaultPre[Future, Int, A]

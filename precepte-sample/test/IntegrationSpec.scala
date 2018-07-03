@@ -1,20 +1,17 @@
-import org.specs2.mutable._
 import org.specs2.runner._
 import org.junit.runner._
 
 import play.api.test._
-import play.api.test.Helpers._
 
 import org.fluentlenium.core.filter.FilterConstructor._
 
 @RunWith(classOf[JUnitRunner])
-class IntegrationSpec extends Specification {
+class IntegrationSpec extends PlaySpecification {
 
   "Application" should {
 
-    "work from within a browser" in {
-      running(TestServer(3333), HTMLUNIT) { browser =>
-        browser.goTo("http://localhost:3333/")
+    "work from within a browser" in new WithApplication { new WithBrowser(webDriver = WebDriverFactory(HTMLUNIT), app = app) {
+        browser.goTo("http://localhost:19001/")
 
         browser.$("header h1").first.text must equalTo("Play sample application — Computer database")
         browser.$("section h1").first.text must equalTo("574 computers found")
@@ -60,7 +57,5 @@ class IntegrationSpec extends Specification {
 
       }
     }
-
   }
-
 }

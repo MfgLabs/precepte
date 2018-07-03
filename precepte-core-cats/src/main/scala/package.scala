@@ -22,12 +22,8 @@ import scala.concurrent.Future
 import cats.{ Monad, Applicative, Functor, ~> }
 import cats.kernel.Semigroup
 import cats.data.{ OptionT, EitherT }
-import cats.syntax.apply._
-import cats.syntax.flatMap._
-import cats.syntax.functor._
 
 import scala.language.higherKinds
-import scala.annotation.tailrec
 
 package object corecats extends SubMeta {
 

@@ -19,26 +19,17 @@ package precepte
 
 import org.scalatest._
 import Matchers._
-import Inspectors._
-
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.time.{Millis, Seconds, Span => TSpan}
-
-import scala.language.higherKinds
-
+import org.scalatest.concurrent.{PatienceConfiguration, ScalaFutures}
 import akka.actor.ActorSystem
 import akka.stream._
-import akka.stream.scaladsl._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scalaz.std.scalaFuture._
 import scalaz.syntax.monad._
-import scalaz._
-
 import default._
 import corescalaz._
+import org.scalatest.time.Seconds
 
 
 class PreStreamSpec extends FlatSpec with ScalaFutures {
@@ -65,6 +56,8 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
   }
 
   "Precepte" should "run/eval simple" in {
+    val patience = PatienceConfiguration.Timeout(org.scalatest.time.Span(1, Seconds))
+
     def f1 = P(tags("f1")){(_: ST[Unit]) => 1.point[Future]}
     def f2(i: Int) = P(tags("f2")){(_: ST[Unit]) => s"foo-$i".point[Future]}
 
@@ -77,7 +70,7 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
       r <- (ap1(s) |@| ap2(s)).tupled
     } yield r
 
-    val (s, a) = res.run(nostate).futureValue
+    val (_, a) = res.run(nostate).futureValue(patience)
     a should ===("foo-1-1" -> "foo-1-2")
 
     val flow = PreStream.toFlow(res)
@@ -87,7 +80,7 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
       println(s"s:$s a:$a")
       a should ===("foo-1-1" -> "foo-1-2")
       ()
-    }.futureValue
+    }.futureValue(patience)
 
   }
 }
