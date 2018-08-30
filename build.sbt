@@ -52,8 +52,8 @@ lazy val publishSettings = Seq(
 
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.4.6"
-  , isSnapshot := true
+  , version := "0.4.6-rc1"
+  , isSnapshot := false
   , crossScalaVersions := Seq("2.11.12", "2.12.6")
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
