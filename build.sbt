@@ -103,7 +103,7 @@ lazy val coreCats =
       name := "precepte-core-cats",
       libraryDependencies ++= Seq(
         "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
-          "org.typelevel"   %% "cats-core"   % "1.1.0"
+          "org.typelevel"   %% "cats-core"   % "1.2.0"
         , "org.scalatest"   %% "scalatest"   % "3.0.5" % Test
       )
     )
@@ -117,7 +117,7 @@ lazy val coreScalaz =
       name := "precepte-core-scalaz",
       libraryDependencies ++= Seq(
         "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
-          "org.scalaz"      %% "scalaz-core"  % "7.2.25"
+          "org.scalaz"      %% "scalaz-core"  % "7.2.26"
         , "org.scalatest"   %%  "scalatest"   % "3.0.5"  % Test
       )
     )
@@ -141,8 +141,8 @@ lazy val sample =
         ws,
         "com.h2database" % "h2" % "1.4.197",
         "com.typesafe.play" %% "anorm" % "2.5.3",
-        "org.specs2" %% "specs2-junit" % "3.8.9" % Test,
-        "com.typesafe.play" %% "play-specs2" % "2.6.15" % Test
+        "org.specs2" %% "specs2-junit" % "4.3.4" % Test,
+        "com.typesafe.play" %% "play-specs2" % "2.6.18" % Test
       )
     )
     .dependsOn(coreScalaz, influx, logback, play)
@@ -154,7 +154,7 @@ lazy val influx =
       name := "precepte-influx",
       libraryDependencies ++= Seq(
         // influx deps
-        "com.google.guava" % "guava" % "23.6.1-jre",
+        "com.google.guava" % "guava" % "26.0-jre",
         "com.squareup.retrofit" % "retrofit" % "1.9.0",
         "com.squareup.okhttp" % "okhttp" % "2.7.5"
       ))
@@ -167,14 +167,14 @@ lazy val logback =
       name := "precepte-logback",
       libraryDependencies ++= Seq(
         "ch.qos.logback" % "logback-classic" % "1.2.3",
-        "net.logstash.logback" % "logstash-logback-encoder" % "5.1"))
+        "net.logstash.logback" % "logstash-logback-encoder" % "5.2"))
     .dependsOn(core)
 
 lazy val play =
   project.in(file("precepte-play"))
     .settings(commonSettings:_*)
     .settings(
-      libraryDependencies += "com.typesafe.play" %% "play" % "2.6.15" % Provided,
+      libraryDependencies += "com.typesafe.play" %% "play" % "2.6.18" % Provided,
       name := "precepte-play")
     .dependsOn(core)
 
@@ -183,7 +183,7 @@ lazy val stream =
     .settings(commonSettings:_*)
     .settings(
       libraryDependencies ++= Seq(
-          "com.typesafe.akka" %% "akka-stream" % "2.5.13"
+          "com.typesafe.akka" %% "akka-stream" % "2.5.16"
         , "org.scalatest"     %%  "scalatest"  % "3.0.5"  % Test
       ),
       name := "precepte-stream")
