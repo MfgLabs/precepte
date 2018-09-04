@@ -17,11 +17,10 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
-import play.api.mvc.{ BodyParser, Result, Request, Action, AnyContent }
+import play.api.mvc._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
-
 import default._
 
 trait PreActionFunction[-R[_], +P[_], F[_], C] {
@@ -87,5 +86,18 @@ trait PreActionSyntax[C] {
       val st = initialST
       val f = addSpan(st)(fun.invokeBlock(r, block).eval(st))
       _transform(f)
+    }
+}
+
+object PreActionSyntax {
+  def apply[C](st: C, v: default.Version, e: default.Environment, h: default.Host, cc: ControllerComponents): PreActionSyntax[C] =
+    new PreActionSyntax[C] {
+      def initialState: C = st
+      def version: Version = v
+      def environment: Environment = e
+      def host: Host = h
+
+      protected def executionContext: ExecutionContext = cc.executionContext
+      protected def controllerComponent: ControllerComponents = cc
     }
 }
