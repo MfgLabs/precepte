@@ -234,68 +234,73 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
       (implicit mo: MetaMonad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: MetaSemigroup[UnmanagedState])
       : F[(S, A)] = {
 
-      def stepRun0[B](p: PX[B], state: S, idx: Int = 0): F[(S, B)] = {
+      import cats.free.Trampoline
+      import cats.instances.function._
+
+      def stepRun0[B](p: PX[B], state: S, idx: Int = 0): Trampoline[F[(S, B)]] = {
         p.resume(idx)(state) match {
 
-          case ReturnStep(a, s) => mo.pure(s -> a)
+          case ReturnStep(a, s) =>
+            Trampoline.done(mo.pure(s -> a))
 
-          case FStep(fsa0) => fsa0
+          case FStep(fsa0) =>
+            Trampoline.done(fsa0)
 
-          case FMStep(fa0, next0) => mo.flatMap(fa0){ case (s1, a1) =>
-            stepRun0(next0(a1), s1)
-          }
+          case FMStep(fa0, next0) =>
+            Trampoline.done(mo.flatMap(fa0){ case (s1, a1) =>
+              stepRun0(next0(a1), s1).run
+            })
 
           case ApplyStep(pa, pf, next) =>
-            mo.flatMap(
-              mo.map2(
-                stepRun0(pa, state, idx + 1),
-                stepRun0(pf, state, idx + 2)
-              ){
-                case ((s0, a), (s1, f)) =>
-                  val s = upd.updateUnmanaged(s0, S.combine(s0.unmanaged, s1.unmanaged))
-                  (s, f(a))
-              }
-            ){ case (s0, b) =>
-              stepRun0(next(b), s0, idx)
-            }
+            for {
+              sra <- stepRun0(pa, state, idx + 1)
+              srf <- stepRun0(pf, state, idx + 2)
+            } yield mo.flatMap(mo.map2(sra,srf){ case ((s0, a), (s1, f)) =>
+                                  val s = upd.updateUnmanaged(s0, S.combine(s0.unmanaged, s1.unmanaged))
+                                  (s, f(a))
+                              }){ case (s0, b) =>
+                                    stepRun0(next(b), s0, idx).run
+                                }
 
           case MapFusionStep(p0, f0, f1, s0) =>
             // @tailrec
-            def fusionStep[C, I, D](p: PX[C], f0: C => I, f1: I => D, s: S, depth: Int): F[(S, D)] = {
+            def fusionStep[C, I, D](p: PX[C], f0: C => I, f1: I => D, s: S, depth: Int): Trampoline[F[(S, D)]] = {
               p.resume(0)(s) match {
 
-                case ReturnStep(a, s) => mo.map(mo.pure(s -> a)){ case (s2, a2) => (s2, f1(f0(a2))) }
+                case ReturnStep(a, s) =>
+                  Trampoline.done(mo.map(mo.pure(s -> a)){ case (s2, a2) => (s2, f1(f0(a2))) })
 
                 case MapFusionStep(p1, f2, f3, s1) =>
                   if(depth >= maxDepth) {
-                    mo.map(stepRun0(p1, s1)){ case (s1, a1) =>
-                      (s1, f1(f0(f3(f2(a1)))))
-                    }
-                  } else {
-                    fusionStep(p1, f0.compose(f3).compose(f2), f1, s, depth + 2)
-                  }
+                    for {
+                      sr1 <- stepRun0(p1, s1)
+                    } yield  mo.map(sr1){ case (s1, a1) =>
+                                (s1, f1(f0(f3(f2(a1)))))
+                            }
+                  } else
+                      fusionStep(p1, f0.compose(f3).compose(f2), f1, s, depth + 2)
 
-                case FStep(fsa0) => mo.map(fsa0){ case (s1, a1) =>
-                  s1 -> f1(f0(a1))
-                }
+                case FStep(fsa0) =>
+                  Trampoline.done(mo.map(fsa0){ case (s1, a1) =>
+                    s1 -> f1(f0(a1))
+                  })
 
-                case FMStep(fa0, next0) => mo.flatMap(fa0){ case (s1, a1) =>
-                  mo.map(stepRun0(next0(a1), s1)){ case (s2, a2) => s2 -> f1(f0(a2)) }
-                }
+                case FMStep(fa0, next0) =>
+                  Trampoline.done(mo.flatMap(fa0){ case (s1, a1) =>
+                    mo.map(stepRun0(next0(a1), s1).run){ case (s2, a2) => s2 -> f1(f0(a2)) }
+                  })
 
                 case ApplyStep(pa, pf, next) =>
-                  mo.flatMap(
-                    mo.map2(
-                      stepRun0(pa, state, idx + 1),
-                      stepRun0(pf, state, idx + 2)
-                    ){
-                      case ((s1, a), (s2, f)) =>
-                        val s = upd.updateUnmanaged(s0, S.combine(s1.unmanaged, s2.unmanaged))
-                        (s, f(a))
-                    }
-                  ){ case (s3, b) =>
-                    mo.map(stepRun0(next(b), s3, idx)){ case (s4, a4) => (s4, f1(f0(a4))) }
-                  }
+                  for {
+                    sra <- stepRun0(pa, state, idx + 1)
+                    srf <- stepRun0(pf, state, idx + 2)
+                  } yield mo.flatMap(mo.map2(sra,srf){ case ((s1, a), (s2, f)) =>
+                                                          val s = upd.updateUnmanaged(s0, S.combine(s1.unmanaged, s2.unmanaged))
+                                                          (s, f(a))
+                                                      }
+                          ){ case (s3, b) =>
+                                mo.map(stepRun0(next(b), s3, idx).run){ case (s4, a4) => (s4, f1(f0(a4))) }
+                          }
               }
             }
 
@@ -305,7 +310,7 @@ sealed trait Precepte[Ta, ManagedState, UnmanagedState, F[_], A] {
         }
       }
 
-      stepRun0(this, state, idx)
+      stepRun0(this, state, idx).run
     }
 
     final def run(state: S)(implicit mo: MetaMonad[F], upd: PStateUpdater[Ta, ManagedState, UnmanagedState], S: MetaSemigroup[UnmanagedState]): F[(S, A)] =

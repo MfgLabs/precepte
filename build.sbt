@@ -52,7 +52,7 @@ lazy val publishSettings = Seq(
 
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.4.6-rc1"
+  , version := "0.4.6-rc3"
   , isSnapshot := false
   , crossScalaVersions := Seq("2.11.12", "2.12.6")
   , resolvers ++= Seq(
@@ -91,6 +91,7 @@ lazy val core =
       libraryDependencies ++= Seq(
         "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
         "com.chuusai"     %% "shapeless"    % "2.3.3",
+        "org.typelevel"   %% "cats-free"    % "1.2.0",
         "org.scalatest"   %%  "scalatest"   % "3.0.5" % Test
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
