@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
+ */
 
 package com.mfglabs
 package precepte
@@ -27,13 +27,13 @@ import org.scalatest.time.{Millis, Seconds, Span => TSpan}
 class SamplesSpec extends FlatSpec with ScalaFutures {
 
   implicit val defaultPatience =
-    PatienceConfig(timeout =  TSpan(300, Seconds), interval = TSpan(5, Millis))
+    PatienceConfig(timeout = TSpan(300, Seconds), interval = TSpan(5, Millis))
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import cats.instances.future._
   import cats.Applicative
-  
+
   import default._
   import default.Macros._
 
@@ -44,89 +44,92 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
   /** Metric Service
     * Expecting no injection so UnmanagedState = Unit
     */
-  class Metric {
+  final class Metric {
     // Type alias are always advised to make syntax nicer and help sometimes scalac with HK types
     type Pre[A] = DefaultPre[Future, Unit, A]
 
     // using a Precepte of future for the logger... yes this is expensive as it will as the exectx for a thread
     // but let's be pure for samples :D
-    def metric(m: String): Pre[Unit] = Applicative[Pre].pure(println(m))
+    @inline def metric(m: String): Pre[Unit] = Applicative[Pre].pure(println(m))
   }
 
   /** Logger Service
     * Expecting no injection so UnmanagedState = Unit
     */
-  class Logger {
+  final class Logger {
     // Type alias are always advised to make syntax nicer and help sometimes scalac with HK types
     type Pre[A] = DefaultPre[Future, Unit, A]
 
     // using a Precepte of future for the logger... yes this is expensive as it will as the exectx for a thread
     // but let's be pure for samples :D
-    def info(m: String): Pre[Unit] = Applicative[Pre].pure(println(m))
+    @inline def info(m: String): Pre[Unit] = Applicative[Pre].pure(println(m))
   }
 
-  case class Stuff(id: Long, name: String)
+  final case class Stuff(id: Long, name: String)
 
-  case class DBCtx(
-    logger: Logger
+  final case class DBCtx(
+      logger: Logger
   )
 
   /** DB Service
     * Expecting a logger injection so UnmanagedState = Logger
     */
-  class DB {
+  final class DB {
     // PreMP uses this implicit category to build Précepte in this scope
     implicit val category = Category.Database
 
     // Type alias are always advised to make syntax nicer and help sometimes scalac with HK types
     type Pre[A] = DefaultPre[Future, DBCtx, A]
 
-    def findById(id: Long): Pre[Option[Stuff]] = PreMP { s:ST[DBCtx] =>
-      for {
-        // Logger returns a DefaultPre[Future, Unit, A] so you need to xmapState to convert injectors
-        _ <- s.um.logger.info(s"searching $id").unify(s)
-        // Performs a fake effect returning a value
-        r <- Pre.liftF(Applicative[Future].pure(Some(Stuff(id, "toto"))))
-      } yield (r)
-    }
+    def findById(id: Long): Pre[Option[Stuff]] =
+      PrecepteCategory(implicitly[Category]).ofPrecepte { s: ST[DBCtx] =>
+        for {
+          // Logger returns a DefaultPre[Future, Unit, A] so you need to xmapState to convert injectors
+          _ <- s.unmanaged.logger.info(s"searching $id").unify(s)
+          // Performs a fake effect returning a value
+          r <- Precepte.liftF(Applicative[Future].pure(Some(Stuff(id, "toto"))))
+        } yield (r)
+      }
   }
 
   sealed trait PayResult
-  case class Paid(id: Long, amount: Double) extends PayResult
-  case class NotPaid(id: Long, amount: Double) extends PayResult
+  final case class Paid(id: Long, amount: Double) extends PayResult
+  final case class NotPaid(id: Long, amount: Double) extends PayResult
 
-
-  case class PayCtx(
-    logger: Logger,
-    metric: Metric
+  final case class PayCtx(
+      logger: Logger,
+      metric: Metric
   )
   // Payment Service that returns PreUnit
-  class PayService {
+  final class PayService {
     // PreMP uses this implicit category to build Précepte in this scope
     implicit object PaymentService extends Category("payment_service")
 
     // Type alias are always advised to make syntax nicer and help sometimes scalac with HK types
     type Pre[A] = DefaultPre[Future, PayCtx, A]
 
-    def pay(stuff: Stuff, amount: Double): Pre[PayResult] = PreMP { s:ST[PayCtx] =>
-      // IsoState is meant to allow conversions between Précepte with different UnmanagedState
-      // val iso = IsoState(s); import iso._
+    def pay(stuff: Stuff, amount: Double): Pre[PayResult] =
+      PrecepteCategory(implicitly[Category]).ofPrecepte { s: ST[PayCtx] =>
+        // IsoState is meant to allow conversions between Précepte with different UnmanagedState
+        // val iso = IsoState(s); import iso._
 
-      for {
-        _ <- s.um.logger.info(s"$stuff going to pay $amount").unify(s)
-        _ <- s.um.metric.metric(s"$stuff going to pay $amount").unify(s)
-        r <- Pre.liftF(Future(Paid(stuff.id, amount)))
-        _ <- s.um.logger.info(s"$stuff paid $amount").unify(s)
-      } yield (r)
-    }
+        for {
+          _ <- s.unmanaged.logger.info(s"$stuff going to pay $amount").unify(s)
+          _ <- s.unmanaged.metric
+            .metric(s"$stuff going to pay $amount")
+            .unify(s)
+          r <- Precepte.liftF(Future(Paid(stuff.id, amount)))
+          _ <- s.unmanaged.logger.info(s"$stuff paid $amount").unify(s)
+        } yield (r)
+      }
   }
 
   /** The container to be injected at compile-time */
-  case class Ctx (
-    db: DB,
-    logger: Logger,
-    metric: Metric,
-    payment: PayService
+  final case class Ctx(
+      db: DB,
+      logger: Logger,
+      metric: Metric,
+      payment: PayService
   )
 
   object Ctx {
@@ -147,30 +150,41 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
     /** a Sample managing in a monadic flow */
     def pay0(id: Long, amount: Double): DefaultPre[Future, Ctx, PayResult] =
       // PreMP is a macro oriented helper that extracts the name of the function and the category from scope
-      PreMP { s: ST[Ctx] =>
-        (for {
-          stuff <-  s.um.db.findById(id).unify(s)
-          r     <-  stuff match {
-                      case None => for {
-                        _ <- s.um.logger.info(s"Could not find stuff $stuff").unify(s)
-                      } yield (NotPaid(id, amount):PayResult)
+      PrecepteCategory(implicitly[Category]).ofPrecepte { s: ST[Ctx] =>
+        for {
+          stuff <- s.unmanaged.db.findById(id).unify(s)
+          r <- stuff match {
+            case None =>
+              for {
+                _ <- s.unmanaged.logger
+                  .info(s"Could not find stuff $stuff")
+                  .unify(s)
+              } yield (NotPaid(id, amount): PayResult)
 
-                      case Some(stuff) => for {
-                        _ <- s.um.logger.info(s"found stuff $stuff").unify(s)
-                        r <- s.um.payment.pay(stuff, amount).unify(s)
-                      } yield (r)
-                    }
-        } yield (r))
+            case Some(stuff) =>
+              for {
+                _ <- s.unmanaged.logger.info(s"found stuff $stuff").unify(s)
+                r <- s.unmanaged.payment.pay(stuff, amount).unify(s)
+              } yield (r)
+          }
+        } yield (r)
       }
 
     /** a Sample with OptionT monad transformer */
-    def pay(id: Long, amount: Double): DefaultPre[Future, Ctx, Option[PayResult]] = PreMP { (s: ST[Ctx]) =>
-      (for {
-        stuff <- trans(s.um.db.findById(id).unify(s))
-        _     <- trans(s.um.logger.info(s"found stuff $stuff").map(Option(_)).unify(s))
-        r     <- trans(s.um.payment.pay(stuff, amount).map(Option(_)).unify(s))
-      } yield (r)).value
-    }
+    def pay(id: Long,
+            amount: Double): DefaultPre[Future, Ctx, Option[PayResult]] =
+      PrecepteCategory(implicitly[Category]).ofPrecepte { (s: ST[Ctx]) =>
+        (for {
+          stuff <- trans(s.unmanaged.db.findById(id).unify(s))
+          _ <- trans(
+            s.unmanaged.logger
+              .info(s"found stuff $stuff")
+              .map(Option(_))
+              .unify(s))
+          r <- trans(
+            s.unmanaged.payment.pay(stuff, amount).map(Option(_)).unify(s))
+        } yield (r)).value
+      }
   }
 
   "Precepte" should "sample compile-time DI" in {
@@ -186,7 +200,8 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
     val payService = new PayService()
     val env = BaseEnv(Host("localhost"), Environment.Test, Version("1.0"))
     // inject context and initiate Span
-    val s0 = ST(Span.gen, env, Vector.empty, Ctx(db, logger, metric, payService))
+    val s0 =
+      ST(Span.gen, env, Vector.empty, Ctx(db, logger, metric, payService))
 
     // 3 - Execute
     val (graph, r) = p.graph(Graph.empty).eval(s0).futureValue

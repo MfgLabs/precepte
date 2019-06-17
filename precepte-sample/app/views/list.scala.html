@@ -56,7 +56,7 @@
                 @computers.map {
                     case (computer, company) => {
                         <tr>
-                            <td><a href="@routes.Application.edit(computer.id.get)">@computer.name</a></td>
+                            <td><a href="@routes.Application.edit(computer.id.getOrElse(0L))">@computer.name</a></td>
                             <td>
                                 @computer.introduced.map(_.format("dd MMM yyyy")).getOrElse { <em>-</em> }
                             </td>

@@ -12,63 +12,70 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
+ */
 
 package com.mfglabs
 package precepte
 
 import java.net.URL
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
+import scala.concurrent.duration._
 import default._
-
 import java.util.concurrent.TimeUnit
+
 import org.influxdb._
+import org.influxdb.dto.Point
+import shapeless.tag
+import shapeless.tag.@@
 
-case class Influx[C : MetaSemigroup](
-  influxdbURL: URL,
-  user: String,
-  password: String,
-  dbName: String,
-  retentionPolicy: String
-)(implicit ex: ExecutionContext) {
+final class Influx[C: MetaSemigroup](
+    influxdbURL: URL,
+    user: String,
+    password: String,
+    dbName: String,
+    retentionPolicy: String
+) {
 
-  import scala.util.{ Try, Failure, Success }
-  private lazy val influxDB =
+  import scala.util.{Try, Failure, Success}
+  private lazy val influxDB: Try[InfluxDB] =
     Try {
       val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
       in.createDatabase(dbName)
       in.enableBatch(2000, 3, TimeUnit.SECONDS)
     }
 
-  type SF[T] = (ST[C], Future[T])
-
-  private def toSerie(startTime: Long, endTime: Long, now: Long, st: ST[C], error: Option[Throwable]) = {
+  private def toSerie(startTime: Long @@ NANOSECONDS.type,
+                      endTime: Long @@ NANOSECONDS.type,
+                      now: Long @@ MILLISECONDS.type,
+                      st: ST[C],
+                      error: Option[Throwable]): Point = {
     val duration = endTime - startTime
     val sep = "/"
     val path = st.managed.path
     val p =
-      path.map { c =>
-        c.id.value
-      }.mkString(sep, sep, "")
+      path
+        .map { c =>
+          c.id.value
+        }
+        .mkString(sep, sep, "")
 
-    val method = path.last.tags.callee.value
+    val (method, category): (Callee, Category) =
+      path.lastOption match {
+        case Some(last) => (last.tags.callee, last.tags.category)
+        case _          => (Callee("ε"), new Category("ε") {})
+      }
 
-    // val callees: String =
-    //   path.map(_.tags.callee.value).mkString(sep, sep, "")
-
-    val category =
-      path.last.tags.category.value
-
-    val builder = dto.Point.measurement("response_times")
+    val builder = dto.Point
+      .measurement("response_times")
       .time(now, TimeUnit.MILLISECONDS)
       .tag("host", st.managed.env.host.value)
       .tag("environment", st.managed.env.environment.value)
       .tag("version", st.managed.env.version.value)
-      .tag("category", category)
+      .tag("category", category.value)
       // .tag("callees", callees)
-      .tag("method", method)
+      .tag("method", method.value)
       .field("span", st.managed.span.value)
       .field("path", p)
       .field("execution_time", duration)
@@ -80,22 +87,23 @@ case class Influx[C : MetaSemigroup](
     builder.build()
   }
 
-  def monitor =
+  @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
+  def monitor(
+      implicit ex: ExecutionContext): InstrumentStep[BaseTags, MS, C, Future] =
     influxDB match {
       case Success(in) =>
-        new (SF ~~> Future) {
-          def apply[A](sf: SF[A]): Future[A] = {
-            val t0 = System.nanoTime()
-            val (st, f) = sf
-            f.andThen { case r =>
-              val t1 = System.nanoTime()
-              val serie = toSerie(t0, t1, System.currentTimeMillis(), st, r.failed.toOption)
-              in.write(dbName, retentionPolicy, serie)
-            }
-          }
+        new (InstrumentStep[BaseTags, MS, C, Future]) {
+          def apply[A](sf: (PState[BaseTags, MS, C], Future[A])): Future[A] =
+            for {
+              t0 <- Future(tag[NANOSECONDS.type](System.nanoTime()))
+              r <- sf._2.transform(Success(_))
+              t1 <- Future(tag[NANOSECONDS.type](System.nanoTime()))
+              now <- Future(tag[MILLISECONDS.type](System.currentTimeMillis()))
+              serie = toSerie(t0, t1, now, sf._1, r.failed.toOption)
+              _ <- Future(in.write(dbName, retentionPolicy, serie))
+              x <- Future.fromTry(r)
+            } yield x
         }
       case Failure(e) => throw e
     }
-
-
 }

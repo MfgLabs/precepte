@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
+ */
 
 package com.mfglabs
 package precepte
@@ -27,13 +27,13 @@ import org.scalatest.time.{Millis, Seconds, Span => TSpan}
 class CostSpec extends FlatSpec with ScalaFutures {
 
   implicit val defaultPatience =
-    PatienceConfig(timeout =  TSpan(300, Seconds), interval = TSpan(5, Millis))
+    PatienceConfig(timeout = TSpan(300, Seconds), interval = TSpan(5, Millis))
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.Future
   import cats.instances.future._
   import cats.Applicative
-  
+
   import default._
 
   type Pre[A] = DefaultPre[Future, Unit, A]
@@ -50,8 +50,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
     def combine(f1: Unit, f2: Unit) = ()
   }
 
-  val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
-
+  val ids = EndlessStream.unfold(1L)(n => (PId(n.toString), n + 1))
 
   def timeMs[T](f: => Future[T]): Double = {
     val bef = System.nanoTime
@@ -63,10 +62,11 @@ class CostSpec extends FlatSpec with ScalaFutures {
 
   "Precepte" should "run/eval simple" in {
 
-    def res(i: Int): Future[Int] = for {
-      i <- Applicative[Future].pure(i)
-      r <- if(i > 0) res(i-1) else Applicative[Future].pure(i)
-    } yield r
+    def res(i: Int): Future[Int] =
+      for {
+        i <- Applicative[Future].pure(i)
+        r <- if (i > 0) res(i - 1) else Applicative[Future].pure(i)
+      } yield r
 
     val ms = timeMs(res(10000))
     println(s"Future(10000) -> duration: $ms ms")
@@ -79,13 +79,15 @@ class CostSpec extends FlatSpec with ScalaFutures {
 
   }
 
-
   "Precepte" should "run/eval pre" in {
 
-    def res(i: Int): Pre[Int] = for {
-      i <- Precepte(tags(s"f$i")){(_: ST[Unit]) => Applicative[Future].pure(i) }
-      r <- if(i>0) res(i-1) else Applicative[Pre].pure(i)
-    } yield r
+    def res(i: Int): Pre[Int] =
+      for {
+        i <- Precepte(tags(s"f$i")) { (_: ST[Unit]) =>
+          Applicative[Future].pure(i)
+        }
+        r <- if (i > 0) res(i - 1) else Applicative[Pre].pure(i)
+      } yield r
 
     // val ms0 = timeMs(res(1000).eval(nostate))
     // println(s"Pre(1000) -> duration: $ms0 ms")

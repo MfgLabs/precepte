@@ -1,4 +1,4 @@
-  /*
+/*
 Copyright 2015 Mfg labs.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
+ */
 
 package com.mfglabs
 package precepte
@@ -23,12 +23,18 @@ import scalaz.Isomorphism.<~>
 
 import scala.language.higherKinds
 
-
 /** Implicit conversions to correct these functions doesn't work, scalac still uses original ones */
-case class ScalazExt[Ta, ManagedState, UnmanagedState, F[_], A](
-  p: Precepte[Ta, ManagedState, UnmanagedState, F, A]
+final class ScalazExt[Ta, ManagedState, UnmanagedState, F[_], A](
+    val p: Precepte[Ta, ManagedState, UnmanagedState, F, A]
 ) extends AnyVal {
-  final def compile[G[_]](iso: F <~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] = p.compile(ScalazMetaIso(iso))
+  final def compile[G[_]](
+      iso: F <~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] =
+    p.compile(ScalazMetaIso(iso))
 
-  final def mapSuspension(nat: p.SF ~> F): Precepte[Ta, ManagedState, UnmanagedState, F, A] = p.mapSuspension(ScalazMetaNat(nat))
-} 
+  final def mapSuspension(
+      nat: λ[α => (PState[Ta, ManagedState, UnmanagedState], F[α])] ~> F)
+    : Precepte[Ta, ManagedState, UnmanagedState, F, A] =
+    p.mapSuspension(
+      ScalazMetaNat[λ[α => (PState[Ta, ManagedState, UnmanagedState], F[α])],
+                    F](nat))
+}

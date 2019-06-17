@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
+ */
 
 package com.mfglabs
 package precepte
@@ -21,13 +21,13 @@ package corescalaz
 import scala.reflect.macros.whitebox
 
 import scalaz.Leibniz.===
-import scalaz.{ EitherT, \/}
+import scalaz.{EitherT, \/}
 
 import scala.language.higherKinds
 
-class EitherHasHoist[A] extends HasHoist[({ type λ[α] = A \/ α })#λ] {
+final class EitherHasHoist[A] extends HasHoist[A \/ ?] {
   type T[F[_], B] = EitherT[F, A, B]
-  def lift[F[_], B](f: F[A \/ B]): EitherT[F, A, B] = EitherT.apply(f)
+  @inline def lift[F[_], B](f: F[A \/ B]): EitherT[F, A, B] = EitherT.apply(f)
 }
 
 /** The horrible cludge to go around SI-2712 */
@@ -37,7 +37,7 @@ trait PrecepteHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A] {
 
   type T[_]
 
-  lazy val MTC: M[T] = mkMTC
+  final lazy val MTC: M[T] = mkMTC
 
   def mkMTC: M[T]
 
@@ -48,16 +48,25 @@ trait PrecepteHackSI2712[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A] {
 object PrecepteHackSI2712 {
   import scala.language.experimental.macros
 
-  implicit def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A]: PrecepteHackSI2712[TCA, TC, M, F, Ta, MS, UMS, A] = macro NoSI2712Macros.materialize[TCA, TC, M, F, Ta, MS, UMS, A]
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  implicit def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A]: PrecepteHackSI2712[
+    TCA,
+    TC,
+    M,
+    F,
+    Ta,
+    MS,
+    UMS,
+    A] = macro NoSI2712Macros.materialize[TCA, TC, M, F, Ta, MS, UMS, A]
 
 }
 
-class NoSI2712Macros(val c: whitebox.Context) {
+final class NoSI2712Macros(val c: whitebox.Context) {
   import c.universe._
   import shapeless.Id
 
-  def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A]
-    (implicit
+  def materialize[TCA, TC[_[_], _], M[_[_]], F[_], Ta, MS, UMS, A](
+      implicit
       tcaTag: WeakTypeTag[TCA],
       tcTag: WeakTypeTag[TC[Id, Int]],
       mTag: WeakTypeTag[M[Id]],
@@ -65,8 +74,7 @@ class NoSI2712Macros(val c: whitebox.Context) {
       tagsTag: WeakTypeTag[Ta],
       msTag: WeakTypeTag[MS],
       umsTag: WeakTypeTag[UMS],
-      aTag: WeakTypeTag[A]
-    ): Tree = {
+      aTag: WeakTypeTag[A]): Tree = {
     val tcaTpe = tcaTag.tpe
 
     val tcTpe = tcTag.tpe

@@ -1,3 +1,17 @@
+import play.twirl.sbt.Import.TwirlKeys
+
+lazy val warts = Warts.allBut(
+  Wart.ToString, // Needed because of Macro.param
+  Wart.Throw, // Needed because of Macros
+  Wart.Overloading,
+  Wart.DefaultArguments,
+  Wart.Recursion,
+  Wart.Any,
+  Wart.Nothing
+)
+
+lazy val catsVersion = "1.6.1"
+
 val safeScalaOptionsCommon =
   Seq(
     "-deprecation",
@@ -54,7 +68,7 @@ lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
   , version := "0.4.6-rc3"
   , isSnapshot := false
-  , crossScalaVersions := Seq("2.11.12", "2.12.6")
+  , crossScalaVersions := Seq("2.11.12", "2.12.8")
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
     , "Oncue Bintray Repo" at "http://dl.bintray.com/oncue/releases"
@@ -63,6 +77,7 @@ lazy val commonSettings =  Seq(
   )
   , logLevel in update := Level.Warn  
   , updateOptions := updateOptions.value.withCachedResolution(true)
+  , scalacOptions -= "-Xfatal-warnings"
   , scalacOptions ++= safeScalaOptionsCommon ++ {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 11)) => safeScalaOptionsCommon_2_11
@@ -71,7 +86,11 @@ lazy val commonSettings =  Seq(
       case _ => throw new Exception(s"Bad scala version: ${scalaVersion.value}")
     }
   }
-  , addCompilerPlugin("io.tryp" % "splain" % "0.3.1" cross CrossVersion.patch)
+  , addCompilerPlugin("io.tryp" % "splain" % "0.4.1" cross CrossVersion.patch)
+  , addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3" cross CrossVersion.binary)
+  , scalafmtOnCompile := true
+  , wartremoverErrors in (Compile, compile) := warts
+  , wartremoverWarnings in (Compile, console) := warts
 ) ++ publishSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
 
 
@@ -91,7 +110,7 @@ lazy val core =
       libraryDependencies ++= Seq(
         "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
         "com.chuusai"     %% "shapeless"    % "2.3.3",
-        "org.typelevel"   %% "cats-free"    % "1.2.0",
+        "org.typelevel"   %% "cats-free"    % catsVersion,
         "org.scalatest"   %%  "scalatest"   % "3.0.5" % Test
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
@@ -103,8 +122,8 @@ lazy val coreCats =
     .settings(
       name := "precepte-core-cats",
       libraryDependencies ++= Seq(
-        "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
-          "org.typelevel"   %% "cats-core"   % "1.2.0"
+          "org.scala-lang"  % "scala-reflect" % scalaVersion.value
+        , "org.typelevel"   %% "cats-core"   % catsVersion
         , "org.scalatest"   %% "scalatest"   % "3.0.5" % Test
       )
     )
@@ -118,7 +137,7 @@ lazy val coreScalaz =
       name := "precepte-core-scalaz",
       libraryDependencies ++= Seq(
         "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
-          "org.scalaz"      %% "scalaz-core"  % "7.2.26"
+          "org.scalaz"      %% "scalaz-core"  % "7.2.28"
         , "org.scalatest"   %%  "scalatest"   % "3.0.5"  % Test
       )
     )
@@ -136,11 +155,12 @@ lazy val sample =
     .settings(
       name := "precepte-sample",
       scalacOptions += "-Yrangepos", // For specs2
+      wartremoverExcluded.in(Compile) ++= (routes.in(Compile).value ++ TwirlKeys.compileTemplates.in(Compile).value),
       libraryDependencies ++= Seq(
         jdbc,
         evolutions,
         ws,
-        "com.h2database" % "h2" % "1.4.197",
+        "com.h2database" % "h2" % "1.4.199",
         "com.typesafe.play" %% "anorm" % "2.5.3",
         "org.specs2" %% "specs2-junit" % "4.3.4" % Test,
         "com.typesafe.play" %% "play-specs2" % "2.6.18" % Test
@@ -153,12 +173,17 @@ lazy val influx =
     .settings(commonSettings:_*)
     .settings(
       name := "precepte-influx",
-      libraryDependencies ++= Seq(
-        // influx deps
-        "com.google.guava" % "guava" % "26.0-jre",
-        "com.squareup.retrofit" % "retrofit" % "1.9.0",
-        "com.squareup.okhttp" % "okhttp" % "2.7.5"
-      ))
+      libraryDependencies += "org.influxdb" % "influxdb-java" % "2.15"
+    )
+    .dependsOn(core)
+
+lazy val applicationinsights =
+  project.in(file("precepte-applicationinsights"))
+    .settings(commonSettings:_*)
+    .settings(
+      name := "precepte-applicationinsights",
+      libraryDependencies += "com.microsoft.azure" % "applicationinsights-core" % "2.4.0-BETA"
+    )
     .dependsOn(core)
 
 lazy val logback =
@@ -168,7 +193,7 @@ lazy val logback =
       name := "precepte-logback",
       libraryDependencies ++= Seq(
         "ch.qos.logback" % "logback-classic" % "1.2.3",
-        "net.logstash.logback" % "logstash-logback-encoder" % "5.2"))
+        "net.logstash.logback" % "logstash-logback-encoder" % "6.1"))
     .dependsOn(core)
 
 lazy val play =
@@ -185,7 +210,7 @@ lazy val stream =
     .settings(
       libraryDependencies ++= Seq(
           "com.typesafe.akka" %% "akka-stream" % "2.5.16"
-        , "org.scalatest"     %%  "scalatest"  % "3.0.5"  % Test
+        , "org.scalatest"     %%  "scalatest"  % "3.0.8"  % Test
       ),
       name := "precepte-stream")
     .dependsOn(coreScalaz)
@@ -201,4 +226,4 @@ lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
   .settings(noPublishSettings:_*)
   .settings(name := "precepte-root")
-  .aggregate(core, play, influx, logback, sample, stream, doc, coreScalaz, coreCats)
+  .aggregate(core, play, influx, applicationinsights, logback, /*sample,*/ stream, doc, coreScalaz, coreCats)

@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
+ */
 
 package com.mfglabs
 package precepte
@@ -31,8 +31,7 @@ import default._
 import corescalaz._
 import org.scalatest.time.Seconds
 
-
-class PreStreamSpec extends FlatSpec with ScalaFutures {
+final class PreStreamSpec extends FlatSpec with ScalaFutures {
 
   type P[A] = DefaultPre[Future, Unit, A]
 
@@ -46,7 +45,7 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
 
   def nostate = ST(Span.gen, env, Vector.empty, ())
 
-  val ids = PIdStream((1 to 30).map(i => PId(i.toString)).toStream)
+  val ids = EndlessStream.unfold(1L)(n => (PId(n.toString), n + 1))
 
   implicit val as = ActorSystem()
   implicit val fm = ActorMaterializer()
@@ -56,13 +55,22 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
   }
 
   "Precepte" should "run/eval simple" in {
-    val patience = PatienceConfiguration.Timeout(org.scalatest.time.Span(1, Seconds))
+    val patience =
+      PatienceConfiguration.Timeout(org.scalatest.time.Span(1, Seconds))
 
-    def f1 = P(tags("f1")){(_: ST[Unit]) => 1.point[Future]}
-    def f2(i: Int) = P(tags("f2")){(_: ST[Unit]) => s"foo-$i".point[Future]}
+    def f1 = P(tags("f1")) { (_: ST[Unit]) =>
+      1.point[Future]
+    }
+    def f2(i: Int) = P(tags("f2")) { (_: ST[Unit]) =>
+      s"foo-$i".point[Future]
+    }
 
-    def ap1(s: String): P[String] = P(tags("ap1")){(_: ST[Unit]) => s"$s-1".point[Future]}
-    def ap2(s: String): P[String] = P(tags("ap2")){(_: ST[Unit]) => s"$s-2".point[Future]}
+    def ap1(s: String): P[String] = P(tags("ap1")) { (_: ST[Unit]) =>
+      s"$s-1".point[Future]
+    }
+    def ap2(s: String): P[String] = P(tags("ap2")) { (_: ST[Unit]) =>
+      s"$s-2".point[Future]
+    }
 
     val res = for {
       i <- f1
@@ -74,13 +82,16 @@ class PreStreamSpec extends FlatSpec with ScalaFutures {
     a should ===("foo-1-1" -> "foo-1-2")
 
     val flow = PreStream.toFlow(res)
-    val p = scaladsl.Source.fromIterator(() => Iterator(nostate, nostate)).via(flow)
+    val p =
+      scaladsl.Source.fromIterator(() => Iterator(nostate, nostate)).via(flow)
 
-    p.runForeach{ case (s, a) =>
-      println(s"s:$s a:$a")
-      a should ===("foo-1-1" -> "foo-1-2")
-      ()
-    }.futureValue(patience)
+    p.runForeach {
+        case (s, a) =>
+          println(s"s:$s a:$a")
+          a should ===("foo-1-1" -> "foo-1-2")
+          ()
+      }
+      .futureValue(patience)
 
   }
 }

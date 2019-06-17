@@ -6,9 +6,8 @@ import default._
 
 object Monitoring {
   import scala.concurrent.Future
-  import scala.concurrent.ExecutionContext.Implicits.global
   import play.api.mvc._
-  
+
   implicit val unitSG = new scalaz.Semigroup[Unit] {
     def append(f1: Unit, f2: => Unit) = ()
   }
@@ -19,34 +18,43 @@ object Monitoring {
     Version(com.mfglabs.BuildInfo.version)
   )
 
-  val influx = Influx(
+  val influx = new Influx(
     new java.net.URL("http://localhost:8086"),
-      "root",
-      "root",
-      "precepte_sample",
-      "autogen"
-    )
+    "root",
+    "root",
+    "precepte_sample",
+    "autogen"
+  )
 
-  lazy val logback = Logback(env, "application")
+  lazy val logback = new Logback(env, "application")
 
   type Req[A] = (MonitoringContext, Request[A])
 
+  @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
   def TimedAction(implicit callee: Callee) =
     new PreActionFunction[Request, Req, Future, Unit] {
-      def invokeBlock[A](request: Request[A], block: ((MonitoringContext, Request[A])) => DPre[Future, Unit, Result]) =
-        Pre(BaseTags(callee, Category.Api)) { (st: ST[Unit]) => Future.successful(st) } // XXX: does not make sense at the graph level
-          .flatMap{ st => block(MonitoringContext(st) -> request) }
-          // TODO: enable InfluxDB on Travis CI
-          //.mapSuspension(influx.monitor)
+      def invokeBlock[A](request: Request[A],
+                         block: (
+                             (MonitoringContext, Request[A])) => DPre[Future,
+                                                                      Unit,
+                                                                      Result]) =
+        Precepte(BaseTags(callee, Category.Api)) { (st: ST[Unit]) =>
+          Future.successful(st)
+        } // XXX: does not make sense at the graph level
+          .flatMap { st =>
+            block(MonitoringContext(st) -> request)
+          }
+      // TODO: enable InfluxDB on Travis CI
+      //.mapSuspension(influx.monitor)
     }
 
-  case class MonitoringContext(span: Span, path: default.Call.Path[BaseTags]) {
-    val logger = logback.Logger(span, path)
+  final case class MonitoringContext(span: Span,
+                                     path: default.Call.Path[BaseTags]) {
+    val logger = new logback.Logger(span, path)
   }
 
   object MonitoringContext {
-    def apply[C](st: ST[Unit]): MonitoringContext = MonitoringContext(st.managed.span, st.managed.path)
+    def apply[C](st: ST[Unit]): MonitoringContext =
+      MonitoringContext(st.managed.span, st.managed.path)
   }
 }
-
-

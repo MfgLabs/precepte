@@ -12,13 +12,12 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
+ */
 
 package com.mfglabs
 package precepte
 
 import scala.language.higherKinds
-
 
 trait MetaSemigroup[A] {
   def combine(a: A, b: A): A
@@ -39,7 +38,6 @@ trait MetaApplicative[F[_]] extends MetaFunctor[F] {
 trait MetaMonad[F[_]] extends MetaApplicative[F] {
   def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
 }
-
 
 trait ~~>[F[_], G[_]] {
   def apply[A](f: F[A]): G[A]

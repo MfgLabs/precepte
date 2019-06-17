@@ -23,32 +23,36 @@ import scala.concurrent.ExecutionContext
 trait Commons extends PreActionSyntax[Unit] {
   import commons.Monitoring.env
 
-  def initialState = ()
-  def version = env.version
-  def environment = env.environment
-  def host = env.host
+  @inline final def initialState = ()
+  @inline final def version = env.version
+  @inline final def environment = env.environment
+  @inline final def host = env.host
 }
 
 /**
- * Manage a database of computers
- */
-class Application (
-  val controllerComponent : play.api.mvc.ControllerComponents,
-  companyDB               : models.CompanyDB,
-  computerDB              : models.ComputerDB
-)(implicit val executionContext: ExecutionContext) extends AbstractController(controllerComponent) with Commons {
+  * Manage a database of computers
+  */
+@SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
+final class Application(
+    val controllerComponent: play.api.mvc.ControllerComponents,
+    companyDB: models.CompanyDB,
+    computerDB: models.ComputerDB
+)(implicit val executionContext: ExecutionContext)
+    extends AbstractController(controllerComponent)
+    with Commons {
 
-  implicit def messages(implicit request: RequestHeader): play.api.i18n.Messages =
+  implicit def messages(
+      implicit request: RequestHeader): play.api.i18n.Messages =
     controllerComponent.messagesApi.preferred(request)
 
   /**
-   * This result directly redirect to the application home.
-   */
+    * This result directly redirect to the application home.
+    */
   val Home = Redirect(routes.Application.list(0, 2, ""))
 
   /**
-   * Describe the computer form (used in both edit and create screens).
-   */
+    * Describe the computer form (used in both edit and create screens).
+    */
   val computerForm = Form(
     mapping(
       "id" -> ignored[Option[Long]](None),
@@ -62,32 +66,35 @@ class Application (
   // -- Actions
 
   /**
-   * Handle default path requests, redirect to computers list
-   */
-  def index =
+    * Handle default path requests, redirect to computers list
+    */
+  def index: Action[AnyContent] =
     future(TimedAction) { _ =>
       Future.successful(Home)
     }
 
   /**
-   * Display the paginated list of computers.
-   *
-   * @param page Current page number (starts from 0)
-   * @param orderBy Column to be sorted
-   * @param filter Filter applied on computer names
-   */
-  def list(page: Int, orderBy: Int, filter: String) = async(TimedAction) { req =>
-    implicit val r = req._2
-    for {
-      cs <- computerDB.list(page = page, orderBy = orderBy, filter = ("%"+filter+"%"))
-    } yield Ok(html.list(cs, orderBy, filter))
+    * Display the paginated list of computers.
+    *
+    * @param page Current page number (starts from 0)
+    * @param orderBy Column to be sorted
+    * @param filter Filter applied on computer names
+    */
+  def list(page: Int, orderBy: Int, filter: String) = async(TimedAction) {
+    req =>
+      implicit val r = req._2
+      for {
+        cs <- computerDB.list(page = page,
+                              orderBy = orderBy,
+                              filter = ("%" + filter + "%"))
+      } yield Ok(html.list(cs, orderBy, filter))
   }
 
   /**
-   * Display the 'edit form' of a existing Computer.
-   *
-   * @param id Id of the computer to edit
-   */
+    * Display the 'edit form' of a existing Computer.
+    *
+    * @param id Id of the computer to edit
+    */
   def edit(id: Long) = async(TimedAction) { req =>
     implicit val r = req._2
 
@@ -100,10 +107,10 @@ class Application (
   }
 
   /**
-   * Handle the 'edit form' submission
-   *
-   * @param id Id of the computer to edit
-   */
+    * Handle the 'edit form' submission
+    *
+    * @param id Id of the computer to edit
+    */
   def update(id: Long) = async(TimedAction) { req =>
     implicit val r = req._2
     computerForm.bindFromRequest.fold(
@@ -114,12 +121,15 @@ class Application (
       computer =>
         for {
           _ <- computerDB.update(id, computer)
-        } yield Home.flashing("success" -> "Computer %s has been updated".format(computer.name)))
+        } yield
+          Home.flashing(
+            "success" -> "Computer %s has been updated".format(computer.name))
+    )
   }
 
   /**
-   * Display the 'new computer form'.
-   */
+    * Display the 'new computer form'.
+    */
   def create = async(TimedAction) { req =>
     implicit val r = req._2
     for {
@@ -128,8 +138,8 @@ class Application (
   }
 
   /**
-   * Handle the 'new computer form' submission.
-   */
+    * Handle the 'new computer form' submission.
+    */
   def save = async(TimedAction) { req =>
     implicit val r = req._2
     computerForm.bindFromRequest.fold(
@@ -140,14 +150,16 @@ class Application (
       computer => {
         for {
           _ <- computerDB.insert(computer)
-        } yield Home.flashing("success" -> "Computer %s has been created".format(computer.name))
+        } yield
+          Home.flashing(
+            "success" -> "Computer %s has been created".format(computer.name))
       }
     )
   }
 
   /**
-   * Handle computer deletion.
-   */
+    * Handle computer deletion.
+    */
   def delete(id: Long) = async(TimedAction) { _ =>
     for {
       _ <- computerDB.delete(id)
@@ -155,4 +167,3 @@ class Application (
   }
 
 }
-
