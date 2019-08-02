@@ -32,7 +32,7 @@ package object corecats extends SubMeta {
     new Monad[Precepte[Ta, ManagedState, UnmanagedState, F, ?]] {
       override def pure[A](
           a: A): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
-        Return(a)
+        Pure(a)
       override def map[A, B](
           m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(
           f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =

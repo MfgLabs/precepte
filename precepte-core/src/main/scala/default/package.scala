@@ -81,5 +81,4 @@ package object default extends HK {
             Leaf("ε", "ε")
         }
     }
-
 }

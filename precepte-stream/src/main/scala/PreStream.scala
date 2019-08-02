@@ -43,22 +43,14 @@ object PreStream {
 
     def step[B](p: P[T, M, U, B])(idx: Int): Flow[PS, (PS, B), NotUsed] =
       p match {
-        case Return(a) =>
+        case Pure(a) =>
           Flow[PS].mapAsync(parallelism) { state =>
             Future.successful(state -> a)
           }
 
-        case Suspend(fa) =>
+        case Lift(fa) =>
           Flow[PS].mapAsync(parallelism) { state =>
             fa.map(a => state -> a)
-          }
-
-        case StepMap(fst, fmap, tags) =>
-          Flow[PS].mapAsync(parallelism) { state =>
-            val state0 = upd.appendTags(state, tags, idx)
-            fst(state0).map { a =>
-              fmap(state0, a)
-            }
           }
 
         case Mapped(sub, pf) =>
@@ -96,8 +88,26 @@ object PreStream {
             FlowShape(bcast.in, zip.out)
           })
 
-        case ps @ SubStep(_, _, _, _) =>
-          step(ps.toStepMap)(idx)
+        case ps: SubStep[T, M, U, Future, i, B] =>
+          type IN = i
+          type OUT = B
+
+          Flow[PS].mapAsync(parallelism) { state =>
+            val state0 = upd.appendTags(state, ps.tags, idx)
+
+            val stzero: Future[(PState[T, M, U], IN)] =
+              ps.sub(state0).run(state0)
+
+            val finalst: Future[(PState[T, M, U], IN)] =
+              ps.nats.foldLeft(stzero) {
+                case (acc, nat) => nat(state0 -> acc)
+              }
+
+            def fun(si: (PState[T, M, U], IN)): (PState[T, M, U], OUT) =
+              ps.fun(state0, si._1, si._2)
+
+            finalst.map(fun)
+          }
       }
 
     step(pre)(0)
