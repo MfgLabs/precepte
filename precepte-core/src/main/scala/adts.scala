@@ -31,8 +31,22 @@ final case class PState[Ta, ManagedState, UnmanagedState](
 }
 
 /** A Typeclass representing an updatable Precepte state (can append a Tag+idx & update unmanaged part) */
-trait PStateUpdater[Ta, MS, FS] {
-  type S = PState[Ta, MS, FS]
+trait PStateUpdater[Ta, MS, FS] { self =>
+  final type S = PState[Ta, MS, FS]
   def appendTags(s: S, t: Ta, idx: Int): S
   def updateUnmanaged(s: S, ext: FS): S
+
+  @inline final def xmapUnmanaged[FS2](
+      to: FS => FS2,
+      from: FS2 => FS): PStateUpdater[Ta, MS, FS2] =
+    new PStateUpdater[Ta, MS, FS2] {
+      def appendTags(s: PState[Ta, MS, FS2],
+                     t: Ta,
+                     idx: Int): PState[Ta, MS, FS2] =
+        self.appendTags(s.mapUnmanaged(from), t, idx).mapUnmanaged(to)
+
+      def updateUnmanaged(s: PState[Ta, MS, FS2],
+                          ext: FS2): PState[Ta, MS, FS2] =
+        self.updateUnmanaged(s.mapUnmanaged(from), from(ext)).mapUnmanaged(to)
+    }
 }

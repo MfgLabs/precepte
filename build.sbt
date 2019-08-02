@@ -11,6 +11,7 @@ lazy val warts = Warts.allBut(
 )
 
 lazy val catsVersion = "1.6.1"
+lazy val silencerVersion = "1.4.2"
 
 val safeScalaOptionsCommon =
   Seq(
@@ -88,6 +89,8 @@ lazy val commonSettings =  Seq(
   }
   , addCompilerPlugin("io.tryp" % "splain" % "0.4.1" cross CrossVersion.patch)
   , addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3" cross CrossVersion.binary)
+  , addCompilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion)
+  , scalacOptions += "-P:silencer:globalFilters=The outer reference in this type test cannot be checked at run time"
   , scalafmtOnCompile := true
   , wartremoverErrors in (Compile, compile) := warts
   , wartremoverWarnings in (Compile, console) := warts
@@ -156,6 +159,7 @@ lazy val sample =
       name := "precepte-sample",
       scalacOptions += "-Yrangepos", // For specs2
       wartremoverExcluded.in(Compile) ++= (routes.in(Compile).value ++ TwirlKeys.compileTemplates.in(Compile).value),
+      scalacOptions.in(Compile) ++= (routes.in(Compile).value ++ TwirlKeys.compileTemplates.in(Compile).value).map(f => s"-P:silencer:pathFilters=$f"),
       libraryDependencies ++= Seq(
         jdbc,
         evolutions,

@@ -326,15 +326,17 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       ()
     }
 
-    def f1 = Precepte(tags("f1")) { (c: ST[Unit]) =>
-      push(c)
-      Applicative[Future].pure(1)
-    }
+    def f1: Precepte[BaseTags, MS, Unit, Future, Int] =
+      Precepte(tags("f1")) { (c: ST[Unit]) =>
+        push(c)
+        Applicative[Future].pure(1)
+      }
 
-    def f2(i: Int) = Precepte(tags("f2")) { (c: ST[Unit]) =>
-      push(c)
-      Applicative[Future].pure(s"foo $i")
-    }
+    def f2(i: Int): Precepte[BaseTags, MS, Unit, Future, String] =
+      Precepte(tags("f2")) { (c: ST[Unit]) =>
+        push(c)
+        Applicative[Future].pure(s"foo $i")
+      }
 
     val r = for {
       i <- f1
@@ -347,7 +349,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     ctxs.map(_.managed.span).toSet.size should ===(1) // span is unique
     ctxs(0).managed.path.length should ===(1)
     ctxs(1).managed.path.length should ===(2)
-
   }
 
   it should "not stack context on trans" in {
