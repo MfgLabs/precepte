@@ -585,10 +585,26 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     type SF[T] = (ST[Int], Future[T])
 
-    object Mon extends (SF ~> Future) {
-      def apply[A](f: SF[A]): Future[A] =
-        // TODO: Store measure and test result
-        f._2
+    type P[X] = Precepte[BaseTags, MS, Int, Future, X]
+    object P extends PrecepteAPI[BaseTags, MS, Int, Future]
+
+    object Mon extends (P ~> P) {
+      def apply[A](f: P[A]): P[A] =
+        for {
+          state0 <- P.get
+          t0 <- P.delay(System.nanoTime())
+          a <- f
+          t1 <- P.delay(System.nanoTime())
+          _ <- P.delay {
+
+            val path = state0.managed.path
+            val method = path.last.tags.callee.value
+            val duration = t1 - t0
+
+            // TODO: Store measure and test result
+            println(s"$method $duration")
+          }
+        } yield a
     }
 
     implicit val intSG = new scalaz.Semigroup[Int] {

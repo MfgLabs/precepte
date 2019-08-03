@@ -63,6 +63,9 @@ object PreStream {
             fa.map(a => state -> a)
           }
 
+        case Defer(defered) =>
+          step(defered())(idx)
+
         case Mapped(sub, pf) =>
           step(sub)(idx).map {
             case (state, a) =>
@@ -101,16 +104,7 @@ object PreStream {
         case ps: SubStep[T, M, U, Future, B] =>
           Flow[PS].mapAsync(parallelism) { state =>
             val state0 = upd.appendTags(state, ps.tags, idx)
-
-            val stzero: Future[(PState[T, M, U], B)] =
-              ps.sub.run(state0)
-
-            val finalst: Future[(PState[T, M, U], B)] =
-              ps.nats.foldLeft(stzero) {
-                case (acc, nat) => nat(state0 -> acc)
-              }
-
-            finalst
+            ps.intrumented.run(state0)
           }
       }
 

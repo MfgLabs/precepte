@@ -18,22 +18,29 @@ package com.mfglabs
 
 package object precepte {
 
-  type InstrumentStep[Ta, ManagedState, UnmanagedState, F[_]] =
-    λ[α => (PState[Ta, ManagedState, UnmanagedState], F[α])] ~~> F
+  /**
+    * @tparam T Precepte Tags
+    * @tparam M Precepte Managed State
+    * @tparam U Precepte Unmanaged State
+    * @tparam F Base effect
+    */
+  type InstrumentStep[T, M, U, F[_]] =
+    Precepte[T, M, U, F, ?] ~~> Precepte[T, M, U, F, ?]
 
   object InstrumentStepFun {
     @inline def iso[T, M, U, F[_], G[_]](iso: F <~~> G)(
-        f: InstrumentStep[T, M, U, F]): InstrumentStep[T, M, U, G] =
+        instr: InstrumentStep[T, M, U, F]): InstrumentStep[T, M, U, G] =
       new (InstrumentStep[T, M, U, G]) {
-        def apply[A](stg: (PState[T, M, U], G[A])): G[A] =
-          iso.to(f[A](stg._1 -> iso.from(stg._2)))
+        def apply[A](f: Precepte[T, M, U, G, A]): Precepte[T, M, U, G, A] =
+          instr(f.compile(iso.reverse)).compile(iso)
       }
 
-    @inline def contraMapUnmanagedState[T, M, U, U2, F[_]](from: U2 => U)(
-        f: InstrumentStep[T, M, U, F]): InstrumentStep[T, M, U2, F] =
+    @inline def xmapUnmanagedState[T, M, U, U2, F[_]](to: U => U2,
+                                                      from: U2 => U)(
+        instr: InstrumentStep[T, M, U, F]): InstrumentStep[T, M, U2, F] =
       new (InstrumentStep[T, M, U2, F]) {
-        def apply[A](stf: (PState[T, M, U2], F[A])): F[A] =
-          f[A](stf._1.mapUnmanaged(from) -> stf._2)
+        def apply[A](f: Precepte[T, M, U2, F, A]): Precepte[T, M, U2, F, A] =
+          instr(f.xmapState(from, to)).xmapState(to, from)
       }
   }
 }

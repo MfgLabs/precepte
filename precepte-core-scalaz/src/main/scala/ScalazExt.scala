@@ -31,10 +31,9 @@ final class ScalazExt[Ta, ManagedState, UnmanagedState, F[_], A](
       iso: F <~> G): Precepte[Ta, ManagedState, UnmanagedState, G, A] =
     p.compile(ScalazMetaIso(iso))
 
+  private type P[X] = Precepte[Ta, ManagedState, UnmanagedState, F, X]
+
   final def mapSuspension(
-      nat: λ[α => (PState[Ta, ManagedState, UnmanagedState], F[α])] ~> F)
-    : Precepte[Ta, ManagedState, UnmanagedState, F, A] =
-    p.mapSuspension(
-      ScalazMetaNat[λ[α => (PState[Ta, ManagedState, UnmanagedState], F[α])],
-                    F](nat))
+      nat: P ~> P): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
+    p.mapSuspension(ScalazMetaNat[P, P](nat))
 }

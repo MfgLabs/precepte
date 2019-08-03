@@ -118,16 +118,20 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
       implicit ec: ExecutionContext): InstrumentStep[BaseTags, MS, C, Future] =
     client match {
       case Success(clt) =>
-        new (InstrumentStep[BaseTags, MS, C, Future]) {
-          def apply[A](sf: (PState[BaseTags, MS, C], Future[A])): Future[A] =
+        object P extends PrecepteAPI[BaseTags, MS, C, Future]
+
+        new (P.instrumentStep) {
+          def apply[A](p: P.precepte[A]): P.precepte[A] =
             for {
-              t0 <- Future(tag[NANOSECONDS.type](System.nanoTime()))
-              r <- sf._2.transform(Success(_))
-              t1 <- Future(tag[NANOSECONDS.type](System.nanoTime()))
-              now <- Future(tag[MILLISECONDS.type](System.currentTimeMillis()))
-              telemetry = toTelemetry(t0, t1, now, sf._1, r.failed.toOption)
-              _ <- Future(clt.track(telemetry))
-              x <- Future.fromTry(r)
+              st <- P.get
+              t0 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
+              r <- p.map(Success(_))
+              t1 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
+              now <- P.lift(
+                Future(tag[MILLISECONDS.type](System.currentTimeMillis())))
+              telemetry = toTelemetry(t0, t1, now, st, r.failed.toOption)
+              _ <- P.lift(Future(clt.track(telemetry)))
+              x <- P.lift(Future.fromTry(r))
             } yield x
         }
       case Failure(e) => throw e

@@ -92,16 +92,20 @@ final class Influx[C: MetaSemigroup](
       implicit ex: ExecutionContext): InstrumentStep[BaseTags, MS, C, Future] =
     influxDB match {
       case Success(in) =>
-        new (InstrumentStep[BaseTags, MS, C, Future]) {
-          def apply[A](sf: (PState[BaseTags, MS, C], Future[A])): Future[A] =
+        object P extends PrecepteAPI[BaseTags, MS, C, Future]
+
+        new (P.instrumentStep) {
+          def apply[A](p: P.precepte[A]): P.precepte[A] =
             for {
-              t0 <- Future(tag[NANOSECONDS.type](System.nanoTime()))
-              r <- sf._2.transform(Success(_))
-              t1 <- Future(tag[NANOSECONDS.type](System.nanoTime()))
-              now <- Future(tag[MILLISECONDS.type](System.currentTimeMillis()))
-              serie = toSerie(t0, t1, now, sf._1, r.failed.toOption)
-              _ <- Future(in.write(dbName, retentionPolicy, serie))
-              x <- Future.fromTry(r)
+              st <- P.get
+              t0 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
+              r <- p.map(Success(_))
+              t1 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
+              now <- P.lift(
+                Future(tag[MILLISECONDS.type](System.currentTimeMillis())))
+              serie = toSerie(t0, t1, now, st, r.failed.toOption)
+              _ <- P.lift(Future(in.write(dbName, retentionPolicy, serie)))
+              x <- P.lift(Future.fromTry(r))
             } yield x
         }
       case Failure(e) => throw e

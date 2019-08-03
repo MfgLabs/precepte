@@ -31,10 +31,10 @@ final class CatsExt[Ta, ManagedState, UnmanagedState, F[_], A](
       from: G ~> F): Precepte[Ta, ManagedState, UnmanagedState, G, A] =
     p.compile(CatsMetaIso(to, from))
 
+  private type P[X] = Precepte[Ta, ManagedState, UnmanagedState, F, X]
+
   final def mapSuspension(
-      nat: λ[α => (PState[Ta, ManagedState, UnmanagedState], F[α])] ~> F)
-    : Precepte[Ta, ManagedState, UnmanagedState, F, A] =
-    p.mapSuspension(
-      CatsMetaNat[λ[α => (PState[Ta, ManagedState, UnmanagedState], F[α])], F](
-        nat))
+      nat: P ~> P): Precepte[Ta, ManagedState, UnmanagedState, F, A] = {
+    p.mapSuspension(CatsMetaNat[P, P](nat))
+  }
 }
