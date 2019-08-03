@@ -19,7 +19,7 @@ package com.mfglabs
 import cats.Applicative
 import cats.free.Trampoline
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 package object precepte {
 
@@ -48,29 +48,43 @@ package object precepte {
 
   implicit def metaMonadPrecepteLifterMonad[T, M, U, F[_]](
       implicit F: MetaMonad[F],
+      FE: MetaErrorEffect[Throwable, F],
       upd: PStateUpdater[T, M, U],
       S: MetaSemigroup[U])
-    : MetaMonadPrecepte[T, M, U, MetaMonadPrecepteLifter[T, M, U, F, ?]] =
-    new (MetaMonadPrecepte[T, M, U, MetaMonadPrecepteLifter[T, M, U, F, ?]]) {
+    : MetaMonadPrecepteEffect[T, M, U, MetaMonadPrecepteLifter[T, M, U, F, ?]] =
+    new (MetaMonadPrecepteEffect[T,
+                                 M,
+                                 U,
+                                 MetaMonadPrecepteLifter[T, M, U, F, ?]]) {
       final type State = PState[T, M, U]
       final type G[X] = Trampoline[F[(State, X)]]
+      final type H[X] = MetaMonadPrecepteLifter[T, M, U, F, X]
 
-      @inline final def pure[A](x: A): MetaMonadPrecepteLifter[T, M, U, F, A] =
+      @inline final def pure[A](x: A): H[A] =
         (s: State) => Trampoline.done(F.pure((s, x)))
 
-      @inline final def get
-        : MetaMonadPrecepteLifter[T, M, U, F, PState[T, M, U]] =
+      @inline final def get: H[PState[T, M, U]] =
         (s: State) => Trampoline.done(F.pure((s, s)))
 
-      @inline final def set(
-          s: PState[T, M, U]): MetaMonadPrecepteLifter[T, M, U, F, Unit] =
+      @inline final def set(s: PState[T, M, U]): H[Unit] =
         (_: State) => Trampoline.done(F.pure((s, ())))
 
-      @inline final def defer[A](ga: => MetaMonadPrecepteLifter[T, M, U, F, A])
-        : MetaMonadPrecepteLifter[T, M, U, F, A] =
+      @inline final def defer[A](ga: => H[A]): H[A] =
         (s: State) => Trampoline.defer(ga(s))
 
+      @inline final def raiseError[A](e: Throwable): H[A] =
+        (_: State) => Trampoline.done(FE.raiseError(e))
+
       import cats.instances.function._
+
+      @inline final def catchError[A](sub: H[A])(
+          handler: Throwable => H[A]): H[A] =
+        (s: State) =>
+          sub(s).map { fa: F[(State, A)] =>
+            FE.catchError(fa) { e: Throwable =>
+              handler(e)(s).run
+            }
+        }
 
       @inline final def map[A, B](fa: MetaMonadPrecepteLifter[T, M, U, F, A])(
           f: A => B): MetaMonadPrecepteLifter[T, M, U, F, B] =
@@ -111,8 +125,20 @@ package object precepte {
     }
 
   /** Dummy implicit to declare Future is trampolined */
-  implicit val trampolinedFuture: Trampolined[Future] =
-    new Trampolined[Future] {
+  @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
+  implicit def trampolinedFuture(implicit ec: ExecutionContext)
+    : MetaDefer[Future] with MetaErrorEffect[Throwable, Future] = {
+    final class C
+        extends MetaErrorEffect[Throwable, Future]
+        with MetaDefer[Future] {
       def defer[A](ga: => Future[A]): Future[A] = ga
+
+      def raiseError[A](e: Throwable): Future[A] = Future.failed(e)
+
+      def catchError[A](sub: Future[A])(
+          handler: Throwable => Future[A]): Future[A] =
+        sub.recoverWith { case e => handler(e) }
     }
+    new C
+  }
 }

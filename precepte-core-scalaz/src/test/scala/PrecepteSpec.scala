@@ -584,7 +584,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     import scalaz.~>
 
     type P[X] = Precepte[BaseTags, MS, Int, Future, X]
-    object P extends PrecepteAPI[BaseTags, MS, Int, Future]
+    object P extends Precepte.API[BaseTags, MS, Int, Future]
 
     object Mon extends (P ~> P) {
       def apply[A](f: P[A]): P[A] =

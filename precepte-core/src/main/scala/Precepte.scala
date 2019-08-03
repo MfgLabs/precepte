@@ -109,19 +109,22 @@ sealed trait Precepte[T, M, U, F[_], A] {
 
   @inline final def run(state: PState[T, M, U])(
       implicit mo: MetaMonad[F],
+      FE: MetaErrorEffect[Throwable, F],
       upd: PStateUpdater[T, M, U],
-      trampolinedF: Trampolined[F],
+      trampolinedF: MetaDefer[F],
       S: MetaSemigroup[U]): F[(PState[T, M, U], A)] =
     Precepte.run(~~>.id[F])(this)(state)
 
   @inline final def interpret[G[_]](nt: F ~~> G)(
-      implicit G: MetaMonadPrecepte[T, M, U, G],
+      implicit G: MetaMonadPrecepteEffect[T, M, U, G],
       upd: PStateUpdater[T, M, U]): G[A] = Precepte.interpret(nt)(this)
 
-  @inline final def eval(state: PState[T, M, U])(implicit mo: MetaMonad[F],
-                                                 upd: PStateUpdater[T, M, U],
-                                                 trampolinedF: Trampolined[F],
-                                                 S: MetaSemigroup[U]): F[A] =
+  @inline final def eval(state: PState[T, M, U])(
+      implicit mo: MetaMonad[F],
+      FE: MetaErrorEffect[Throwable, F],
+      upd: PStateUpdater[T, M, U],
+      trampolinedF: MetaDefer[F],
+      S: MetaSemigroup[U]): F[A] =
     mo.map(run(state))(_._2)
 
   @inline final def graph(g0: Graph)(
@@ -208,6 +211,40 @@ private[precepte] final case class SetPState[T, M, U, F[_]](
 ) extends Precepte[T, M, U, F, Unit] {
   def mapSuspension(
       f: SubStepInstumentation[T, M, U, F]): SetPState[T, M, U, F] = this
+}
+
+/** Precepte Raise Error
+  *
+  * @tparam T Tags
+  * @tparam M Managed State
+  * @tparam U Unmanaged State
+  * @tparam F Base functor
+  * @tparam A Output type (this value is inchanged!)
+  */
+private[precepte] final case class RaiseError[T, M, U, F[_], A](
+    error: Throwable
+) extends Precepte[T, M, U, F, A] {
+  def mapSuspension(
+      f: SubStepInstumentation[T, M, U, F]): RaiseError[T, M, U, F, A] =
+    this
+}
+
+/** Precepte Catch Error
+  *
+  * @tparam T Tags
+  * @tparam M Managed State
+  * @tparam U Unmanaged State
+  * @tparam F Base functor
+  * @tparam A Output type (this value is inchanged!)
+  */
+private[precepte] final case class CatchError[T, M, U, F[_], A](
+    sub: Precepte[T, M, U, F, A],
+    handler: Throwable => Precepte[T, M, U, F, A]
+) extends Precepte[T, M, U, F, A] {
+  def mapSuspension(
+      f: SubStepInstumentation[T, M, U, F]): CatchError[T, M, U, F, A] =
+    CatchError(sub.mapSuspension(f),
+               (e: Throwable) => handler(e).mapSuspension(f))
 }
 
 /** Functorial Map
@@ -349,6 +386,32 @@ object Precepte extends Implicits {
       set(s1).map(_ => a)
     }
 
+  /** Raise an error
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def raiseError[T, M, U, F[_], A](
+      error: Throwable): Precepte[T, M, U, F, A] =
+    RaiseError(error)
+
+  /** Applicative ap
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def catchError[T, M, U, F[_], A](sub: Precepte[T, M, U, F, A])(
+      handler: Throwable => Precepte[T, M, U, F, A]): Precepte[T, M, U, F, A] =
+    sub match {
+      case Pure(_)       => sub
+      case RaiseError(e) => handler(e)
+      case _             => CatchError(sub, handler)
+    }
+
   /** Delay the evaluation of the argument until this precepte is run.
     *
     * @tparam T Tags
@@ -423,6 +486,9 @@ object Precepte extends Implicits {
       case (_, _)             => Apply(pa, pf)
     }
 
+  ///////////////////////////////////////////////////
+  // Functions
+
   /** Print the Graph
     *
     * @tparam T Tags
@@ -435,6 +501,12 @@ object Precepte extends Implicits {
     p match {
       case Pure(a) =>
         Pure(g0 -> a)
+
+      case RaiseError(e) =>
+        RaiseError(e)
+
+      case CatchError(sub, h) =>
+        CatchError(sub.graph(g0), (e: Throwable) => h(e).graph(g0))
 
       case _: GetPState[T, M, U, F] =>
         Mapped(GetPState(), (s: PState[T, M, U]) => g0 -> s)
@@ -502,6 +574,11 @@ object Precepte extends Implicits {
       case Lift(fa)                   => Lift(isoFG.to(fa))
       case Defer(defered) =>
         defered().compile(isoFG)
+      case RaiseError(e) => RaiseError(e)
+
+      case CatchError(sub, h) =>
+        CatchError(iso(isoFG)(sub), (e: Throwable) => iso(isoFG)(h(e)))
+
       case SubStep(sub, tags, nats, leaf) =>
         SubStep(sub.compile(isoFG),
                 tags,
@@ -535,6 +612,13 @@ object Precepte extends Implicits {
       case Defer(defered) =>
         defered().xmapState(to, from)
 
+      case RaiseError(e) =>
+        RaiseError(e)
+
+      case CatchError(sub, h) =>
+        CatchError(xmapState(to, from)(sub),
+                   (e: Throwable) => xmapState(to, from)(h(e)))
+
       case SubStep(sub, tags, nats, leaf) =>
         SubStep(
           sub.xmapState(to, from),
@@ -554,14 +638,20 @@ object Precepte extends Implicits {
     }
 
   @inline final def interpret[T, M, U, F[_], A, G[_]](nt: F ~~> G)(
-      p: Precepte[T, M, U, F, A])(implicit G: MetaMonadPrecepte[T, M, U, G],
-                                  upd: PStateUpdater[T, M, U]): G[A] = {
+      p: Precepte[T, M, U, F, A])(
+      implicit G: MetaMonadPrecepteEffect[T, M, U, G],
+      upd: PStateUpdater[T, M, U]): G[A] = {
     type P[Z] = Precepte[T, M, U, F, Z]
 
     def aux[X](px: P[X]): G[X] =
       px match {
-        case Pure(x)           => G.pure(x)
-        case Lift(gx)          => nt(gx)
+        case Pure(x)       => G.pure(x)
+        case Lift(gx)      => nt(gx)
+        case RaiseError(e) => G.raiseError(e)
+        case CatchError(sub, h) =>
+          G.catchError(G.defer(aux(sub))) { (e: Throwable) =>
+            G.defer(aux(h(e)))
+          }
         case Defer(defered)    => aux(defered())
         case Mapped(sub, next) => G.map(G.defer(aux(sub)))(next)
         case Flatmap(sub, next) =>
@@ -585,7 +675,8 @@ object Precepte extends Implicits {
   @inline final def run[T, M, U, F[_], A, G[_]](nt: F ~~> G)(
       p: Precepte[T, M, U, F, A])(st9999: PState[T, M, U])(
       implicit G: MetaMonad[G],
-      GT: Trampolined[G],
+      GE: MetaErrorEffect[Throwable, G],
+      GT: MetaDefer[G],
       upd: PStateUpdater[T, M, U],
       U: MetaSemigroup[U]): G[(PState[T, M, U], A)] = {
 
@@ -593,31 +684,40 @@ object Precepte extends Implicits {
     type State = PState[T, M, U]
     type GS[X] = G[(State, X)]
 
-    @inline def auxTrickTailRec[X](st0: State, px: P[X], cont: Cont[X]): GS[A] =
+    @inline def auxTrickTailRec[X, B](st0: State,
+                                      px: P[X],
+                                      cont: Cont[X, B]): GS[B] =
       aux(st0, px, cont)
 
-    sealed abstract class Cont[X]
-    final case object IdK extends Cont[A]
-    final case class MappedK[I, X](next: I => X, cont: Cont[X]) extends Cont[I]
-    final case class FlatmapK[I, X](next: I => P[X], cont: Cont[X])
-        extends Cont[I]
-    final case class ApplyK1[I, X](st0: State, next: P[I => X], cont: Cont[X])
-        extends Cont[I]
-    final case class ApplyK2[I, X](st0: State, res1: GS[I], cont: Cont[X])
-        extends Cont[I => X]
+    sealed abstract class Cont[X, B]
+    final case class IdK[B]() extends Cont[B, B]
+    final case class MappedK[I, X, B](next: I => X, cont: Cont[X, B])
+        extends Cont[I, B]
+    final case class FlatmapK[I, X, B](next: I => P[X], cont: Cont[X, B])
+        extends Cont[I, B]
+    final case class ApplyK1[I, X, B](st0: State,
+                                      next: P[I => X],
+                                      cont: Cont[X, B])
+        extends Cont[I, B]
+    final case class ApplyK2[I, X, B](st0: State, res1: GS[I], cont: Cont[X, B])
+        extends Cont[I => X, B]
+    final case class CatchErrorK[X, B](st0: State,
+                                       handler: Throwable => P[X],
+                                       cont: Cont[X, B])
+        extends Cont[X, B]
 
-    final case class InvokeAux[X](st0: State, px: P[X], cont: Cont[X])
+    final case class InvokeAux[X, B](st0: State, px: P[X], cont: Cont[X, B])
 
     @tailrec
-    def aux[X](st0: State, px: P[X], cont: Cont[X]): GS[A] = {
+    def aux[X, B](st0: State, px: P[X], cont: Cont[X, B]): GS[B] = {
 
-      type Ret = Either[GS[A], InvokeAux[_]]
+      type Ret = Either[GS[B], InvokeAux[_, B]]
 
       @tailrec
-      def runCont[Z](cont: Cont[Z], gx: G[(State, Z)]): Ret =
+      def runCont[C](cont: Cont[C, B], gx: G[(State, C)]): Ret =
         cont match {
-          case IdK =>
-            Left(gx): Ret
+          case _: IdK[a] =>
+            Left[GS[B], InvokeAux[_, B]](gx)
           case MappedK(next, k) =>
             runCont(k, G.map(gx) { case (st1, i) => (st1, next(i)) })
           case FlatmapK(next, k) =>
@@ -625,13 +725,13 @@ object Precepte extends Implicits {
               case (s1, i) => GT.defer(auxTrickTailRec(s1, next(i), k))
             })
 
-          case apk: ApplyK1[i, x] =>
+          case apk: ApplyK1[i, x, a] =>
             Right(
-              InvokeAux[i => x](apk.st0,
-                                apk.next,
-                                ApplyK2[i, x](apk.st0, gx, apk.cont)))
+              InvokeAux[i => x, a](apk.st0,
+                                   apk.next,
+                                   ApplyK2[i, x, a](apk.st0, gx, apk.cont)))
 
-          case apk: ApplyK2[i, x] =>
+          case apk: ApplyK2[i, x, a] =>
             runCont[x](
               apk.cont,
               G.ap[(State, i), (State, x)](apk.res1)(
@@ -646,20 +746,26 @@ object Precepte extends Implicits {
                   }
                 })
             )
+
+          case cek: CatchErrorK[x, b] =>
+            runCont[x](cek.cont, GE.catchError[(State, x)](gx) { e: Throwable =>
+              GT.defer(auxTrickTailRec[x, x](cek.st0, cek.handler(e), IdK()))
+            })
         }
 
       px match {
         case Pure(x) =>
           runCont(cont, G.pure(st0 -> x)) match {
-            case Left(g)                => g
-            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+            case Left(g)                   => g
+            case Right(i: InvokeAux[a, b]) => aux(i.st0, i.px, i.cont)
           }
         case Lift(gx) =>
           runCont(cont, G.map(nt(gx))(a => st0 -> a)) match {
-            case Left(g)                => g
-            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+            case Left(g)                   => g
+            case Right(i: InvokeAux[a, b]) => aux(i.st0, i.px, i.cont)
           }
         case Defer(defered) => aux(st0, defered(), cont)
+
         case Mapped(sub, next) =>
           aux(st0, sub, MappedK(next, cont))
 
@@ -671,14 +777,23 @@ object Precepte extends Implicits {
 
         case _: GetPState[T, M, U, F] =>
           runCont(cont, G.pure(st0 -> st0)) match {
-            case Left(g)                => g
-            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+            case Left(g)                   => g
+            case Right(i: InvokeAux[a, b]) => aux(i.st0, i.px, i.cont)
           }
         case set: SetPState[T, M, U, F] =>
           runCont(cont, G.pure((set.state, ()))) match {
-            case Left(g)                => g
-            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+            case Left(g)                   => g
+            case Right(i: InvokeAux[a, b]) => aux(i.st0, i.px, i.cont)
           }
+
+        case RaiseError(e) =>
+          runCont(cont, GE.raiseError[(State, X)](e)) match {
+            case Left(g)                   => g
+            case Right(i: InvokeAux[a, b]) => aux(i.st0, i.px, i.cont)
+          }
+
+        case CatchError(sub, h) =>
+          aux(st0, sub, CatchErrorK(st0, h, cont))
 
         case sub: SubStep[T, M, U, F, X] =>
           val st1 = upd.appendTags(st0, sub.tags, 0)
@@ -686,7 +801,7 @@ object Precepte extends Implicits {
       }
     }
 
-    aux(st9999, p, IdK)
+    aux(st9999, p, IdK())
   }
   @inline def updateUnmamaged[T, M, U, F[_], A](x: (U, A))(
       implicit upd: PStateUpdater[T, M, U]): Precepte[T, M, U, F, A] =
@@ -694,6 +809,48 @@ object Precepte extends Implicits {
       state0 <- get
       _ <- set(upd.updateUnmanaged(state0, x._1))
     } yield x._2
+
+  trait PrecepteInstances[T, M, U, F[_]]
+      extends MetaMonadPrecepteEffect[T, M, U, Precepte[T, M, U, F, ?]] {
+
+    final type precepte[A] = Precepte[T, M, U, F, A]
+    final type instrumentStep = SubStepInstumentation[T, M, U, F]
+    final type state = PState[T, M, U]
+
+    @inline final def pure[A](x: A): precepte[A] =
+      Precepte.pure[T, M, U, F, A](x)
+    @inline final def lift[A](fa: F[A]): precepte[A] =
+      Precepte.liftF[T, M, U, F, A](fa)
+    @inline final def defer[A](ga: => precepte[A]): precepte[A] =
+      Precepte.defer[T, M, U, F, A](ga)
+
+    @inline final def deferedLift[A](ga: => F[A]): precepte[A] =
+      Precepte.deferedLift[T, M, U, F, A](ga)
+
+    @inline final def get: precepte[PState[T, M, U]] = Precepte.get[T, M, U, F]
+    @inline final def set(s: PState[T, M, U]): precepte[Unit] =
+      Precepte.set[T, M, U, F](s)
+
+    @inline final def raiseError[A](e: Throwable): precepte[A] =
+      Precepte.raiseError(e)
+
+    @inline final def catchError[A](sub: precepte[A])(
+        handler: Throwable => precepte[A]): precepte[A] =
+      Precepte.catchError(sub)(handler)
+
+    @inline final def map[A, B](fa: precepte[A])(f: A => B): precepte[B] =
+      fa.map(f)
+    @inline final def flatMap[A, B](fa: precepte[A])(
+        f: A => precepte[B]): precepte[B] =
+      fa.flatMap(f)
+    @inline final def ap[A, B](fa: precepte[A])(
+        f: precepte[A => B]): precepte[B] = fa.ap(f)
+  }
+
+  implicit def precepteInstances[T, M, U, F[_]]: PrecepteInstances[T, M, U, F] =
+    new PrecepteInstances[T, M, U, F] {}
+
+  final type API[T, M, U, F[_]] = PrecepteInstances[T, M, U, F]
 }
 
 trait PrecepteBuilder[Ta] {
@@ -751,34 +908,6 @@ trait PrecepteBuilder[Ta] {
   def apply[M, U, F[_], A](
       m: => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
     applyP(_ => m)
-}
-
-trait PrecepteAPI[T, M, U, F[_]]
-    extends MetaMonadPrecepte[T, M, U, Precepte[T, M, U, F, ?]] {
-
-  final type precepte[A] = Precepte[T, M, U, F, A]
-  final type instrumentStep = SubStepInstumentation[T, M, U, F]
-  final type state = PState[T, M, U]
-
-  @inline final def pure[A](x: A): precepte[A] = Precepte.pure[T, M, U, F, A](x)
-  @inline final def lift[A](fa: F[A]): precepte[A] =
-    Precepte.liftF[T, M, U, F, A](fa)
-  @inline final def defer[A](ga: => precepte[A]): precepte[A] =
-    Precepte.defer[T, M, U, F, A](ga)
-
-  @inline final def deferedLift[A](ga: => F[A]): precepte[A] =
-    Precepte.deferedLift[T, M, U, F, A](ga)
-
-  @inline final def get: precepte[PState[T, M, U]] = Precepte.get[T, M, U, F]
-  @inline final def set(s: PState[T, M, U]): precepte[Unit] =
-    Precepte.set[T, M, U, F](s)
-  @inline final def map[A, B](fa: precepte[A])(f: A => B): precepte[B] =
-    fa.map(f)
-  @inline final def flatMap[A, B](fa: precepte[A])(
-      f: A => precepte[B]): precepte[B] =
-    fa.flatMap(f)
-  @inline final def ap[A, B](fa: precepte[A])(
-      f: precepte[A => B]): precepte[B] = fa.ap(f)
 }
 
 trait Implicits {

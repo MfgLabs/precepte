@@ -11,6 +11,7 @@ lazy val warts = Warts.allBut(
 )
 
 lazy val catsVersion = "1.6.1"
+lazy val catsMTLVersion = "0.6.0"
 lazy val silencerVersion = "1.4.2"
 
 val safeScalaOptionsCommon =
@@ -127,6 +128,7 @@ lazy val coreCats =
       libraryDependencies ++= Seq(
           "org.scala-lang"  % "scala-reflect" % scalaVersion.value
         , "org.typelevel"   %% "cats-core"   % catsVersion
+        , "org.typelevel" %% "cats-mtl-core" % catsMTLVersion
         , "org.scalatest"   %% "scalatest"   % "3.0.5" % Test
       )
     )

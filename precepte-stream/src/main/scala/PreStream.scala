@@ -33,7 +33,9 @@ object PreStream {
      TODO: tailrec!
    */
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
-  def toFlow[T, M, U, A](pre: P[T, M, U, A], parallelism: Int = 1)(
+  def toFlow[T, M, U, A](pre: P[T, M, U, A],
+                         parallelism: Int = 1,
+                         retries: Int = 3)(
       implicit mo: MetaMonad[Future],
       ex: ExecutionContext,
       upd: PStateUpdater[T, M, U],
@@ -51,6 +53,22 @@ object PreStream {
         case GetPState() =>
           Flow[PS].mapAsync(parallelism) { state =>
             Future.successful(state -> state)
+          }
+
+        case RaiseError(e) =>
+          Flow[PS].mapAsync(parallelism) { _ =>
+            Future.failed(e)
+          }
+
+        case CatchError(sub, handler) =>
+          Flow[PS].flatMapConcat { state =>
+            Source
+              .single(state)
+              .via(step(sub)(idx))
+              .recoverWithRetries(
+                retries,
+                { case e => Source.single(state).via(step(handler(e))(idx)) }
+              )
           }
 
         case SetPState(state2) =>

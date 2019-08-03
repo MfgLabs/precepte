@@ -92,7 +92,7 @@ final class Influx[C: MetaSemigroup](
     : SubStepInstumentation[BaseTags, MS, C, Future] =
     influxDB match {
       case Success(in) =>
-        object P extends PrecepteAPI[BaseTags, MS, C, Future]
+        object P extends Precepte.API[BaseTags, MS, C, Future]
 
         new (P.instrumentStep) {
           def apply[A](p: P.precepte[A]): P.precepte[A] =

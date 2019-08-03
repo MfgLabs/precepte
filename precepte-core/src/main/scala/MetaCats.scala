@@ -31,7 +31,7 @@ trait MetaApplicative[F[_]] extends MetaFunctor[F] {
   def pure[A](x: A): F[A]
   def ap[A, B](fa: F[A])(f: F[A => B]): F[B]
 
-  final def map2[A, B, Z](fa: F[A], fb: F[B])(f: (A, B) => Z): F[Z] =
+  def map2[A, B, Z](fa: F[A], fb: F[B])(f: (A, B) => Z): F[Z] =
     ap(fb)(map(fa)(a => (b: B) => f(a, b)))
 }
 
@@ -39,19 +39,25 @@ trait MetaMonad[F[_]] extends MetaApplicative[F] {
   def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
 }
 
-trait MetaGlobalState[S, F[_]] {
+trait MetaStateEffect[S, F[_]] {
   def get: F[S]
   def set(s: S): F[Unit]
 }
 
-trait Trampolined[F[_]] {
+trait MetaDefer[F[_]] {
   def defer[A](ga: => F[A]): F[A]
 }
 
-trait MetaMonadPrecepte[T, M, U, F[_]]
+trait MetaErrorEffect[E, F[_]] {
+  def raiseError[A](e: E): F[A]
+  def catchError[A](sub: F[A])(handler: E => F[A]): F[A]
+}
+
+trait MetaMonadPrecepteEffect[T, M, U, F[_]]
     extends MetaMonad[F]
-    with MetaGlobalState[PState[T, M, U], F]
-    with Trampolined[F] {
+    with MetaStateEffect[PState[T, M, U], F]
+    with MetaErrorEffect[Throwable, F]
+    with MetaDefer[F] {
 
   @inline final def modify(f: PState[T, M, U] => PState[T, M, U]): F[Unit] =
     flatMap(get)(f.andThen(set))

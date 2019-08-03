@@ -18,46 +18,78 @@ package com.mfglabs
 package precepte
 
 import scala.concurrent.Future
-
-import cats.{Monad, Applicative, Functor, ~>}
+import cats.{Applicative, Functor, Monad, MonadError, ~>}
 import cats.kernel.Semigroup
-import cats.data.{OptionT, EitherT}
+import cats.data.{EitherT, OptionT}
+import cats.mtl.MonadState
 
 import scala.language.higherKinds
 
 package object corecats extends SubMeta {
 
-  @inline implicit def precepteMonad[Ta, ManagedState, UnmanagedState, F[_]]
-    : Monad[Precepte[Ta, ManagedState, UnmanagedState, F, ?]] =
-    new Monad[Precepte[Ta, ManagedState, UnmanagedState, F, ?]] {
-      override def pure[A](
-          a: A): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
-        Pure(a)
-      override def map[A, B](
-          m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(
-          f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-        m.map(f)
-      override def flatMap[A, B](
-          m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(
-          f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B])
-        : Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-        m.flatMap(f)
+  @inline implicit def precepteMonad[T, M, U, F[_]]
+    : (MonadError[Precepte[T, M, U, F, ?], Throwable]
+      with MonadState[Precepte[T, M, U, F, ?], PState[T, M, U]]
+      with cats.Defer[Precepte[T, M, U, F, ?]]) = {
+    class C
+        extends MonadError[Precepte[T, M, U, F, ?], Throwable]
+        with MonadState[Precepte[T, M, U, F, ?], PState[T, M, U]]
+        with cats.Defer[Precepte[T, M, U, F, ?]] {
 
-      override def ap[A, B](
-          pab: Precepte[Ta, ManagedState, UnmanagedState, F, A => B])(
-          pa: Precepte[Ta, ManagedState, UnmanagedState, F, A])
-        : Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
-        Apply(pa, pab)
-      }
-      override def tailRecM[A, B](a: A)(
-          f: A => Precepte[Ta, ManagedState, UnmanagedState, F, Either[A, B]])
-        : Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
+      final type precepte[A] = Precepte[T, M, U, F, A]
+      final type instrumentStep = SubStepInstumentation[T, M, U, F]
+      final type state = PState[T, M, U]
+
+      final val monad: Monad[Precepte[T, M, U, F, ?]] = this
+
+      @inline final def inspect[A](
+          f: PState[T, M, U] => A): Precepte[T, M, U, F, A] =
+        get.map(f)
+
+      @inline final def modify(
+          f: PState[T, M, U] => PState[T, M, U]): precepte[Unit] =
+        flatMap(get)(f.andThen(set))
+
+      @inline final def pure[A](x: A): precepte[A] =
+        Precepte.pure[T, M, U, F, A](x)
+      @inline final def defer[A](ga: => precepte[A]): precepte[A] =
+        Precepte.defer[T, M, U, F, A](ga)
+
+      @inline final def get: precepte[PState[T, M, U]] =
+        Precepte.get[T, M, U, F]
+      @inline final def set(s: PState[T, M, U]): precepte[Unit] =
+        Precepte.set[T, M, U, F](s)
+
+      @inline final def raiseError[A](e: Throwable): precepte[A] =
+        Precepte.raiseError(e)
+
+      @inline final override def map[A, B](fa: precepte[A])(
+          f: A => B): precepte[B] =
+        fa.map(f)
+
+      @inline final def flatMap[A, B](fa: precepte[A])(
+          f: A => precepte[B]): precepte[B] =
+        fa.flatMap(f)
+      @inline final override def ap[A, B](ff: precepte[A => B])(
+          fa: precepte[A]): precepte[B] =
+        fa.ap(ff)
+
+      @inline final def tailRecM[A, B](a: A)(
+          f: A => Precepte[T, M, U, F, Either[A, B]])
+        : Precepte[T, M, U, F, B] = {
         f(a).flatMap {
           case Left(result)  => tailRecM(result)(f)
           case Right(result) => pure(result)
         }
       }
+
+      @inline final def handleErrorWith[A](fa: precepte[A])(
+          f: Throwable => precepte[A]): precepte[A] =
+        Precepte.catchError(fa)(f)
     }
+
+    new C
+  }
 
   @inline implicit def CatSemigroup[A](
       implicit sg: Semigroup[A]): MetaSemigroup[A] =
@@ -111,21 +143,20 @@ package object corecats extends SubMeta {
         .map(λ(pa))(Right(_))
         .recover { case e => Left(e) }
     }
-
 }
 
 trait SubMeta {
   @inline implicit def CatsMetaFunctor[F[_]](
       implicit mo: Functor[F]): MetaFunctor[F] =
     new MetaFunctor[F] {
-      override def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
+      def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
     }
 
   @inline implicit def CatsMetaApplicative[F[_]](
       implicit mo: Applicative[F]): MetaApplicative[F] =
     new MetaApplicative[F] {
-      override def pure[A](a: A): F[A] = mo.pure(a)
-      override def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
-      override def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fab)(fa)
+      def pure[A](a: A): F[A] = mo.pure(a)
+      def map[A, B](fa: F[A])(f: A => B): F[B] = mo.map(fa)(f)
+      def ap[A, B](fa: F[A])(fab: F[A => B]): F[B] = mo.ap(fab)(fa)
     }
 }

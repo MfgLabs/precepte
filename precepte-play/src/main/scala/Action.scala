@@ -90,6 +90,7 @@ trait PreActionSyntax[C] {
                                      callee: default.Callee): Action[A] =
     controllerComponent.actionBuilder.async(bodyParser) { r =>
       val st = initialST
+      implicit val ec: ExecutionContext = executionContext
       val f = addSpan(st)(
         fun
           .invokeBlock(r, { p: R[A] =>
@@ -116,6 +117,7 @@ trait PreActionSyntax[C] {
       semi: MetaSemigroup[C]): Action[A] =
     controllerComponent.actionBuilder.async(bodyParser) { r =>
       val st = initialST
+      implicit val ec: ExecutionContext = executionContext
       val f = addSpan(st)(fun.invokeBlock(r, block).eval(st))
       _transform(f)
     }

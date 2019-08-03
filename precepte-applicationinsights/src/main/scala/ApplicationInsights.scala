@@ -118,7 +118,7 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
     : SubStepInstumentation[BaseTags, MS, C, Future] =
     client match {
       case Success(clt) =>
-        object P extends PrecepteAPI[BaseTags, MS, C, Future]
+        object P extends Precepte.API[BaseTags, MS, C, Future]
 
         new (P.instrumentStep) {
           def apply[A](p: P.precepte[A]): P.precepte[A] =
