@@ -17,8 +17,8 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
-import scala.language.higherKinds
 import scala.annotation.tailrec
+import scala.language.higherKinds
 
 /**
   * Precepte, let your code be state-aware and make runtime effect observation acceptable...
@@ -93,305 +93,47 @@ import scala.annotation.tailrec
 sealed trait Precepte[T, M, U, F[_], A] {
   self =>
 
-  final type PX[A0] = Precepte[T, M, U, F, A0]
+  final type P[A0] = Precepte[T, M, U, F, A0]
 
-  @inline final def flatMap[B](
-      f: A => Precepte[T, M, U, F, B]): Precepte[T, M, U, F, B] =
-    Flatmap[T, M, U, F, A, B](self, f)
+  @inline final def flatMap[B](f: A => P[B]): P[B] =
+    Precepte.flatMap[T, M, U, F, A, B](this)(f)
 
-  @inline final def map[B](f: A => B): Precepte[T, M, U, F, B] =
-    Mapped(this, f)
+  @inline final def map[B](f: A => B): P[B] =
+    Precepte.map(this)(f)
 
-  @inline final def ap[B](
-      f: Precepte[T, M, U, F, A => B]): Precepte[T, M, U, F, B] =
-    Apply(this, f)
+  @inline final def ap[B](f: P[A => B]): P[B] =
+    Precepte.ap(this)(f)
 
-  final def lift[AP[_]](
-      implicit ap: MetaApplicative[AP]): Precepte[T, M, U, F, AP[A]] =
+  @inline final def lift[G[_]](implicit ap: MetaApplicative[G]): P[G[A]] =
     map(a => ap.pure(a))
 
-  final def run(state: PState[T, M, U], idx: Int = 0, maxDepth: Int = 100)(
+  @inline final def run(state: PState[T, M, U])(
       implicit mo: MetaMonad[F],
       upd: PStateUpdater[T, M, U],
-      S: MetaSemigroup[U]): F[(PState[T, M, U], A)] = {
+      trampolinedF: Trampolined[F],
+      S: MetaSemigroup[U]): F[(PState[T, M, U], A)] =
+    Precepte.run(~~>.id[F])(this)(state)
 
-    import cats.free.Trampoline
-    import cats.instances.function._
+  @inline final def interpret[G[_]](nt: F ~~> G)(
+      implicit G: MetaMonadPrecepte[T, M, U, G],
+      upd: PStateUpdater[T, M, U]): G[A] = Precepte.interpret(nt)(this)
 
-    sealed trait ResumeStep[X]
-    final case class ReturnStep[X](v: X, state: PState[T, M, U])
-        extends ResumeStep[X]
-    final case class FStep[X](v: F[(PState[T, M, U], X)]) extends ResumeStep[X]
-    final case class FMStep[I, X](
-        v: F[(PState[T, M, U], I)],
-        next: I => Precepte[T, M, U, F, X]
-    ) extends ResumeStep[X]
-
-    final case class MapFusionStep[X, I, Y](
-        v: Precepte[T, M, U, F, X],
-        f1: X => I,
-        f2: I => Y,
-        state: PState[T, M, U]
-    ) extends ResumeStep[Y] {
-      type _I = I
-    }
-
-    final case class ApplyStep[X, Y, Z](
-        pa: Precepte[T, M, U, F, X],
-        pf: Precepte[T, M, U, F, X => Y],
-        next: Y => Precepte[T, M, U, F, Z]
-    ) extends ResumeStep[Z]
-
-    @tailrec def resume[X](idxResume: Int)(stateResume: PState[T, M, U])(
-        p: Precepte[T, M, U, F, X]): ResumeStep[X] = {
-
-      /** A flatMap that doesn't create more FlatMap levels
-        * or
-        * Not tail rec
-        */
-      def fastFlatMap[Y, Z](p2: Precepte[T, M, U, F, Y])(
-          f: Y => Precepte[T, M, U, F, Z],
-          maxDepth: Int = 500): Precepte[T, M, U, F, Z] = {
-        def step[C, D](
-            p: Precepte[T, M, U, F, C],
-            f: C => Precepte[T, M, U, F, D],
-            d: Int = 0
-        ): Precepte[T, M, U, F, D] = p match {
-          case Pure(a) => f(a)
-
-          case fm @ Mapped(sub, pf) =>
-            if (d < maxDepth) {
-              step(sub, (a: fm._I) => f(pf(a)), d + 1)
-            } else {
-              sub.flatMap(a => f(pf(a)))
-            }
-
-          case fm @ Flatmap(sub, next) =>
-            if (d < maxDepth) {
-              step(sub, (a: fm._I) => step(next(a), f, d + 1), d + 1)
-            } else {
-              sub.flatMap(a => next(a).flatMap(f))
-            }
-
-          case x => x.flatMap(f)
-        }
-
-        step[Y, Z](p2, f)
-      }
-
-      p match {
-        case Pure(a) =>
-          ReturnStep(a, stateResume)
-
-        case GetPState() =>
-          ReturnStep(stateResume, stateResume)
-
-        case set: SetPState[T, M, U, F] =>
-          ReturnStep((), set.state)
-
-        case Lift(fa) =>
-          FStep(mo.map(fa)(a => stateResume -> a))
-
-        case Defer(defered) =>
-          resume(idxResume)(stateResume)(defered())
-
-        case Apply(pa, pf) =>
-          ApplyStep(pa, pf, (x: X) => Pure(x))
-
-        case substep: SubStep[T, M, U, F, X] =>
-          // append tags to managed state and propagate this new managed state to next step
-          val state0 = upd.appendTags(stateResume, substep.tags, idxResume)
-          FStep(substep.intrumented.run(state0))
-
-        case mf: Mapped[T, M, U, F, i, X] =>
-          mf.sub match {
-            case sub: SubStep[T, M, U, F, i] =>
-              // append tags to managed state and propagate this new managed state to next step
-              val state0 = upd.appendTags(stateResume, sub.tags, idxResume)
-              FStep(mo.map(sub.intrumented.run(state0)) {
-                case (s1, a1) => s1 -> mf.next(a1)
-              })
-
-            case Pure(a) =>
-              ReturnStep(mf.next(a), stateResume)
-
-            case Defer(defered) =>
-              resume(idxResume)(stateResume)(Mapped(defered(), mf.next))
-
-            case Lift(fa) =>
-              FStep(mo.map(fa)(a => stateResume -> mf.next(a)))
-
-            case GetPState() =>
-              ReturnStep(mf.next(stateResume), stateResume)
-
-            case set: SetPState[T, M, U, F] =>
-              ReturnStep(mf.next(()), set.state)
-
-            case Mapped(sub2, pf2) =>
-              MapFusionStep(sub2, pf2, mf.next, stateResume)
-
-            case Flatmap(sub2, next2) =>
-              resume(idxResume)(stateResume)(fastFlatMap(sub2)(z =>
-                next2(z).map(mf.next)))
-
-            case Apply(pa, pfa) =>
-              ApplyStep(pa, pfa, (i: mf._I) => Pure(mf.next(i)))
-          }
-
-        case fm: Flatmap[T, M, U, F, i, X] =>
-          fm.sub match {
-            case Pure(a) =>
-              resume(idxResume)(stateResume)(fm.next(a))
-
-            case GetPState() =>
-              resume(idxResume)(stateResume)(fm.next(stateResume))
-
-            case set: SetPState[T, M, U, F] =>
-              resume(idxResume)(set.state)(fm.next(()))
-
-            case Defer(defered) =>
-              resume(idxResume)(stateResume)(Flatmap(defered(), fm.next))
-
-            case sub: SubStep[T, M, U, F, i] =>
-              // append tags to managed state and propagate this new managed state to next step
-              val state0 = upd.appendTags(stateResume, sub.tags, idxResume)
-              // repass state as a Step in a Flatmap means the flatMap chain is finished
-              FMStep(sub.intrumented.run(state0), fm.next)
-
-            case Lift(fa) =>
-              FMStep(mo.map(fa)(a => stateResume -> a), fm.next)
-
-            case Mapped(sub2, f2) =>
-              resume(idxResume)(stateResume)(fastFlatMap(sub2)(z =>
-                fm.next(f2(z))))
-
-            case Flatmap(sub2, next2) =>
-              resume(idxResume)(stateResume)(fastFlatMap(sub2)(z =>
-                fastFlatMap(next2(z))(fm.next)))
-
-            case Apply(pa, pfa) =>
-              ApplyStep(pa, pfa, fm.next)
-          }
-      }
-    }
-
-    def stepRun0[B](p: PX[B],
-                    state: PState[T, M, U],
-                    idx: Int = 0): Trampoline[F[(PState[T, M, U], B)]] = {
-      resume(idx)(state)(p) match {
-
-        case ReturnStep(a, s) =>
-          Trampoline.done(mo.pure(s -> a))
-
-        case FStep(fsa0) =>
-          Trampoline.done(fsa0)
-
-        case FMStep(fa0, next0) =>
-          Trampoline.done(mo.flatMap(fa0) {
-            case (s1, a1) =>
-              stepRun0(next0(a1), s1).run
-          })
-
-        case ApplyStep(pa, pf, next) =>
-          for {
-            sra <- stepRun0(pa, state, idx + 1)
-            srf <- stepRun0(pf, state, idx + 2)
-          } yield
-            mo.flatMap(mo.map2(sra, srf) {
-              case ((s0, a), (s1, f)) =>
-                val s =
-                  upd.updateUnmanaged(s0, S.combine(s0.unmanaged, s1.unmanaged))
-                (s, f(a))
-            }) {
-              case (s0, b) =>
-                stepRun0(next(b), s0, idx).run
-            }
-
-        case MapFusionStep(p0, f0, f1, s0) =>
-          // @tailrec
-          def fusionStep[C, I, D](
-              p: PX[C],
-              f0: C => I,
-              f1: I => D,
-              s: PState[T, M, U],
-              depth: Int): Trampoline[F[(PState[T, M, U], D)]] = {
-            resume(0)(s)(p) match {
-              case ReturnStep(a, s) =>
-                Trampoline.done(mo.map(mo.pure(s -> a)) {
-                  case (s2, a2) => (s2, f1(f0(a2)))
-                })
-
-              case mfs: MapFusionStep[x, i, C] => //MapFusionStep(p1, f2, f3, s1) =>
-                if (depth >= maxDepth) {
-                  for {
-                    sr1 <- stepRun0(mfs.v, mfs.state)
-                  } yield
-                    mo.map(sr1) {
-                      case (s1, a1) =>
-                        (s1, f1(f0(mfs.f2(mfs.f1(a1)))))
-                    }
-                } else
-                  fusionStep(mfs.v,
-                             f0.compose(mfs.f2).compose(mfs.f1),
-                             f1,
-                             s,
-                             depth + 2)
-
-              case FStep(fsa0) =>
-                Trampoline.done(mo.map(fsa0) {
-                  case (s1, a1) =>
-                    s1 -> f1(f0(a1))
-                })
-
-              case FMStep(fa0, next0) =>
-                Trampoline.done(mo.flatMap(fa0) {
-                  case (s1, a1) =>
-                    mo.map(stepRun0(next0(a1), s1).run) {
-                      case (s2, a2) => s2 -> f1(f0(a2))
-                    }
-                })
-
-              case ApplyStep(pa, pf, next) =>
-                for {
-                  sra <- stepRun0(pa, state, idx + 1)
-                  srf <- stepRun0(pf, state, idx + 2)
-                } yield
-                  mo.flatMap(mo.map2(sra, srf) {
-                    case ((s1, a), (s2, f)) =>
-                      val s = upd.updateUnmanaged(s0,
-                                                  S.combine(s1.unmanaged,
-                                                            s2.unmanaged))
-                      (s, f(a))
-                  }) {
-                    case (s3, b) =>
-                      mo.map(stepRun0(next(b), s3, idx).run) {
-                        case (s4, a4) => (s4, f1(f0(a4)))
-                      }
-                  }
-            }
-          }
-          // depth is already 2 as we are in a mapfusionstep
-          fusionStep(p0, f0, f1, s0, 2)
-      }
-    }
-
-    stepRun0(this, state, idx).run
-  }
-
-  final def eval(state: PState[T, M, U])(implicit mo: MetaMonad[F],
-                                         upd: PStateUpdater[T, M, U],
-                                         S: MetaSemigroup[U]): F[A] =
+  @inline final def eval(state: PState[T, M, U])(implicit mo: MetaMonad[F],
+                                                 upd: PStateUpdater[T, M, U],
+                                                 trampolinedF: Trampolined[F],
+                                                 S: MetaSemigroup[U]): F[A] =
     mo.map(run(state))(_._2)
 
   @inline final def graph(g0: Graph)(
       implicit nod: ToNode[PState[T, M, U]]): Precepte[T, M, U, F, (Graph, A)] =
     Precepte.graph(g0)(this)
 
-  def mapSuspension(f: InstrumentStep[T, M, U, F]): Precepte[T, M, U, F, A]
+  def mapSuspension(
+      f: SubStepInstumentation[T, M, U, F]): Precepte[T, M, U, F, A]
 
   /** translates your effect into another one using a natural transformation */
   @inline final def compile[G[_]](iso: F <~~> G): Precepte[T, M, U, G, A] =
-    Precepte.compile(iso)(this)
+    Precepte.iso(iso)(this)
 
   @inline final def xmapState[UnmanagedState2](
       to: U => UnmanagedState2,
@@ -409,7 +151,7 @@ sealed trait Precepte[T, M, U, F[_], A] {
 private[precepte] final case class Pure[T, M, U, F[_], A](a: A)
     extends Precepte[T, M, U, F, A] {
   @inline final def mapSuspension(
-      f: InstrumentStep[T, M, U, F]): Pure[T, M, U, F, A] = this
+      f: SubStepInstumentation[T, M, U, F]): Pure[T, M, U, F, A] = this
 }
 
 /** Applicative/Monadic Lift
@@ -422,7 +164,7 @@ private[precepte] final case class Pure[T, M, U, F[_], A](a: A)
 private[precepte] final case class Lift[T, M, U, F[_], A](fa: F[A])
     extends Precepte[T, M, U, F, A] {
   @inline final def mapSuspension(
-      f: InstrumentStep[T, M, U, F]): Lift[T, M, U, F, A] = this
+      f: SubStepInstumentation[T, M, U, F]): Lift[T, M, U, F, A] = this
 }
 
 /** Trampolining
@@ -436,7 +178,7 @@ private[precepte] final case class Defer[T, M, U, F[_], A](
     defered: () => Precepte[T, M, U, F, A])
     extends Precepte[T, M, U, F, A] {
   @inline final def mapSuspension(
-      f: InstrumentStep[T, M, U, F]): Precepte[T, M, U, F, A] =
+      f: SubStepInstumentation[T, M, U, F]): Precepte[T, M, U, F, A] =
     Defer(() => defered().mapSuspension(f))
 }
 
@@ -449,7 +191,8 @@ private[precepte] final case class Defer[T, M, U, F[_], A](
   */
 private[precepte] final case class GetPState[T, M, U, F[_]]()
     extends Precepte[T, M, U, F, PState[T, M, U]] {
-  def mapSuspension(f: InstrumentStep[T, M, U, F]): GetPState[T, M, U, F] = this
+  def mapSuspension(
+      f: SubStepInstumentation[T, M, U, F]): GetPState[T, M, U, F] = this
 }
 
 /** Precepte Effect
@@ -463,7 +206,8 @@ private[precepte] final case class GetPState[T, M, U, F[_]]()
 private[precepte] final case class SetPState[T, M, U, F[_]](
     state: PState[T, M, U]
 ) extends Precepte[T, M, U, F, Unit] {
-  def mapSuspension(f: InstrumentStep[T, M, U, F]): SetPState[T, M, U, F] = this
+  def mapSuspension(
+      f: SubStepInstumentation[T, M, U, F]): SetPState[T, M, U, F] = this
 }
 
 /** Functorial Map
@@ -480,7 +224,7 @@ private[precepte] final case class Mapped[T, M, U, F[_], I, A](
   type _I = I
 
   @inline final def mapSuspension(
-      f: InstrumentStep[T, M, U, F]): Mapped[T, M, U, F, I, A] =
+      f: SubStepInstumentation[T, M, U, F]): Mapped[T, M, U, F, I, A] =
     Mapped(sub.mapSuspension(f), next)
 }
 
@@ -498,7 +242,7 @@ private[precepte] final case class Flatmap[T, M, U, F[_], I, A](
   type _I = I
 
   @inline final def mapSuspension(
-      f: InstrumentStep[T, M, U, F]): Flatmap[T, M, U, F, I, A] =
+      f: SubStepInstumentation[T, M, U, F]): Flatmap[T, M, U, F, I, A] =
     Flatmap(sub.mapSuspension(f), (i: I) => next(i).mapSuspension(f))
 }
 
@@ -516,7 +260,7 @@ private[precepte] final case class Apply[T, M, U, F[_], A, B](
   type _A = A
 
   @inline final def mapSuspension(
-      f: InstrumentStep[T, M, U, F]): Apply[T, M, U, F, A, B] =
+      f: SubStepInstumentation[T, M, U, F]): Apply[T, M, U, F, A, B] =
     Apply(pa.mapSuspension(f), pf.mapSuspension(f))
 }
 
@@ -530,12 +274,12 @@ private[precepte] final case class Apply[T, M, U, F[_], A, B](
 private[precepte] final case class SubStep[T, M, U, F[_], A](
     sub: Precepte[T, M, U, F, A],
     tags: T,
-    nats: Vector[InstrumentStep[T, M, U, F]],
+    nats: Vector[SubStepInstumentation[T, M, U, F]],
     leaf: Boolean
 ) extends Precepte[T, M, U, F, A] {
 
   @inline final def mapSuspension(
-      f: InstrumentStep[T, M, U, F]): SubStep[T, M, U, F, A] =
+      f: SubStepInstumentation[T, M, U, F]): SubStep[T, M, U, F, A] =
     SubStep(sub.mapSuspension(f), tags, nats.:+(f), leaf)
 
   @inline final def intrumented: Precepte[T, M, U, F, A] =
@@ -548,36 +292,144 @@ object Precepte extends Implicits {
       val tags = _tags
     }
 
-  def liftF[Ta, M, U, F[_], A](fa: F[A]): Precepte[Ta, M, U, F, A] =
+  //////////////////////////////////////////////////////////////////
+  //  Precepte Public API
+
+  /** Applicative Pure
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  def pure[T, M, U, F[_], A](a: A): Precepte[T, M, U, F, A] = Pure(a)
+
+  /** Lift an F
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  def liftF[T, M, U, F[_], A](fa: F[A]): Precepte[T, M, U, F, A] =
     Lift(fa)
 
-  def pure[Ta, M, U, F[_], A](a: A): Precepte[Ta, M, U, F, A] = Pure(a)
-
+  /** Get the current State
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
   @inline def get[T, M, U, F[_]]: Precepte[T, M, U, F, PState[T, M, U]] =
     GetPState()
 
+  /** Set the current State
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
   @inline def set[T, M, U, F[_]](
       state: PState[T, M, U]): Precepte[T, M, U, F, Unit] =
     SetPState[T, M, U, F](state)
 
+  /** Modify the current State
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def modify[T, M, U, F[_], A](
+      f: PState[T, M, U] => (PState[T, M, U], A)): Precepte[T, M, U, F, A] =
+    get.flatMap { s0 =>
+      val (s1, a) = f(s0)
+      set(s1).map(_ => a)
+    }
+
+  /** Delay the evaluation of the argument until this precepte is run.
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def delay[T, M, U, F[_], A](defered: => A): Precepte[T, M, U, F, A] =
+    Defer(() => Pure(defered))
+
+  /** Delay the evaluation of the argument until this precepte is run.
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
   @inline def defer[T, M, U, F[_], A](
       defered: => Precepte[T, M, U, F, A]): Precepte[T, M, U, F, A] =
     Defer(() => defered)
 
+  /** Delay the evaluation of the argument until this precepte is run.
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
   @inline final def deferedLift[T, M, U, F[_], A](
       ga: => F[A]): Precepte[T, M, U, F, A] =
     Defer(() => Lift(ga))
 
-  @inline def delay[T, M, U, F[_], A](defered: => A): Precepte[T, M, U, F, A] =
-    Defer(() => Pure(defered))
+  /** Functorial map
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def map[T, M, U, F[_], A, B](pa: Precepte[T, M, U, F, A])(
+      f: A => B): Precepte[T, M, U, F, B] =
+    pa match {
+      case Pure(a) => Pure(f(a))
+      case _       => Mapped(pa, f)
+    }
 
-  @inline def updateUnmamaged[T, M, U, F[_], A](x: (U, A))(
-      implicit upd: PStateUpdater[T, M, U]): Precepte[T, M, U, F, A] =
-    for {
-      state0 <- get
-      _ <- set(upd.updateUnmanaged(state0, x._1))
-    } yield x._2
+  /** Monadic FlatMap
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def flatMap[T, M, U, F[_], A, B](pa: Precepte[T, M, U, F, A])(
+      f: A => Precepte[T, M, U, F, B]): Precepte[T, M, U, F, B] =
+    pa match {
+      case Pure(a) => f(a)
+      case _       => Flatmap(pa, f)
+    }
 
+  /** Applicative ap
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def ap[T, M, U, F[_], A, B](pa: Precepte[T, M, U, F, A])(
+      pf: Precepte[T, M, U, F, A => B]): Precepte[T, M, U, F, B] =
+    (pa, pf) match {
+      case (Pure(a), Pure(f)) => Pure(f(a))
+      case (_, _)             => Apply(pa, pf)
+    }
+
+  /** Print the Graph
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
   final def graph[T, M, U, F[_], A](g0: Graph)(p: Precepte[T, M, U, F, A])(
       implicit nod: ToNode[PState[T, M, U]]): Precepte[T, M, U, F, (Graph, A)] =
     p match {
@@ -641,36 +493,29 @@ object Precepte extends Implicits {
     }
 
   /** translates your effect into another one using a natural transformation */
-  final def compile[T, M, U, F[_], A, G[_]](iso: F <~~> G)(
+  final def iso[T, M, U, F[_], A, G[_]](isoFG: F <~~> G)(
       p: Precepte[T, M, U, F, A]): Precepte[T, M, U, G, A] =
     p match {
-
-      case Pure(a) => Pure(a)
-
-      case _: GetPState[T, M, U, F] => GetPState()
-
+      case Pure(a)                    => Pure(a)
+      case _: GetPState[T, M, U, F]   => GetPState()
       case set: SetPState[T, M, U, F] => SetPState(set.state)
-
-      case Lift(fa) => Lift(iso.to(fa))
-
+      case Lift(fa)                   => Lift(isoFG.to(fa))
       case Defer(defered) =>
-        defered().compile(iso)
-
+        defered().compile(isoFG)
       case SubStep(sub, tags, nats, leaf) =>
-        SubStep(sub.compile(iso),
+        SubStep(sub.compile(isoFG),
                 tags,
-                nats.map(InstrumentStepFun.iso(iso)),
+                nats.map(SubStepInstrumentation.iso(isoFG)),
                 leaf)
 
-      case Mapped(sub2, f2) => Mapped(sub2.compile(iso), f2)
-
+      case Mapped(sub2, f2) => Mapped(sub2.compile(isoFG), f2)
       case f @ Flatmap(sub, next) =>
         def next2(gi: f._I): Precepte[T, M, U, G, A] =
-          next(gi).compile(iso)
-        Flatmap(sub.compile(iso), next2)
+          next(gi).compile(isoFG)
+        Flatmap(sub.compile(isoFG), next2)
 
       case Apply(pa, pfa) =>
-        Apply(pa.compile(iso), pfa.compile(iso))
+        Apply(pa.compile(isoFG), pfa.compile(isoFG))
     }
 
   @inline final def xmapState[T, M, U, F[_], A, U2](to: U => U2, from: U2 => U)(
@@ -694,7 +539,7 @@ object Precepte extends Implicits {
         SubStep(
           sub.xmapState(to, from),
           tags,
-          nats.map(InstrumentStepFun.xmapUnmanagedState(to, from)),
+          nats.map(SubStepInstrumentation.xmapUnmanagedState(to, from)),
           leaf
         )
 
@@ -707,38 +552,148 @@ object Precepte extends Implicits {
       case Apply(pa, pfa) =>
         Apply(pa.xmapState(to, from), pfa.xmapState(to, from))
     }
-  /*
-  @inline final def run[T, M, U, F[_], G[_]](
-      nt: F ~~> G,idx: Int = 0)(implicit G: MetaMonadPrecepte[T,M,U,G], upd: PStateUpdater[T,M,U]): Precepte[T,M,U,F,?] ~~> G = {
-    type P[A] = Precepte[T, M, U, F, A]
-    new (P ~~> G) {
-      def apply[A](pa: P[A]): G[A] =
-        pa match {
-          case Pure(x)                  => G.pure(x)
-          case Lift(gx)                 => G.defer(nt(gx))
-          case Mapped(sub, next)        => G.map(G.defer(apply(sub)))(next)
-          case Flatmap(sub, next)       => G.flatMap(G.defer(apply(sub))) { r => G.defer(apply(next(r))) }
-          case Apply(pa, pf)            => G.ap(G.defer(apply(pa)))(G.defer(apply(pf)))
-          case GetPState()              => G.get
-          case SetPState(s)             => G.set(s)
-          case SubStep(sub, tags, nats, leaf) =>
-            G.flatMap(G.get) { state0 =>
-              // append tags to managed state and propagate this new managed state to next step
-              val updatedState = upd.appendTags(state0, tags, 0)
 
-              G.flatMap(G.set(updatedState)) { _ =>
-                val gsub =
-                val instrumented =
-                  nats.foldLeft(gsub) {
-                    case (acc, nat) => nat(state0 -> acc)
+  @inline final def interpret[T, M, U, F[_], A, G[_]](nt: F ~~> G)(
+      p: Precepte[T, M, U, F, A])(implicit G: MetaMonadPrecepte[T, M, U, G],
+                                  upd: PStateUpdater[T, M, U]): G[A] = {
+    type P[Z] = Precepte[T, M, U, F, Z]
+
+    def aux[X](px: P[X]): G[X] =
+      px match {
+        case Pure(x)           => G.pure(x)
+        case Lift(gx)          => nt(gx)
+        case Defer(defered)    => aux(defered())
+        case Mapped(sub, next) => G.map(G.defer(aux(sub)))(next)
+        case Flatmap(sub, next) =>
+          G.flatMap(G.defer(aux(sub))) { r =>
+            G.defer(aux(next(r)))
+          }
+        case Apply(pa, pf) =>
+          G.ap(G.defer(aux(pa)))(G.defer(aux(pf)))
+        case _: GetPState[T, M, U, F]   => G.get
+        case set: SetPState[T, M, U, F] => G.set(set.state)
+
+        case sub: SubStep[T, M, U, F, a] =>
+          G.flatMap(G.modify(upd.appendTags(_, sub.tags, 0))) { _ =>
+            G.defer(aux(sub.intrumented))
+          }
+
+      }
+    aux(p)
+  }
+
+  @inline final def run[T, M, U, F[_], A, G[_]](nt: F ~~> G)(
+      p: Precepte[T, M, U, F, A])(st9999: PState[T, M, U])(
+      implicit G: MetaMonad[G],
+      GT: Trampolined[G],
+      upd: PStateUpdater[T, M, U],
+      U: MetaSemigroup[U]): G[(PState[T, M, U], A)] = {
+
+    type P[Z] = Precepte[T, M, U, F, Z]
+    type State = PState[T, M, U]
+    type GS[X] = G[(State, X)]
+
+    @inline def auxTrickTailRec[X](st0: State, px: P[X], cont: Cont[X]): GS[A] =
+      aux(st0, px, cont)
+
+    sealed abstract class Cont[X]
+    final case object IdK extends Cont[A]
+    final case class MappedK[I, X](next: I => X, cont: Cont[X]) extends Cont[I]
+    final case class FlatmapK[I, X](next: I => P[X], cont: Cont[X])
+        extends Cont[I]
+    final case class ApplyK1[I, X](st0: State, next: P[I => X], cont: Cont[X])
+        extends Cont[I]
+    final case class ApplyK2[I, X](st0: State, res1: GS[I], cont: Cont[X])
+        extends Cont[I => X]
+
+    final case class InvokeAux[X](st0: State, px: P[X], cont: Cont[X])
+
+    @tailrec
+    def aux[X](st0: State, px: P[X], cont: Cont[X]): GS[A] = {
+
+      type Ret = Either[GS[A], InvokeAux[_]]
+
+      @tailrec
+      def runCont[Z](cont: Cont[Z], gx: G[(State, Z)]): Ret =
+        cont match {
+          case IdK =>
+            Left(gx): Ret
+          case MappedK(next, k) =>
+            runCont(k, G.map(gx) { case (st1, i) => (st1, next(i)) })
+          case FlatmapK(next, k) =>
+            Left(G.flatMap(gx) {
+              case (s1, i) => GT.defer(auxTrickTailRec(s1, next(i), k))
+            })
+
+          case apk: ApplyK1[i, x] =>
+            Right(
+              InvokeAux[i => x](apk.st0,
+                                apk.next,
+                                ApplyK2[i, x](apk.st0, gx, apk.cont)))
+
+          case apk: ApplyK2[i, x] =>
+            runCont[x](
+              apk.cont,
+              G.ap[(State, i), (State, x)](apk.res1)(
+                G.map[(State, i => x), ((State, i)) => (State, x)](gx) {
+                  case (stf, g) => {
+                    case (sta, a) =>
+                      val st1 =
+                        upd.updateUnmanaged(apk.st0,
+                                            U.combine(sta.unmanaged,
+                                                      stf.unmanaged))
+                      st1 -> g(a)
                   }
-
-                FStep(finalst)
-              }
-            }
+                })
+            )
         }
+
+      px match {
+        case Pure(x) =>
+          runCont(cont, G.pure(st0 -> x)) match {
+            case Left(g)                => g
+            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+          }
+        case Lift(gx) =>
+          runCont(cont, G.map(nt(gx))(a => st0 -> a)) match {
+            case Left(g)                => g
+            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+          }
+        case Defer(defered) => aux(st0, defered(), cont)
+        case Mapped(sub, next) =>
+          aux(st0, sub, MappedK(next, cont))
+
+        case Flatmap(sub, next) =>
+          aux(st0, sub, FlatmapK(next, cont))
+
+        case Apply(pa, pf) =>
+          aux(st0, pa, ApplyK1(st0, pf, cont))
+
+        case _: GetPState[T, M, U, F] =>
+          runCont(cont, G.pure(st0 -> st0)) match {
+            case Left(g)                => g
+            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+          }
+        case set: SetPState[T, M, U, F] =>
+          runCont(cont, G.pure((set.state, ()))) match {
+            case Left(g)                => g
+            case Right(i: InvokeAux[a]) => aux(i.st0, i.px, i.cont)
+          }
+
+        case sub: SubStep[T, M, U, F, X] =>
+          val st1 = upd.appendTags(st0, sub.tags, 0)
+          aux(st1, sub.intrumented, cont)
+      }
     }
-  }*/
+
+    aux(st9999, p, IdK)
+  }
+  @inline def updateUnmamaged[T, M, U, F[_], A](x: (U, A))(
+      implicit upd: PStateUpdater[T, M, U]): Precepte[T, M, U, F, A] =
+    for {
+      state0 <- get
+      _ <- set(upd.updateUnmanaged(state0, x._1))
+    } yield x._2
 }
 
 trait PrecepteBuilder[Ta] {
@@ -802,7 +757,7 @@ trait PrecepteAPI[T, M, U, F[_]]
     extends MetaMonadPrecepte[T, M, U, Precepte[T, M, U, F, ?]] {
 
   final type precepte[A] = Precepte[T, M, U, F, A]
-  final type instrumentStep = InstrumentStep[T, M, U, F]
+  final type instrumentStep = SubStepInstumentation[T, M, U, F]
   final type state = PState[T, M, U]
 
   @inline final def pure[A](x: A): precepte[A] = Precepte.pure[T, M, U, F, A](x)

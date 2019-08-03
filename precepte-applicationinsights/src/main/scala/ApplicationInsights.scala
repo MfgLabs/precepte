@@ -114,8 +114,8 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
-  def monitor(
-      implicit ec: ExecutionContext): InstrumentStep[BaseTags, MS, C, Future] =
+  def monitor(implicit ec: ExecutionContext)
+    : SubStepInstumentation[BaseTags, MS, C, Future] =
     client match {
       case Success(clt) =>
         object P extends PrecepteAPI[BaseTags, MS, C, Future]

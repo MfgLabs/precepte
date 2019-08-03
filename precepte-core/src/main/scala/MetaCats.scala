@@ -44,15 +44,20 @@ trait MetaGlobalState[S, F[_]] {
   def set(s: S): F[Unit]
 }
 
-trait Trampolined[F[_]] extends MetaApplicative[F] {
+trait Trampolined[F[_]] {
   def defer[A](ga: => F[A]): F[A]
-  def delay[A](a: => A): F[A] = defer(pure(a))
 }
 
 trait MetaMonadPrecepte[T, M, U, F[_]]
     extends MetaMonad[F]
     with MetaGlobalState[PState[T, M, U], F]
-    with Trampolined[F]
+    with Trampolined[F] {
+
+  @inline final def modify(f: PState[T, M, U] => PState[T, M, U]): F[Unit] =
+    flatMap(get)(f.andThen(set))
+
+  @inline final def delay[A](a: => A): F[A] = defer(pure(a))
+}
 
 trait ~~>[F[_], G[_]] { self =>
   def apply[A](f: F[A]): G[A]
@@ -69,6 +74,12 @@ trait ~~>[F[_], G[_]] { self =>
     new (H ~~> K) {
       def apply[A](f: H[A]): K[A] = post(self(pre(f)))
     }
+}
+
+object ~~> {
+  def id[F[_]]: F ~~> F = new (F ~~> F) {
+    def apply[A](f: F[A]): F[A] = f
+  }
 }
 
 trait <~~>[F[_], G[_]] { self =>

@@ -586,8 +586,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     import cats.~>
 
-    type SF[T] = (ST[Int], Future[T])
-
     type P[X] = Precepte[BaseTags, MS, Int, Future, X]
     object P extends PrecepteAPI[BaseTags, MS, Int, Future]
 
@@ -617,6 +615,6 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
 
     val res = new CatsExt(p8).mapSuspension(Mon).eval(nostate).futureValue
     res should ===(())
-  }
 
+  }
 }

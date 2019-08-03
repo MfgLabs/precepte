@@ -88,8 +88,8 @@ final class Influx[C: MetaSemigroup](
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
-  def monitor(
-      implicit ex: ExecutionContext): InstrumentStep[BaseTags, MS, C, Future] =
+  def monitor(implicit ex: ExecutionContext)
+    : SubStepInstumentation[BaseTags, MS, C, Future] =
     influxDB match {
       case Success(in) =>
         object P extends PrecepteAPI[BaseTags, MS, C, Future]
