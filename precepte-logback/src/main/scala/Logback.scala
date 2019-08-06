@@ -43,7 +43,7 @@ final class Logback(val env: BaseEnv, val loggerName: String) {
       ScMap(
         env.environment.name -> env.environment.value,
         "span" -> span.value,
-        "path" -> path.map(_.id.value).mkString(sep, sep, ""),
+        "path" -> path.map(_.id.name).mkString(sep, sep, ""),
         "callees" -> callees,
         "parameters" -> ScMap(params: _*).asJava
       ).asJava

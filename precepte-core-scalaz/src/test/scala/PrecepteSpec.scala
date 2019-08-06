@@ -48,7 +48,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     def append(f1: Unit, f2: => Unit) = ()
   }
 
-  val ids = EndlessStream.unfold(1L)(n => (PId(n.toString), n + 1))
+  val ids = EndlessStream.unfold(BigInt(1L))(n => (PId("CostSpec", n), n + 1))
 
   "Precepte" should "run/eval simple" in {
     def f1 = Precepte(tags("simple.f1")) { (_: ST[Unit]) =>
@@ -456,7 +456,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         p4.graph(Graph.empty).eval(s).map {
           case (g, a) =>
             val value = s.managed.path.last.tags.callee.value
-            val id = value + "_" + s.managed.path.last.id.value
+            val id = value + "_" + s.managed.path.last.id.name
             val g1 = Graph.empty + Sub(id, value, g)
             (g1, a)
         }

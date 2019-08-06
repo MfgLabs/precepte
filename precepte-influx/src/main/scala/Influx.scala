@@ -57,7 +57,7 @@ final class Influx[C: MetaSemigroup](
     val p =
       path
         .map { c =>
-          c.id.value
+          c.id.name
         }
         .mkString(sep, sep, "")
 

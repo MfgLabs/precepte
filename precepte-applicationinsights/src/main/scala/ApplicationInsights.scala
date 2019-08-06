@@ -66,7 +66,7 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
     val p =
       path
         .map { c =>
-          c.id.value
+          c.id.name
         }
         .mkString(sep, sep, "")
 

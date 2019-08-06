@@ -45,7 +45,7 @@ final class PreStreamSpec extends FlatSpec with ScalaFutures {
 
   def nostate = ST(Span.gen, env, Vector.empty, ())
 
-  val ids = EndlessStream.unfold(1L)(n => (PId(n.toString), n + 1))
+  val ids = EndlessStream.unfold(BigInt(1L))(n => (PId("CostSpec", n), n + 1))
 
   implicit val as = ActorSystem()
   implicit val fm = ActorMaterializer()

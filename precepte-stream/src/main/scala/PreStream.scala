@@ -43,7 +43,7 @@ object PreStream {
   ): Flow[PState[T, M, U], (PState[T, M, U], A), NotUsed] = {
     type PS = PState[T, M, U]
 
-    def step[B](p: P[T, M, U, B])(idx: Int): Flow[PS, (PS, B), NotUsed] =
+    def step[B](p: P[T, M, U, B]): Flow[PS, (PS, B), NotUsed] =
       p match {
         case Pure(a) =>
           Flow[PS].mapAsync(parallelism) { state =>
@@ -64,10 +64,10 @@ object PreStream {
           Flow[PS].flatMapConcat { state =>
             Source
               .single(state)
-              .via(step(sub)(idx))
+              .via(step(sub))
               .recoverWithRetries(
                 retries,
-                { case e => Source.single(state).via(step(handler(e))(idx)) }
+                { case e => Source.single(state).via(step(handler(e))) }
               )
           }
 
@@ -82,18 +82,18 @@ object PreStream {
           }
 
         case Defer(defered) =>
-          step(defered())(idx)
+          step(defered())
 
         case Mapped(sub, pf) =>
-          step(sub)(idx).map {
+          step(sub).map {
             case (state, a) =>
               state -> pf(a)
           }
 
         case Flatmap(sub, next) =>
-          step(sub)(idx).flatMapConcat {
+          step(sub).flatMapConcat {
             case (state, a) =>
-              Source.single(state).via(step(next(a))(idx))
+              Source.single(state).via(step(next(a)))
           }
 
         case ap @ Apply(pa, pf) =>
@@ -102,13 +102,13 @@ object PreStream {
           Flow.fromGraph(GraphDSL.create() { implicit b =>
             val bcast = b.add(Broadcast[PS](2))
 
-            val ga: Flow[PS, (PS, ap._A), NotUsed] = step(pa)(idx + 1)
-            val gf: Flow[PS, (PS, ap._A => B), NotUsed] = step(pf)(idx + 2)
+            val ga: Flow[PS, (PS, ap._A), NotUsed] = step(pa)
+            val gf: Flow[PS, (PS, ap._A => B), NotUsed] = step(pf)
 
             val zip = b.add(ZipWith[(PS, ap._A), (PS, ap._A => B), (PS, B)] {
               case ((ps0, _a), (ps1, f)) =>
                 val ps =
-                  upd.updateUnmanaged(ps0,
+                  upd.updateUnmanaged(upd.recombine(ps0, ps0, ps1),
                                       sU.append(ps0.unmanaged, ps1.unmanaged))
                 ps -> f(_a)
             })
@@ -121,11 +121,11 @@ object PreStream {
 
         case ps: SubStep[T, M, U, Future, B] =>
           Flow[PS].mapAsync(parallelism) { state =>
-            val state0 = upd.appendTags(state, ps.tags, idx)
+            val state0 = upd.appendTags(state, ps.tags)
             ps.intrumented.run(state0)
           }
       }
 
-    step(pre)(0)
+    step(pre)
   }
 }

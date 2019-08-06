@@ -57,17 +57,45 @@ package object default extends HK {
 
   @inline implicit def pstateUpdater[C]: PStateUpdater[BaseTags, MS, C] =
     new PStateUpdater[BaseTags, MS, C] {
-      def appendTags(s: ST[C], tags: BaseTags, idx: Int) = {
-        val ids = s.managed.ids
-        val newId = PId(s"${ids.head.value}_${idx}")
-        val is0 = ManagedState(s.managed.env,
-                               s.managed.span,
-                               s.managed.path :+ Call(newId, tags),
-                               ids.tail)
-        s.copy(managed = is0)
+      def appendTags(s: ST[C], tags: BaseTags): PState[BaseTags, MS, C] = {
+        import s.managed._
+        s.copy(
+          managed = s.managed.copy(
+            path = path :+ Call(ids.head, tags),
+            ids = ids.tail
+          ))
       }
       def updateUnmanaged(s: ST[C], unmanaged: C): ST[C] =
         s.copy(unmanaged = unmanaged)
+
+      def spawn(s0: PState[BaseTags, MS, C])
+        : (PState[BaseTags, MS, C], PState[BaseTags, MS, C]) = {
+        import s0.managed._
+        val s1: PState[BaseTags, MS, C] = {
+          val idsOdd = ids.evenIndices
+          s0.copy(managed = s0.managed.copy(ids = idsOdd))
+        }
+        val s2: PState[BaseTags, MS, C] = {
+          val idsEven = ids.oddIndices
+          s0.copy(managed = s0.managed.copy(ids = idsEven))
+        }
+        (s1, s2)
+      }
+
+      /** Recombine the split states s1 and s2 from the [[spawn]] operation
+        * back into a single state. s0 is the original state used in [[spawn]].
+        *
+        * @param s0 the state that was split into (s1',s2').
+        *           into its own computation but need to be merged back.
+        * @param s1 the state that comes from {{{split(s0)._1}}} and lived its life
+        *           into its own computation but need to be merged back.
+        * @param s2 the state that comes from {{{split(s0)._2}}} and lived its life
+        *           into its own computation but need to be merged back.
+        */
+      def recombine(s0: S, s1: S, s2: S): S = {
+        s0.copy(
+          managed = s0.managed.copy(ids = s1.managed.ids.merge(s2.managed.ids)))
+      }
     }
 
   @inline implicit def toNode[C]: ToNode[ST[C]] =
@@ -75,7 +103,7 @@ package object default extends HK {
       def toNode(s: ST[C]): Node =
         s.managed.path.lastOption match {
           case Some(last) =>
-            val id = last.tags.callee.value + "_" + last.id.value
+            val id = last.tags.callee.value + "_" + last.id.name
             Leaf(id, last.tags.callee.value)
           case _ =>
             Leaf("ε", "ε")

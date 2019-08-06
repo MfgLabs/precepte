@@ -50,7 +50,7 @@ class CostSpec extends FlatSpec with ScalaFutures {
     def append(f1: Unit, f2: => Unit) = ()
   }
 
-  val ids = EndlessStream.unfold(1L)(n => (PId(n.toString), n + 1))
+  val ids = EndlessStream.unfold(BigInt(1L))(n => (PId("CostSpec", n), n + 1))
 
   def timeMs[T](f: => Future[T]): Double = {
     val bef = System.nanoTime

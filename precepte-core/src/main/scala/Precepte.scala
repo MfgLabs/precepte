@@ -19,6 +19,7 @@ package precepte
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
+import scala.util.{Failure, Success, Try}
 
 /**
   * Precepte, let your code be state-aware and make runtime effect observation acceptable...
@@ -93,18 +94,28 @@ import scala.language.higherKinds
 sealed trait Precepte[T, M, U, F[_], A] {
   self =>
 
-  final type P[A0] = Precepte[T, M, U, F, A0]
+  final type precepte[A0] = Precepte[T, M, U, F, A0]
 
-  @inline final def flatMap[B](f: A => P[B]): P[B] =
+  @inline final def flatMap[B](f: A => precepte[B]): precepte[B] =
     Precepte.flatMap[T, M, U, F, A, B](this)(f)
 
-  @inline final def map[B](f: A => B): P[B] =
+  @inline final def map[B](f: A => B): precepte[B] =
     Precepte.map(this)(f)
 
-  @inline final def ap[B](f: P[A => B]): P[B] =
+  @inline final def ap[B](f: precepte[A => B]): precepte[B] =
     Precepte.ap(this)(f)
 
-  @inline final def lift[G[_]](implicit ap: MetaApplicative[G]): P[G[A]] =
+  @inline final def recoverWith(
+      handler: Throwable => precepte[A]): precepte[A] =
+    Precepte.catchError(this)(handler)
+
+  @inline final def attempt: precepte[Try[A]] =
+    map(x => Success(x): Try[A]).recoverWith { e =>
+      Precepte.pure[T, M, U, F, Try[A]](Failure(e))
+    }
+
+  @inline final def lift[G[_]](
+      implicit ap: MetaApplicative[G]): precepte[G[A]] =
     map(a => ap.pure(a))
 
   @inline final def run(state: PState[T, M, U])(
@@ -128,11 +139,10 @@ sealed trait Precepte[T, M, U, F[_], A] {
     mo.map(run(state))(_._2)
 
   @inline final def graph(g0: Graph)(
-      implicit nod: ToNode[PState[T, M, U]]): Precepte[T, M, U, F, (Graph, A)] =
+      implicit nod: ToNode[PState[T, M, U]]): precepte[(Graph, A)] =
     Precepte.graph(g0)(this)
 
-  def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): Precepte[T, M, U, F, A]
+  def mapSuspension(f: SubStepInstumentation[T, M, U, F]): precepte[A]
 
   /** translates your effect into another one using a natural transformation */
   @inline final def compile[G[_]](iso: F <~~> G): Precepte[T, M, U, G, A] =
@@ -247,6 +257,28 @@ private[precepte] final case class CatchError[T, M, U, F[_], A](
                (e: Throwable) => handler(e).mapSuspension(f))
 }
 
+/** Precepte Effect
+  *
+  * @tparam T Tags
+  * @tparam M Managed State
+  * @tparam U Unmanaged State
+  * @tparam F Base functor
+  */
+private[precepte] final case class SubStep[T, M, U, F[_], A](
+    sub: Precepte[T, M, U, F, A],
+    tags: T,
+    nats: Vector[SubStepInstumentation[T, M, U, F]],
+    leaf: Boolean
+) extends Precepte[T, M, U, F, A] {
+
+  @inline final def mapSuspension(
+      f: SubStepInstumentation[T, M, U, F]): SubStep[T, M, U, F, A] =
+    SubStep(sub.mapSuspension(f), tags, nats.:+(f), leaf)
+
+  @inline final def intrumented: Precepte[T, M, U, F, A] =
+    nats.foldLeft(sub) { case (acc, nat) => nat(acc) }
+}
+
 /** Functorial Map
   *
   * @tparam T Tags
@@ -301,29 +333,7 @@ private[precepte] final case class Apply[T, M, U, F[_], A, B](
     Apply(pa.mapSuspension(f), pf.mapSuspension(f))
 }
 
-/** Precepte Effect
-  *
-  * @tparam T Tags
-  * @tparam M Managed State
-  * @tparam U Unmanaged State
-  * @tparam F Base functor
-  */
-private[precepte] final case class SubStep[T, M, U, F[_], A](
-    sub: Precepte[T, M, U, F, A],
-    tags: T,
-    nats: Vector[SubStepInstumentation[T, M, U, F]],
-    leaf: Boolean
-) extends Precepte[T, M, U, F, A] {
-
-  @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): SubStep[T, M, U, F, A] =
-    SubStep(sub.mapSuspension(f), tags, nats.:+(f), leaf)
-
-  @inline final def intrumented: Precepte[T, M, U, F, A] =
-    nats.foldLeft(sub) { case (acc, nat) => nat(acc) }
-}
-
-object Precepte extends Implicits {
+object Precepte {
   def apply[Ta](_tags: Ta): PrecepteBuilder[Ta] =
     new PrecepteBuilder[Ta] {
       val tags = _tags
@@ -444,6 +454,21 @@ object Precepte extends Implicits {
       ga: => F[A]): Precepte[T, M, U, F, A] =
     Defer(() => Lift(ga))
 
+  /** Precepte Effect
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline final def subStep[T, M, U, F[_], A](
+      tags: T,
+      leaf: Boolean = true,
+      nats: Vector[SubStepInstumentation[T, M, U, F]] = Vector.empty
+  )(
+      sub: Precepte[T, M, U, F, A]
+  ): Precepte[T, M, U, F, A] = SubStep(sub, tags, nats, leaf)
+
   /** Functorial map
     *
     * @tparam T Tags
@@ -488,6 +513,19 @@ object Precepte extends Implicits {
 
   ///////////////////////////////////////////////////
   // Functions
+
+  /** Conversion from Try to Precepte
+    *
+    * @tparam T Tags
+    * @tparam M Managed State
+    * @tparam U Unmanaged State
+    * @tparam F Base functor
+    */
+  @inline def fromTry[T, M, U, F[_], A](v: Try[A]): Precepte[T, M, U, F, A] =
+    v match {
+      case Success(a) => pure(a)
+      case Failure(e) => raiseError(e)
+    }
 
   /** Print the Graph
     *
@@ -664,7 +702,7 @@ object Precepte extends Implicits {
         case set: SetPState[T, M, U, F] => G.set(set.state)
 
         case sub: SubStep[T, M, U, F, a] =>
-          G.flatMap(G.modify(upd.appendTags(_, sub.tags, 0))) { _ =>
+          G.flatMap(G.modify(upd.appendTags(_, sub.tags))) { _ =>
             G.defer(aux(sub.intrumented))
           }
 
@@ -695,11 +733,14 @@ object Precepte extends Implicits {
         extends Cont[I, B]
     final case class FlatmapK[I, X, B](next: I => P[X], cont: Cont[X, B])
         extends Cont[I, B]
-    final case class ApplyK1[I, X, B](st0: State,
+    final case class ApplyK1[I, X, B](originalState: State,
+                                      secondState: State,
                                       next: P[I => X],
                                       cont: Cont[X, B])
         extends Cont[I, B]
-    final case class ApplyK2[I, X, B](st0: State, res1: GS[I], cont: Cont[X, B])
+    final case class ApplyK2[I, X, B](originalState: State,
+                                      res1: GS[I],
+                                      cont: Cont[X, B])
         extends Cont[I => X, B]
     final case class CatchErrorK[X, B](st0: State,
                                        handler: Throwable => P[X],
@@ -727,9 +768,10 @@ object Precepte extends Implicits {
 
           case apk: ApplyK1[i, x, a] =>
             Right(
-              InvokeAux[i => x, a](apk.st0,
-                                   apk.next,
-                                   ApplyK2[i, x, a](apk.st0, gx, apk.cont)))
+              InvokeAux[i => x, a](
+                apk.secondState,
+                apk.next,
+                ApplyK2[i, x, a](apk.originalState, gx, apk.cont)))
 
           case apk: ApplyK2[i, x, a] =>
             runCont[x](
@@ -739,9 +781,9 @@ object Precepte extends Implicits {
                   case (stf, g) => {
                     case (sta, a) =>
                       val st1 =
-                        upd.updateUnmanaged(apk.st0,
-                                            U.combine(sta.unmanaged,
-                                                      stf.unmanaged))
+                        upd.updateUnmanaged(
+                          upd.recombine(apk.originalState, sta, stf),
+                          U.combine(sta.unmanaged, stf.unmanaged))
                       st1 -> g(a)
                   }
                 })
@@ -773,7 +815,8 @@ object Precepte extends Implicits {
           aux(st0, sub, FlatmapK(next, cont))
 
         case Apply(pa, pf) =>
-          aux(st0, pa, ApplyK1(st0, pf, cont))
+          val (st1, st2) = upd.spawn(st0)
+          aux(st1, pa, ApplyK1(st0, st2, pf, cont))
 
         case _: GetPState[T, M, U, F] =>
           runCont(cont, G.pure(st0 -> st0)) match {
@@ -796,7 +839,7 @@ object Precepte extends Implicits {
           aux(st0, sub, CatchErrorK(st0, h, cont))
 
         case sub: SubStep[T, M, U, F, X] =>
-          val st1 = upd.appendTags(st0, sub.tags, 0)
+          val st1 = upd.appendTags(st0, sub.tags)
           aux(st1, sub.intrumented, cont)
       }
     }
@@ -805,10 +848,9 @@ object Precepte extends Implicits {
   }
   @inline def updateUnmamaged[T, M, U, F[_], A](x: (U, A))(
       implicit upd: PStateUpdater[T, M, U]): Precepte[T, M, U, F, A] =
-    for {
-      state0 <- get
-      _ <- set(upd.updateUnmanaged(state0, x._1))
-    } yield x._2
+    Precepte.modify { s =>
+      (upd.updateUnmanaged(s, x._1), x._2)
+    }
 
   trait PrecepteInstances[T, M, U, F[_]]
       extends MetaMonadPrecepteEffect[T, M, U, Precepte[T, M, U, F, ?]] {
@@ -837,6 +879,13 @@ object Precepte extends Implicits {
     @inline final def catchError[A](sub: precepte[A])(
         handler: Throwable => precepte[A]): precepte[A] =
       Precepte.catchError(sub)(handler)
+
+    @inline final def subStep[A](
+        tags: T,
+        nats: Vector[SubStepInstumentation[T, M, U, F]] = Vector.empty,
+        leaf: Boolean = true)(
+        sub: precepte[A]
+    ): precepte[A] = Precepte.subStep(tags, leaf, nats)(sub)
 
     @inline final def map[A, B](fa: precepte[A])(f: A => B): precepte[B] =
       fa.map(f)
@@ -908,31 +957,4 @@ trait PrecepteBuilder[Ta] {
   def apply[M, U, F[_], A](
       m: => Precepte[Ta, M, U, F, A]): Precepte[Ta, M, U, F, A] =
     applyP(_ => m)
-}
-
-trait Implicits {
-
-  @inline implicit def precepteMetaMonad[Ta, ManagedState, UnmanagedState, F[_]]
-    : MetaMonad[Precepte[Ta, ManagedState, UnmanagedState, F, ?]] =
-    new MetaMonad[Precepte[Ta, ManagedState, UnmanagedState, F, ?]] {
-      override def pure[A](
-          a: A): Precepte[Ta, ManagedState, UnmanagedState, F, A] =
-        Pure(a)
-      override def map[A, B](
-          m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(
-          f: A => B): Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-        m.map(f)
-      override def flatMap[A, B](
-          m: Precepte[Ta, ManagedState, UnmanagedState, F, A])(
-          f: A => Precepte[Ta, ManagedState, UnmanagedState, F, B])
-        : Precepte[Ta, ManagedState, UnmanagedState, F, B] =
-        m.flatMap(f)
-
-      override def ap[A, B](
-          pa: Precepte[Ta, ManagedState, UnmanagedState, F, A])(
-          pab: Precepte[Ta, ManagedState, UnmanagedState, F, A => B])
-        : Precepte[Ta, ManagedState, UnmanagedState, F, B] = {
-        Apply(pa, pab)
-      }
-    }
 }
