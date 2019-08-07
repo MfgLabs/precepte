@@ -61,8 +61,8 @@ object EndlessStream extends MetaDefer[EndlessStream] {
 
   @inline final def defer[A](ga: => EndlessStream[A]): EndlessStream[A] =
     new EndlessStream[A] {
-      lazy val defered: EndlessStream[A] = ga
-      lazy val head: A = defered.head
-      lazy val tail: EndlessStream[A] = defered.tail
+      lazy val deferred: EndlessStream[A] = ga
+      lazy val head: A = deferred.head
+      lazy val tail: EndlessStream[A] = deferred.tail
     }
 }

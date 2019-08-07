@@ -115,7 +115,7 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
   def monitor(implicit ec: ExecutionContext)
-    : SubStepInstumentation[BaseTags, MS, C, Future] =
+    : SubStepInstrumentation[BaseTags, MS, C, Future] =
     client match {
       case Success(clt) =>
         object P extends Precepte.API[BaseTags, MS, C, Future]
@@ -125,13 +125,14 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
             for {
               st <- P.get
               t0 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
-              r <- p.map(Success(_))
-              t1 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
-              now <- P.lift(
-                Future(tag[MILLISECONDS.type](System.currentTimeMillis())))
-              telemetry = toTelemetry(t0, t1, now, st, r.failed.toOption)
-              _ <- P.lift(Future(clt.track(telemetry)))
-              x <- P.lift(Future.fromTry(r))
+              r <- p.attempt
+              _ <- P.lift(Future {
+                val t1 = tag[NANOSECONDS.type](System.nanoTime())
+                val now = tag[MILLISECONDS.type](System.currentTimeMillis())
+                val telemetry = toTelemetry(t0, t1, now, st, r.failed.toOption)
+                clt.track(telemetry)
+              }.recover { case _ => () })
+              x <- P.fromTry(r)
             } yield x
         }
       case Failure(e) => throw e

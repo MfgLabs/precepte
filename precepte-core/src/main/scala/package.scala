@@ -26,7 +26,7 @@ package object precepte {
     * @tparam U Precepte Unmanaged State
     * @tparam F Base effect
     */
-  type SubStepInstumentation[T, M, U, F[_]] =
+  type SubStepInstrumentation[T, M, U, F[_]] =
     Precepte[T, M, U, F, ?] ~~> Precepte[T, M, U, F, ?]
 
   /** Dummy implicit to declare Future is trampolined */

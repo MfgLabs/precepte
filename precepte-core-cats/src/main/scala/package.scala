@@ -37,7 +37,7 @@ package object corecats extends SubMeta {
         with cats.Defer[Precepte[T, M, U, F, ?]] {
 
       final type precepte[A] = Precepte[T, M, U, F, A]
-      final type instrumentStep = SubStepInstumentation[T, M, U, F]
+      final type instrumentStep = SubStepInstrumentation[T, M, U, F]
       final type state = PState[T, M, U]
 
       final val monad: Monad[Precepte[T, M, U, F, ?]] = this

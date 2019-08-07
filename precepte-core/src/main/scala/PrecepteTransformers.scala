@@ -28,13 +28,13 @@ object PrecepteTransformers {
     * @tparam U Type of Precepte Unmanaged State
     * @tparam F Base Functor
     */
-  type PrepcepteT[T, M, U, F[_], A] =
+  type PrecepteT[T, M, U, F[_], A] =
     PState[T, M, U] => F[(PState[T, M, U], A)]
 
-  def liftPrepceteT[T, M, U, F[_]](
-      F: MetaFunctor[F]): F ~~> PrepcepteT[T, M, U, F, ?] =
-    new (F ~~> PrepcepteT[T, M, U, F, ?]) {
-      def apply[A](fa: F[A]): PrepcepteT[T, M, U, F, A] =
+  def liftPrecepteT[T, M, U, F[_]](
+      F: MetaFunctor[F]): F ~~> PrecepteT[T, M, U, F, ?] =
+    new (F ~~> PrecepteT[T, M, U, F, ?]) {
+      def apply[A](fa: F[A]): PrecepteT[T, M, U, F, A] =
         (s: PState[T, M, U]) =>
           F.map(fa) { a: A =>
             ((s, a))
@@ -47,7 +47,7 @@ object PrecepteTransformers {
       upd: PStateUpdater[T, M, U],
       FD: MetaDefer[F],
       S: MetaSemigroup[U])
-    : MetaMonadPrecepteEffect[T, M, U, PrepcepteT[T, M, U, F, ?]] =
+    : MetaMonadPrecepteEffect[T, M, U, PrecepteT[T, M, U, F, ?]] =
     new PrecepteTInstances[T, M, U, F]
 
   class PrecepteTInstances[T, M, U, F[_]](implicit
@@ -56,48 +56,48 @@ object PrecepteTransformers {
                                           FD: MetaDefer[F],
                                           upd: PStateUpdater[T, M, U],
                                           S: MetaSemigroup[U])
-      extends MetaMonadPrecepteEffect[T, M, U, PrepcepteT[T, M, U, F, ?]] {
+      extends MetaMonadPrecepteEffect[T, M, U, PrecepteT[T, M, U, F, ?]] {
 
     final type State = PState[T, M, U]
     final type G[X] = F[(State, X)]
 
-    @inline final def pure[A](x: A): PrepcepteT[T, M, U, F, A] =
+    @inline final def pure[A](x: A): PrecepteT[T, M, U, F, A] =
       (s: State) => F.pure((s, x))
 
-    @inline final def get: PrepcepteT[T, M, U, F, PState[T, M, U]] =
+    @inline final def get: PrecepteT[T, M, U, F, PState[T, M, U]] =
       (s: State) => F.pure((s, s))
 
-    @inline final def set(s: PState[T, M, U]): PrepcepteT[T, M, U, F, Unit] =
+    @inline final def set(s: PState[T, M, U]): PrecepteT[T, M, U, F, Unit] =
       (_: State) => F.pure((s, ()))
 
     @inline final def defer[A](
-        ga: => PrepcepteT[T, M, U, F, A]): PrepcepteT[T, M, U, F, A] =
+        ga: => PrecepteT[T, M, U, F, A]): PrecepteT[T, M, U, F, A] =
       (s: State) => FD.defer(ga(s))
 
-    @inline final def raiseError[A](e: Throwable): PrepcepteT[T, M, U, F, A] =
+    @inline final def raiseError[A](e: Throwable): PrecepteT[T, M, U, F, A] =
       (_: State) => FE.raiseError(e)
 
-    @inline final def catchError[A](sub: PrepcepteT[T, M, U, F, A])(
-        handler: Throwable => PrepcepteT[T, M, U, F, A])
-      : PrepcepteT[T, M, U, F, A] =
+    @inline final def catchError[A](sub: PrecepteT[T, M, U, F, A])(
+        handler: Throwable => PrecepteT[T, M, U, F, A])
+      : PrecepteT[T, M, U, F, A] =
       (s: State) =>
         FE.catchError(sub(s)) { e: Throwable =>
           handler(e)(s)
       }
 
-    @inline final def map[A, B](fa: PrepcepteT[T, M, U, F, A])(
-        f: A => B): PrepcepteT[T, M, U, F, B] =
+    @inline final def map[A, B](fa: PrecepteT[T, M, U, F, A])(
+        f: A => B): PrecepteT[T, M, U, F, B] =
       (s: State) => F.map(fa(s)) { case (s1, a) => (s1, f(a)) }
 
-    @inline final def flatMap[A, B](pla: PrepcepteT[T, M, U, F, A])(
-        f: A => PrepcepteT[T, M, U, F, B]): PrepcepteT[T, M, U, F, B] =
+    @inline final def flatMap[A, B](pla: PrecepteT[T, M, U, F, A])(
+        f: A => PrecepteT[T, M, U, F, B]): PrecepteT[T, M, U, F, B] =
       (s0: State) =>
         F.flatMap(pla(s0)) {
           case (s1, a) => f(a)(s1)
       }
 
-    @inline final def ap[A, B](pla: PrepcepteT[T, M, U, F, A])(
-        plf: PrepcepteT[T, M, U, F, A => B]): PrepcepteT[T, M, U, F, B] =
+    @inline final def ap[A, B](pla: PrecepteT[T, M, U, F, A])(
+        plf: PrecepteT[T, M, U, F, A => B]): PrecepteT[T, M, U, F, B] =
       (s0: State) =>
         F.map2[(State, A), (State, A => B), (State, B)](
           pla(s0),

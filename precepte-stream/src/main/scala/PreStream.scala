@@ -81,8 +81,8 @@ object PreStream {
             fa.map(a => state -> a)
           }
 
-        case Defer(defered) =>
-          step(defered())
+        case Defer(deferred) =>
+          step(deferred())
 
         case Mapped(sub, pf) =>
           step(sub).map {

@@ -142,7 +142,7 @@ sealed trait Precepte[T, M, U, F[_], A] {
       implicit nod: ToNode[PState[T, M, U]]): precepte[(Graph, A)] =
     Precepte.graph(g0)(this)
 
-  def mapSuspension(f: SubStepInstumentation[T, M, U, F]): precepte[A]
+  def mapSuspension(f: SubStepInstrumentation[T, M, U, F]): precepte[A]
 
   /** translates your effect into another one using a natural transformation */
   @inline final def compile[G[_]](iso: F <~~> G): Precepte[T, M, U, G, A] =
@@ -164,7 +164,7 @@ sealed trait Precepte[T, M, U, F[_], A] {
 private[precepte] final case class Pure[T, M, U, F[_], A](a: A)
     extends Precepte[T, M, U, F, A] {
   @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): Pure[T, M, U, F, A] = this
+      f: SubStepInstrumentation[T, M, U, F]): Pure[T, M, U, F, A] = this
 }
 
 /** Applicative/Monadic Lift
@@ -177,7 +177,7 @@ private[precepte] final case class Pure[T, M, U, F[_], A](a: A)
 private[precepte] final case class Lift[T, M, U, F[_], A](fa: F[A])
     extends Precepte[T, M, U, F, A] {
   @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): Lift[T, M, U, F, A] = this
+      f: SubStepInstrumentation[T, M, U, F]): Lift[T, M, U, F, A] = this
 }
 
 /** Trampolining
@@ -188,11 +188,11 @@ private[precepte] final case class Lift[T, M, U, F[_], A](fa: F[A])
   * @tparam F Base functor
   */
 private[precepte] final case class Defer[T, M, U, F[_], A](
-    defered: () => Precepte[T, M, U, F, A])
+    deferred: () => Precepte[T, M, U, F, A])
     extends Precepte[T, M, U, F, A] {
   @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): Precepte[T, M, U, F, A] =
-    Defer(() => defered().mapSuspension(f))
+      f: SubStepInstrumentation[T, M, U, F]): Precepte[T, M, U, F, A] =
+    Defer(() => deferred().mapSuspension(f))
 }
 
 /** Precepte Effect
@@ -205,7 +205,7 @@ private[precepte] final case class Defer[T, M, U, F[_], A](
 private[precepte] final case class GetPState[T, M, U, F[_]]()
     extends Precepte[T, M, U, F, PState[T, M, U]] {
   def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): GetPState[T, M, U, F] = this
+      f: SubStepInstrumentation[T, M, U, F]): GetPState[T, M, U, F] = this
 }
 
 /** Precepte Effect
@@ -220,7 +220,7 @@ private[precepte] final case class SetPState[T, M, U, F[_]](
     state: PState[T, M, U]
 ) extends Precepte[T, M, U, F, Unit] {
   def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): SetPState[T, M, U, F] = this
+      f: SubStepInstrumentation[T, M, U, F]): SetPState[T, M, U, F] = this
 }
 
 /** Precepte Raise Error
@@ -235,7 +235,7 @@ private[precepte] final case class RaiseError[T, M, U, F[_], A](
     error: Throwable
 ) extends Precepte[T, M, U, F, A] {
   def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): RaiseError[T, M, U, F, A] =
+      f: SubStepInstrumentation[T, M, U, F]): RaiseError[T, M, U, F, A] =
     this
 }
 
@@ -252,7 +252,7 @@ private[precepte] final case class CatchError[T, M, U, F[_], A](
     handler: Throwable => Precepte[T, M, U, F, A]
 ) extends Precepte[T, M, U, F, A] {
   def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): CatchError[T, M, U, F, A] =
+      f: SubStepInstrumentation[T, M, U, F]): CatchError[T, M, U, F, A] =
     CatchError(sub.mapSuspension(f),
                (e: Throwable) => handler(e).mapSuspension(f))
 }
@@ -267,12 +267,12 @@ private[precepte] final case class CatchError[T, M, U, F[_], A](
 private[precepte] final case class SubStep[T, M, U, F[_], A](
     sub: Precepte[T, M, U, F, A],
     tags: T,
-    nats: Vector[SubStepInstumentation[T, M, U, F]],
+    nats: Vector[SubStepInstrumentation[T, M, U, F]],
     leaf: Boolean
 ) extends Precepte[T, M, U, F, A] {
 
   @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): SubStep[T, M, U, F, A] =
+      f: SubStepInstrumentation[T, M, U, F]): SubStep[T, M, U, F, A] =
     SubStep(sub.mapSuspension(f), tags, nats.:+(f), leaf)
 
   @inline final def intrumented: Precepte[T, M, U, F, A] =
@@ -293,7 +293,7 @@ private[precepte] final case class Mapped[T, M, U, F[_], I, A](
   type _I = I
 
   @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): Mapped[T, M, U, F, I, A] =
+      f: SubStepInstrumentation[T, M, U, F]): Mapped[T, M, U, F, I, A] =
     Mapped(sub.mapSuspension(f), next)
 }
 
@@ -311,7 +311,7 @@ private[precepte] final case class Flatmap[T, M, U, F[_], I, A](
   type _I = I
 
   @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): Flatmap[T, M, U, F, I, A] =
+      f: SubStepInstrumentation[T, M, U, F]): Flatmap[T, M, U, F, I, A] =
     Flatmap(sub.mapSuspension(f), (i: I) => next(i).mapSuspension(f))
 }
 
@@ -329,7 +329,7 @@ private[precepte] final case class Apply[T, M, U, F[_], A, B](
   type _A = A
 
   @inline final def mapSuspension(
-      f: SubStepInstumentation[T, M, U, F]): Apply[T, M, U, F, A, B] =
+      f: SubStepInstrumentation[T, M, U, F]): Apply[T, M, U, F, A, B] =
     Apply(pa.mapSuspension(f), pf.mapSuspension(f))
 }
 
@@ -429,8 +429,8 @@ object Precepte {
     * @tparam U Unmanaged State
     * @tparam F Base functor
     */
-  @inline def delay[T, M, U, F[_], A](defered: => A): Precepte[T, M, U, F, A] =
-    Defer(() => Pure(defered))
+  @inline def delay[T, M, U, F[_], A](deferred: => A): Precepte[T, M, U, F, A] =
+    Defer(() => Pure(deferred))
 
   /** Delay the evaluation of the argument until this precepte is run.
     *
@@ -440,8 +440,8 @@ object Precepte {
     * @tparam F Base functor
     */
   @inline def defer[T, M, U, F[_], A](
-      defered: => Precepte[T, M, U, F, A]): Precepte[T, M, U, F, A] =
-    Defer(() => defered)
+      deferred: => Precepte[T, M, U, F, A]): Precepte[T, M, U, F, A] =
+    Defer(() => deferred)
 
   /** Delay the evaluation of the argument until this precepte is run.
     *
@@ -450,7 +450,7 @@ object Precepte {
     * @tparam U Unmanaged State
     * @tparam F Base functor
     */
-  @inline final def deferedLift[T, M, U, F[_], A](
+  @inline final def deferredLift[T, M, U, F[_], A](
       ga: => F[A]): Precepte[T, M, U, F, A] =
     Defer(() => Lift(ga))
 
@@ -464,7 +464,7 @@ object Precepte {
   @inline final def subStep[T, M, U, F[_], A](
       tags: T,
       leaf: Boolean = true,
-      nats: Vector[SubStepInstumentation[T, M, U, F]] = Vector.empty
+      nats: Vector[SubStepInstrumentation[T, M, U, F]] = Vector.empty
   )(
       sub: Precepte[T, M, U, F, A]
   ): Precepte[T, M, U, F, A] = SubStep(sub, tags, nats, leaf)
@@ -555,8 +555,8 @@ object Precepte {
       case Lift(fa) =>
         Lift(fa).map(g0 -> _)
 
-      case Defer(defered) =>
-        defered().graph(g0)
+      case Defer(deferred) =>
+        deferred().graph(g0)
 
       case ps: SubStep[T, M, U, F, A] =>
         Flatmap[T, M, U, F, PState[T, M, U], (Graph, A)](
@@ -610,8 +610,8 @@ object Precepte {
       case _: GetPState[T, M, U, F]   => GetPState()
       case set: SetPState[T, M, U, F] => SetPState(set.state)
       case Lift(fa)                   => Lift(isoFG.to(fa))
-      case Defer(defered) =>
-        defered().compile(isoFG)
+      case Defer(deferred) =>
+        deferred().compile(isoFG)
       case RaiseError(e) => RaiseError(e)
 
       case CatchError(sub, h) =>
@@ -647,8 +647,8 @@ object Precepte {
 
       case Lift(fa) => Lift(fa)
 
-      case Defer(defered) =>
-        defered().xmapState(to, from)
+      case Defer(deferred) =>
+        deferred().xmapState(to, from)
 
       case RaiseError(e) =>
         RaiseError(e)
@@ -690,7 +690,7 @@ object Precepte {
           G.catchError(G.defer(aux(sub))) { (e: Throwable) =>
             G.defer(aux(h(e)))
           }
-        case Defer(defered)    => aux(defered())
+        case Defer(deferred)   => aux(deferred())
         case Mapped(sub, next) => G.map(G.defer(aux(sub)))(next)
         case Flatmap(sub, next) =>
           G.flatMap(G.defer(aux(sub))) { r =>
@@ -806,7 +806,7 @@ object Precepte {
             case Left(g)                   => g
             case Right(i: InvokeAux[a, b]) => aux(i.st0, i.px, i.cont)
           }
-        case Defer(defered) => aux(st0, defered(), cont)
+        case Defer(deferred) => aux(st0, deferred(), cont)
 
         case Mapped(sub, next) =>
           aux(st0, sub, MappedK(next, cont))
@@ -856,7 +856,7 @@ object Precepte {
       extends MetaMonadPrecepteEffect[T, M, U, Precepte[T, M, U, F, ?]] {
 
     final type precepte[A] = Precepte[T, M, U, F, A]
-    final type instrumentStep = SubStepInstumentation[T, M, U, F]
+    final type instrumentStep = SubStepInstrumentation[T, M, U, F]
     final type state = PState[T, M, U]
 
     @inline final def pure[A](x: A): precepte[A] =
@@ -866,8 +866,8 @@ object Precepte {
     @inline final def defer[A](ga: => precepte[A]): precepte[A] =
       Precepte.defer[T, M, U, F, A](ga)
 
-    @inline final def deferedLift[A](ga: => F[A]): precepte[A] =
-      Precepte.deferedLift[T, M, U, F, A](ga)
+    @inline final def deferredLift[A](ga: => F[A]): precepte[A] =
+      Precepte.deferredLift[T, M, U, F, A](ga)
 
     @inline final def get: precepte[PState[T, M, U]] = Precepte.get[T, M, U, F]
     @inline final def set(s: PState[T, M, U]): precepte[Unit] =
@@ -882,7 +882,7 @@ object Precepte {
 
     @inline final def subStep[A](
         tags: T,
-        nats: Vector[SubStepInstumentation[T, M, U, F]] = Vector.empty,
+        nats: Vector[SubStepInstrumentation[T, M, U, F]] = Vector.empty,
         leaf: Boolean = true)(
         sub: precepte[A]
     ): precepte[A] = Precepte.subStep(tags, leaf, nats)(sub)
@@ -894,6 +894,9 @@ object Precepte {
       fa.flatMap(f)
     @inline final def ap[A, B](fa: precepte[A])(
         f: precepte[A => B]): precepte[B] = fa.ap(f)
+
+    @inline def fromTry[A](v: Try[A]): precepte[A] =
+      Precepte.fromTry(v)
   }
 
   implicit def precepteInstances[T, M, U, F[_]]: PrecepteInstances[T, M, U, F] =

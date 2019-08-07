@@ -89,7 +89,7 @@ final class Influx[C: MetaSemigroup](
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
   def monitor(implicit ex: ExecutionContext)
-    : SubStepInstumentation[BaseTags, MS, C, Future] =
+    : SubStepInstrumentation[BaseTags, MS, C, Future] =
     influxDB match {
       case Success(in) =>
         object P extends Precepte.API[BaseTags, MS, C, Future]
@@ -99,13 +99,14 @@ final class Influx[C: MetaSemigroup](
             for {
               st <- P.get
               t0 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
-              r <- p.map(Success(_))
-              t1 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
-              now <- P.lift(
-                Future(tag[MILLISECONDS.type](System.currentTimeMillis())))
-              serie = toSerie(t0, t1, now, st, r.failed.toOption)
-              _ <- P.lift(Future(in.write(dbName, retentionPolicy, serie)))
-              x <- P.lift(Future.fromTry(r))
+              r <- p.attempt
+              _ <- P.lift(Future {
+                val t1 = tag[NANOSECONDS.type](System.nanoTime())
+                val now = tag[MILLISECONDS.type](System.currentTimeMillis())
+                val serie = toSerie(t0, t1, now, st, r.failed.toOption)
+                in.write(dbName, retentionPolicy, serie)
+              }.recover { case _ => () })
+              x <- P.fromTry(r)
             } yield x
         }
       case Failure(e) => throw e

@@ -26,9 +26,9 @@ object SubStepInstrumentation {
     * @tparam U Precepte Unmanaged State
     */
   @inline def iso[T, M, U, F[_], G[_]](iso: F <~~> G)(
-      instr: SubStepInstumentation[T, M, U, F])
-    : SubStepInstumentation[T, M, U, G] =
-    new (SubStepInstumentation[T, M, U, G]) {
+      instr: SubStepInstrumentation[T, M, U, F])
+    : SubStepInstrumentation[T, M, U, G] =
+    new (SubStepInstrumentation[T, M, U, G]) {
       def apply[A](f: Precepte[T, M, U, G, A]): Precepte[T, M, U, G, A] =
         instr(f.compile(iso.reverse)).compile(iso)
     }
@@ -41,9 +41,9 @@ object SubStepInstrumentation {
     * @tparam U2 Precepte Unmanaged State Type to use
     */
   @inline def xmapUnmanagedState[T, M, U, U2, F[_]](to: U => U2, from: U2 => U)(
-      instr: SubStepInstumentation[T, M, U, F])
-    : SubStepInstumentation[T, M, U2, F] =
-    new (SubStepInstumentation[T, M, U2, F]) {
+      instr: SubStepInstrumentation[T, M, U, F])
+    : SubStepInstrumentation[T, M, U2, F] =
+    new (SubStepInstrumentation[T, M, U2, F]) {
       def apply[A](f: Precepte[T, M, U2, F, A]): Precepte[T, M, U2, F, A] =
         instr(f.xmapState(from, to)).xmapState(to, from)
     }
