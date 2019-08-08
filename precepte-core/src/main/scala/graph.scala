@@ -42,7 +42,7 @@ final class Sub private (val id: String, val value: String, val graph: Graph)
     |}
   """.stripMargin
 
-  override def toString = s"Sub($id, $value, $graph)"
+  override def toString = s"Sub($id, $value, ${graph.toString})"
 }
 
 object Sub {

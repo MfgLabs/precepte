@@ -10,52 +10,27 @@ lazy val warts = Warts.allBut(
   Wart.Nothing
 )
 
-lazy val catsVersion = "1.6.1"
+lazy val catsVersion = "2.0.0-RC1"
 lazy val catsMTLVersion = "0.6.0"
 lazy val silencerVersion = "1.4.2"
+lazy val scalaTestVersion = "3.0.8"
+lazy val akkaStreamVersion = "2.5.23"
+lazy val playVersion = "2.6.23"
+lazy val anormVersion = "2.6.4"
+lazy val specs2Version = "4.7.0"
 
 val safeScalaOptionsCommon =
   Seq(
-    "-deprecation",
-    "-encoding",
-    "UTF8",
-    "-explaintypes",
-    "-feature",
     "-language:-dynamics",
     "-language:postfixOps",
     "-language:reflectiveCalls",
-    "-language:implicitConversions",
-    "-language:higherKinds",
-    "-language:existentials",
-    "-language:experimental.macros",
-    "-unchecked",
-    "-Xlint:_",
-    "-Yno-adapted-args",
-    "-Ypartial-unification",
-    "-Ywarn-adapted-args",
-    "-Ywarn-dead-code",
-    "-Ywarn-inaccessible",
-    "-Ywarn-infer-any",
-    "-Ywarn-nullary-override",
-    "-Ywarn-nullary-unit",
-    "-Ywarn-numeric-widen",
-    "-Ywarn-unused-import",
-    "-Ywarn-value-discard"
   )
 
 val safeScalaOptionsCommon_2_12 =
   Seq(
-    "-Ywarn-extra-implicit",
     "-Ywarn-macros:both",
     "-Ywarn-self-implicit",
-    "-Ywarn-unused:_"
   )
-
-val safeScalaOptionsCommon_2_11 =
-  Seq(
-    "-Ywarn-unused"
-  )
-
 
 lazy val publishSettings = Seq(
   homepage := Some(url("https://github.com/MfgLabs/precepte")),
@@ -70,7 +45,7 @@ lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
   , version := "0.4.6-rc3"
   , isSnapshot := false
-  , crossScalaVersions := Seq("2.11.12", "2.12.8")
+  , crossScalaVersions := Seq("2.12.8")
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
     , "Oncue Bintray Repo" at "http://dl.bintray.com/oncue/releases"
@@ -82,7 +57,6 @@ lazy val commonSettings =  Seq(
   , scalacOptions -= "-Xfatal-warnings"
   , scalacOptions ++= safeScalaOptionsCommon ++ {
     CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((2, 11)) => safeScalaOptionsCommon_2_11
       case Some((2, 12)) => safeScalaOptionsCommon_2_12
       case Some((p,s)) => throw new Exception(s"Uknown scala binary version $p.$s")
       case _ => throw new Exception(s"Bad scala version: ${scalaVersion.value}")
@@ -115,7 +89,7 @@ lazy val core =
         "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
         "com.chuusai"     %% "shapeless"    % "2.3.3",
         "org.typelevel"   %% "cats-free"    % catsVersion,
-        "org.scalatest"   %%  "scalatest"   % "3.0.5" % Test
+        "org.scalatest"   %%  "scalatest"   % scalaTestVersion % Test
       ),
       javaOptions in (Test,run) += "-XX:+UseConcMarkSweepGC -XX:+UseParallelGC -XX:-UseGCOverheadLimit -Xmx8G"
     )
@@ -129,7 +103,7 @@ lazy val coreCats =
           "org.scala-lang"  % "scala-reflect" % scalaVersion.value
         , "org.typelevel"   %% "cats-core"   % catsVersion
         , "org.typelevel" %% "cats-mtl-core" % catsMTLVersion
-        , "org.scalatest"   %% "scalatest"   % "3.0.5" % Test
+        , "org.scalatest"   %% "scalatest"   % scalaTestVersion % Test
       )
     )
     .dependsOn(core)
@@ -143,7 +117,7 @@ lazy val coreScalaz =
       libraryDependencies ++= Seq(
         "org.scala-lang"  % "scala-reflect" % scalaVersion.value,
           "org.scalaz"      %% "scalaz-core"  % "7.2.28"
-        , "org.scalatest"   %%  "scalatest"   % "3.0.5"  % Test
+        , "org.scalatest"   %%  "scalatest"   % scalaTestVersion  % Test
       )
     )
     .dependsOn(core)
@@ -167,9 +141,9 @@ lazy val sample =
         evolutions,
         ws,
         "com.h2database" % "h2" % "1.4.199",
-        "com.typesafe.play" %% "anorm" % "2.5.3",
-        "org.specs2" %% "specs2-junit" % "4.3.4" % Test,
-        "com.typesafe.play" %% "play-specs2" % "2.6.18" % Test
+        "org.playframework.anorm" %% "anorm" % anormVersion,
+        "org.specs2" %% "specs2-junit" % specs2Version % Test,
+        "com.typesafe.play" %% "play-specs2" % playVersion % Test
       )
     )
     .dependsOn(coreScalaz, influx, logback, play)
@@ -188,7 +162,7 @@ lazy val applicationinsights =
     .settings(commonSettings:_*)
     .settings(
       name := "precepte-applicationinsights",
-      libraryDependencies += "com.microsoft.azure" % "applicationinsights-core" % "2.4.0-BETA"
+      libraryDependencies += "com.microsoft.azure" % "applicationinsights-core" % "2.4.1"
     )
     .dependsOn(core)
 
@@ -206,7 +180,7 @@ lazy val play =
   project.in(file("precepte-play"))
     .settings(commonSettings:_*)
     .settings(
-      libraryDependencies += "com.typesafe.play" %% "play" % "2.6.18" % Provided,
+      libraryDependencies += "com.typesafe.play" %% "play" % playVersion % Provided,
       name := "precepte-play")
     .dependsOn(core)
 
@@ -215,8 +189,8 @@ lazy val stream =
     .settings(commonSettings:_*)
     .settings(
       libraryDependencies ++= Seq(
-          "com.typesafe.akka" %% "akka-stream" % "2.5.16"
-        , "org.scalatest"     %%  "scalatest"  % "3.0.8"  % Test
+          "com.typesafe.akka" %% "akka-stream" % akkaStreamVersion
+        , "org.scalatest"     %%  "scalatest"  % scalaTestVersion  % Test
       ),
       name := "precepte-stream")
     .dependsOn(coreScalaz)
@@ -232,4 +206,5 @@ lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
   .settings(noPublishSettings:_*)
   .settings(name := "precepte-root")
+  .dependsOn(core, play, influx, applicationinsights, logback, sample, stream, doc, coreScalaz, coreCats)
   .aggregate(core, play, influx, applicationinsights, logback, sample, stream, doc, coreScalaz, coreCats)

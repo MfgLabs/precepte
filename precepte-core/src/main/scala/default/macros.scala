@@ -52,10 +52,11 @@ object Macros {
     if (t.symbol != null && t.symbol.isTerm && (t.symbol.asTerm.isVal || t.symbol.asTerm.isVar))
       q"""Seq(${name.name.encodedName.toString} -> $name.toString)"""
     else if (t.symbol == null)
-      throw new scala.reflect.internal.FatalError(s"$t is not a val or a var")
+      throw new scala.reflect.internal.FatalError(
+        s"${t.toString} is not a val or a var")
     else
       throw new scala.reflect.internal.FatalError(
-        s"$name is not a val or a var")
+        s"${name.toString} is not a val or a var")
   }
 
   def paramsMacro[T](c: Context)(ts: c.Tree*): c.universe.Tree = {
@@ -74,8 +75,7 @@ object Macros {
     @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
     @inline def ofPrecepte[F[_], UM, A](
         f: PState[BaseTags, MS, UM] => DefaultPre[F, UM, A])(
-        implicit callee: Callee,
-    ): DefaultPre[F, UM, A] =
+        implicit callee: Callee): DefaultPre[F, UM, A] =
       Precepte(BaseTags(callee, category)).applyP(f)
   }
 

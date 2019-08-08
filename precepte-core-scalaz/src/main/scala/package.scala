@@ -142,10 +142,10 @@ package object corescalaz extends SubMeta {
     new EitherHasHoist[A]
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
-  def future[Ta, M, U, A](ta: Ta)(λ: PState[Ta, M, U] => Future[A])(
+  def future[Tag, M, U, A](tag: Tag)(λ: PState[Tag, M, U] => Future[A])(
       implicit ec: scala.concurrent.ExecutionContext)
-    : Precepte[Ta, M, U, Future, \/[Throwable, A]] =
-    Precepte(ta) { pa =>
+    : Precepte[Tag, M, U, Future, \/[Throwable, A]] =
+    Precepte(tag) { pa =>
       import scalaz.std.scalaFuture._
       Functor[Future]
         .map(λ(pa))(\/-.apply(_))

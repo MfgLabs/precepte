@@ -118,18 +118,25 @@ sealed trait Precepte[T, M, U, F[_], A] {
   @inline final def lift[G[_]](
       implicit ap: MetaApplicative[G]): precepte[G[A]] =
     map(a => ap.pure(a))
+  @inline final def interpret[G[_]](nt: F ~~> G)(
+      implicit G: MetaMonadPrecepteEffect[T, M, U, G],
+      upd: PStateUpdater[T, M, U]): G[A] = Precepte.interpret(nt)(this)
+
+  @inline final def runAs[G[_]](nt: F ~~> G)(state: PState[T, M, U])(
+      implicit mo: MetaMonad[G],
+      FE: MetaErrorEffect[Throwable, G],
+      trampolinedF: MetaDefer[G],
+      upd: PStateUpdater[T, M, U],
+      S: MetaSemigroup[U]): G[(PState[T, M, U], A)] =
+    Precepte.run[T, M, U, F, A, G](nt)(this)(state)
 
   @inline final def run(state: PState[T, M, U])(
       implicit mo: MetaMonad[F],
       FE: MetaErrorEffect[Throwable, F],
-      upd: PStateUpdater[T, M, U],
       trampolinedF: MetaDefer[F],
+      upd: PStateUpdater[T, M, U],
       S: MetaSemigroup[U]): F[(PState[T, M, U], A)] =
     Precepte.run(~~>.id[F])(this)(state)
-
-  @inline final def interpret[G[_]](nt: F ~~> G)(
-      implicit G: MetaMonadPrecepteEffect[T, M, U, G],
-      upd: PStateUpdater[T, M, U]): G[A] = Precepte.interpret(nt)(this)
 
   @inline final def eval(state: PState[T, M, U])(
       implicit mo: MetaMonad[F],
@@ -392,7 +399,7 @@ object Precepte {
     */
   @inline def modify[T, M, U, F[_], A](
       f: PState[T, M, U] => (PState[T, M, U], A)): Precepte[T, M, U, F, A] =
-    get.flatMap { s0 =>
+    get[T, M, U, F].flatMap[A] { (s0: PState[T, M, U]) =>
       val (s1, a) = f(s0)
       set(s1).map(_ => a)
     }

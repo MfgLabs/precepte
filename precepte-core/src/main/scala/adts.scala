@@ -30,12 +30,17 @@ final case class PState[Ta, ManagedState, UnmanagedState](
     : PState[Ta, ManagedState, UnmanagedState2] = PState(managed, f(unmanaged))
 }
 
-/** A Typeclass representing an updatable Precepte state (can append a Tag+idx & update unmanaged part) */
-trait PStateUpdater[Ta, MS, FS] { self =>
-  final type S = PState[Ta, MS, FS]
+/** A Typeclass representing an updatable Precepte state (can append a Tag+idx & update unmanaged part)
+  *
+  * @tparam Tag Type of Precepte Tag
+  * @tparam MS Type of Managed State
+  * @tparam US Type of Unmanaged State
+  */
+trait PStateUpdater[Tag, MS, US] { self =>
+  final type S = PState[Tag, MS, US]
 
-  def appendTags(s: S, t: Ta): S
-  def updateUnmanaged(s: S, ext: FS): S
+  def appendTags(s: S, t: Tag): S
+  def updateUnmanaged(s: S, ext: US): S
 
   /** Split the s0 state into two distinct substates (s1,s2)
     * that can be used in different branches of the computation.
@@ -64,16 +69,16 @@ trait PStateUpdater[Ta, MS, FS] { self =>
     */
   def recombine(s0: S, s1: S, s2: S): S
 
-  @inline final def xmapUnmanaged[FS2](
-      to: FS => FS2,
-      from: FS2 => FS): PStateUpdater[Ta, MS, FS2] =
-    new PStateUpdater[Ta, MS, FS2] {
-      final type S2 = PState[Ta, MS, FS2]
+  @inline final def xmapUnmanaged[US2](
+      to: US => US2,
+      from: US2 => US): PStateUpdater[Tag, MS, US2] =
+    new PStateUpdater[Tag, MS, US2] {
+      final type S2 = PState[Tag, MS, US2]
 
-      def appendTags(s: S2, t: Ta): S2 =
+      def appendTags(s: S2, t: Tag): S2 =
         self.appendTags(s.mapUnmanaged(from), t).mapUnmanaged(to)
 
-      def updateUnmanaged(s: S2, ext: FS2): S2 =
+      def updateUnmanaged(s: S2, ext: US2): S2 =
         self.updateUnmanaged(s.mapUnmanaged(from), from(ext)).mapUnmanaged(to)
 
       def spawn(s0: S2): (S2, S2) = {

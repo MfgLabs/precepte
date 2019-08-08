@@ -42,8 +42,7 @@ package object corecats extends SubMeta {
 
       final val monad: Monad[Precepte[T, M, U, F, ?]] = this
 
-      @inline final def inspect[A](
-          f: PState[T, M, U] => A): Precepte[T, M, U, F, A] =
+      @inline final def inspect[A](f: PState[T, M, U] => A): precepte[A] =
         get.map(f)
 
       @inline final def modify(
@@ -75,8 +74,7 @@ package object corecats extends SubMeta {
         fa.ap(ff)
 
       @inline final def tailRecM[A, B](a: A)(
-          f: A => Precepte[T, M, U, F, Either[A, B]])
-        : Precepte[T, M, U, F, B] = {
+          f: A => precepte[Either[A, B]]): precepte[B] = {
         f(a).flatMap {
           case Left(result)  => tailRecM(result)(f)
           case Right(result) => pure(result)
@@ -134,10 +132,10 @@ package object corecats extends SubMeta {
     new XorHasHoist[A]
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
-  def future[Ta, M, U, A](ta: Ta)(λ: PState[Ta, M, U] => Future[A])(
+  def future[Tag, M, U, A](tag: Tag)(λ: PState[Tag, M, U] => Future[A])(
       implicit ec: scala.concurrent.ExecutionContext)
-    : Precepte[Ta, M, U, Future, Either[Throwable, A]] =
-    Precepte(ta) { pa =>
+    : Precepte[Tag, M, U, Future, Either[Throwable, A]] =
+    Precepte(tag) { pa =>
       import cats.instances.future._
       Functor[Future]
         .map(λ(pa))(Right(_))

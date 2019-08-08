@@ -619,13 +619,17 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   }
 
   it should "catch exceptions in Future" in {
+    /* Idea of the test
+       Count the number of exceptions correctly raised and caught.
+     */
     object P extends Precepte.API[BaseTags, default.MS, Unit, Future]
 
+    /* Returns 0 if no exception is caught, 1 otherwise */
     def f(i: Long): P.precepte[Int] = {
       val m =
         for {
-          v3 <- P.deferredLift(Future(3 / (i % 3)))
-          v5 <- P.deferredLift(Future(5 / (i % 5)))
+          v3 <- P.deferredLift(Future(1 / (i % 3))) // Fail if i % 3 == 0
+          v5 <- P.deferredLift(Future(1 / (i % 5))) // Fail if i % 5 == à
         } yield v3 + v5
 
       m.map(_ => 0).recoverWith { _ =>
@@ -633,6 +637,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       }
     }
 
+    // Run f many times, counts the number of exceptions caught.
     def g(i: Long): P.precepte[Int] =
       if (i <= 0) P.pure(0)
       else
@@ -642,6 +647,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         } yield x + q
 
     val n = 150L
+
+    // Count the number of exceptions that should be caught
     val exceptions =
       (1L to n).filter(i => (i % 3 == 0) || (i % 5 == 0)).size
 
@@ -649,13 +656,17 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
   }
 
   it should "catch exceptions in Defer" in {
+    /* Idea of the test
+       Count the number of exceptions correctly raised and caught.
+     */
     object P extends Precepte.API[BaseTags, default.MS, Unit, Future]
 
+    /* Returns 0 if no exception is caught, 1 otherwise */
     def f(i: Long): P.precepte[Int] = {
       val m =
         for {
-          v3 <- P.delay(3 / (i % 3))
-          v5 <- P.delay(5 / (i % 5))
+          v3 <- P.delay(1 / (i % 3)) // Fail if i % 3 == 0
+          v5 <- P.delay(1 / (i % 5)) // Fail if i % 5 == à
         } yield v3 + v5
 
       m.map(_ => 0).recoverWith { _ =>
@@ -663,6 +674,7 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
       }
     }
 
+    // Run f many times, counts the number of exceptions caught.
     def g(i: Long): P.precepte[Int] =
       if (i <= 0) P.pure(0)
       else
@@ -672,6 +684,8 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
         } yield x + q
 
     val n = 150L
+
+    // Count the number of exceptions that should be caught
     val exceptions =
       (1L to n).filter(i => (i % 3 == 0) || (i % 5 == 0)).size
 
