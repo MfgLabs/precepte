@@ -18,12 +18,14 @@ package com.mfglabs
 package precepte
 
 import scalaz.Semigroup
-import scala.concurrent.{Future, ExecutionContext}
+
+import scala.concurrent.{ExecutionContext, Future}
 import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl._
-
 import corescalaz._
+
+import scala.util.control.NonFatal
 
 object PreStream {
 
@@ -82,7 +84,9 @@ object PreStream {
           }
 
         case Defer(deferred) =>
-          step(deferred())
+          val p: P[T, M, U, B] =
+            try { deferred() } catch { case NonFatal(e) => RaiseError(e) }
+          step(p)
 
         case Mapped(sub, pf) =>
           step(sub).map {

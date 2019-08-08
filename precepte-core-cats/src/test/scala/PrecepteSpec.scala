@@ -617,4 +617,64 @@ class PrecepteSpec extends FlatSpec with ScalaFutures with Inside {
     res should ===(())
 
   }
+
+  it should "catch exceptions in Future" in {
+    object P extends Precepte.API[BaseTags, default.MS, Unit, Future]
+
+    def f(i: Long): P.precepte[Int] = {
+      val m =
+        for {
+          v3 <- P.deferredLift(Future(3 / (i % 3)))
+          v5 <- P.deferredLift(Future(5 / (i % 5)))
+        } yield v3 + v5
+
+      m.map(_ => 0).recoverWith { _ =>
+        P.pure(1)
+      }
+    }
+
+    def g(i: Long): P.precepte[Int] =
+      if (i <= 0) P.pure(0)
+      else
+        for {
+          x <- f(i)
+          q <- g(i - 1)
+        } yield x + q
+
+    val n = 150L
+    val exceptions =
+      (1L to n).filter(i => (i % 3 == 0) || (i % 5 == 0)).size
+
+    g(n).eval(nostate).futureValue should equal(exceptions)
+  }
+
+  it should "catch exceptions in Defer" in {
+    object P extends Precepte.API[BaseTags, default.MS, Unit, Future]
+
+    def f(i: Long): P.precepte[Int] = {
+      val m =
+        for {
+          v3 <- P.delay(3 / (i % 3))
+          v5 <- P.delay(5 / (i % 5))
+        } yield v3 + v5
+
+      m.map(_ => 0).recoverWith { _ =>
+        P.pure(1)
+      }
+    }
+
+    def g(i: Long): P.precepte[Int] =
+      if (i <= 0) P.pure(0)
+      else
+        for {
+          x <- f(i)
+          q <- g(i - 1)
+        } yield x + q
+
+    val n = 150L
+    val exceptions =
+      (1L to n).filter(i => (i % 3 == 0) || (i % 5 == 0)).size
+
+    g(n).eval(nostate).futureValue should equal(exceptions)
+  }
 }

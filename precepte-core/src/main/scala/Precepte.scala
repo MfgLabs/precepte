@@ -19,6 +19,7 @@ package precepte
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -556,7 +557,7 @@ object Precepte {
         Lift(fa).map(g0 -> _)
 
       case Defer(deferred) =>
-        deferred().graph(g0)
+        Defer(() => deferred().graph(g0))
 
       case ps: SubStep[T, M, U, F, A] =>
         Flatmap[T, M, U, F, PState[T, M, U], (Graph, A)](
@@ -611,7 +612,7 @@ object Precepte {
       case set: SetPState[T, M, U, F] => SetPState(set.state)
       case Lift(fa)                   => Lift(isoFG.to(fa))
       case Defer(deferred) =>
-        deferred().compile(isoFG)
+        Defer(() => deferred().compile(isoFG))
       case RaiseError(e) => RaiseError(e)
 
       case CatchError(sub, h) =>
@@ -648,7 +649,7 @@ object Precepte {
       case Lift(fa) => Lift(fa)
 
       case Defer(deferred) =>
-        deferred().xmapState(to, from)
+        Defer(() => deferred().xmapState(to, from))
 
       case RaiseError(e) =>
         RaiseError(e)
@@ -690,7 +691,11 @@ object Precepte {
           G.catchError(G.defer(aux(sub))) { (e: Throwable) =>
             G.defer(aux(h(e)))
           }
-        case Defer(deferred)   => aux(deferred())
+        case Defer(deferred) =>
+          val p: P[X] =
+            try { deferred() } catch { case NonFatal(e) => RaiseError(e) }
+          aux(p)
+
         case Mapped(sub, next) => G.map(G.defer(aux(sub)))(next)
         case Flatmap(sub, next) =>
           G.flatMap(G.defer(aux(sub))) { r =>
@@ -761,9 +766,10 @@ object Precepte {
             Left[GS[B], InvokeAux[_, B]](gx)
           case MappedK(next, k) =>
             runCont(k, G.map(gx) { case (st1, i) => (st1, next(i)) })
-          case FlatmapK(next, k) =>
-            Left(G.flatMap(gx) {
-              case (s1, i) => GT.defer(auxTrickTailRec(s1, next(i), k))
+          case fmk: FlatmapK[i, x, a] =>
+            runCont[x](fmk.cont, G.flatMap(gx) {
+              case (s1, i) =>
+                GT.defer(auxTrickTailRec[x, x](s1, fmk.next(i), IdK()))
             })
 
           case apk: ApplyK1[i, x, a] =>
@@ -806,7 +812,10 @@ object Precepte {
             case Left(g)                   => g
             case Right(i: InvokeAux[a, b]) => aux(i.st0, i.px, i.cont)
           }
-        case Defer(deferred) => aux(st0, deferred(), cont)
+        case Defer(deferred) =>
+          val p: P[X] =
+            try { deferred() } catch { case NonFatal(e) => RaiseError(e) }
+          aux(st0, p, cont)
 
         case Mapped(sub, next) =>
           aux(st0, sub, MappedK(next, cont))
