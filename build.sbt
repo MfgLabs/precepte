@@ -43,7 +43,7 @@ lazy val publishSettings = Seq(
 
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.4.6-rc3"
+  , version := "0.5.0-rc1"
   , isSnapshot := false
   , crossScalaVersions := Seq("2.12.8")
   , resolvers ++= Seq(
