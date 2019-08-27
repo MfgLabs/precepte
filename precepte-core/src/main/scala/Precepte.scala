@@ -97,6 +97,12 @@ sealed trait Precepte[T, M, U, F[_], A] {
 
   final type precepte[A0] = Precepte[T, M, U, F, A0]
 
+  @inline final def subStep(tags: T,
+                            leaf: Boolean = true,
+                            nats: Vector[SubStepInstrumentation[T, M, U, F]] =
+                              Vector.empty): precepte[A] =
+    Precepte.subStep(tags, leaf, nats)(self)
+
   @inline final def flatMap[B](f: A => precepte[B]): precepte[B] =
     Precepte.flatMap[T, M, U, F, A, B](this)(f)
 
@@ -105,6 +111,9 @@ sealed trait Precepte[T, M, U, F[_], A] {
 
   @inline final def ap[B](f: precepte[A => B]): precepte[B] =
     Precepte.ap(this)(f)
+
+  @inline final def recoverWithValue(value: A): precepte[A] =
+    Precepte.catchError(this)(_ => Precepte.pure(value))
 
   @inline final def recoverWith(
       handler: Throwable => precepte[A]): precepte[A] =

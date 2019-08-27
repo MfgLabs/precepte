@@ -17,6 +17,7 @@ limitations under the License.
 package com.mfglabs
 package precepte
 
+import com.mfglabs.precepte.PreActionSyntax.PreActionSyntaxTransformation
 import play.api.mvc._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,6 +42,9 @@ trait PreActionFunction[-R[_], +P[_], F[_], C] {
 trait PreActionSyntax[C] {
   self =>
 
+  /** The precepte API with the correct tags and states */
+  final object P extends Precepte.API[BaseTags, default.MS, C, Future]
+
   final type PrePlayAction[R[_]] = PreActionFunction[Request, R, Future, C]
 
   def initialState: C
@@ -49,6 +53,7 @@ trait PreActionSyntax[C] {
   def host: default.Host
 
   @inline final def _env: BaseEnv = default.BaseEnv(host, environment, version)
+
   @inline final def initialST
     : PState[BaseTags, ManagedState[BaseEnv, BaseTags], C] =
     default.ST(Span.gen, _env, Vector.empty, initialState)
@@ -56,24 +61,28 @@ trait PreActionSyntax[C] {
   protected def executionContext: scala.concurrent.ExecutionContext
   protected def controllerComponent: play.api.mvc.ControllerComponents
 
-  def _transform: (Future[Result] => Future[Result]) = identity
+  def transformation[R[_]](ppa: PrePlayAction[R]): PrePlayAction[R] =
+    ppa
 
   @inline final def transform(
-      f: Future[Result] => Future[Result]): PreActionSyntax[C] =
+      f: PreActionSyntaxTransformation[Request, Future, C])
+    : PreActionSyntax[C] =
     new PreActionSyntax[C] {
       def initialState = self.initialState
       def version = self.version
       def environment = self.environment
       def host = self.host
 
-      def executionContext = self.executionContext
-      def controllerComponent = self.controllerComponent
+      def executionContext: ExecutionContext = self.executionContext
+      def controllerComponent: ControllerComponents = self.controllerComponent
 
-      override def _transform = self._transform andThen f
+      override def transformation[R[_]](
+          ppa: PrePlayAction[R]): PrePlayAction[R] =
+        f(transformation(ppa))
     }
 
-  private def addSpan[T](st: default.ST[T])(fr: Future[Result]) =
-    fr.map(_.withHeaders("Span-Id" -> st.managed.span.value))(executionContext)
+  private def addSpan[T](st: default.ST[T])(r: Result): Result =
+    r.withHeaders("Span-Id" -> st.managed.span.value)
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
   final def future[R[_]](fun: PrePlayAction[R])(
@@ -89,23 +98,21 @@ trait PreActionSyntax[C] {
                                      semi: MetaSemigroup[C],
                                      callee: default.Callee): Action[A] =
     controllerComponent.actionBuilder.async(bodyParser) { r =>
-      val st = initialST
       implicit val ec: ExecutionContext = executionContext
-      val f = addSpan(st)(
-        fun
-          .invokeBlock(r, { p: R[A] =>
-            Precepte(default.BaseTags(callee, default.Category.Api)) {
-              _: ST[C] =>
-                block(p)
-            }
-          })
-          .eval(st))
-      _transform(f)
+      val st = initialST
+      transformation(fun)
+        .invokeBlock(r, { p: R[A] =>
+          P.subStep(default.BaseTags(callee, default.Category.Api)) {
+            P.deferredLift(block(p))
+          }
+        })
+        .eval(st)
+        .map(addSpan(st))
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
   final def async[R[_]](fun: PrePlayAction[R])(
-      block: R[AnyContent] => DPre[Future, C, Result])(
+      block: R[AnyContent] => P.precepte[Result])(
       implicit mo: MetaMonad[Future],
       semi: MetaSemigroup[C]): Action[AnyContent] =
     async(controllerComponent.parsers.anyContent)(fun)(block)
@@ -116,10 +123,12 @@ trait PreActionSyntax[C] {
       implicit mo: MetaMonad[Future],
       semi: MetaSemigroup[C]): Action[A] =
     controllerComponent.actionBuilder.async(bodyParser) { r =>
-      val st = initialST
       implicit val ec: ExecutionContext = executionContext
-      val f = addSpan(st)(fun.invokeBlock(r, block).eval(st))
-      _transform(f)
+      val st = initialST
+      transformation(fun)
+        .invokeBlock(r, block)
+        .eval(st)
+        .map(addSpan(st))
     }
 }
 
@@ -138,4 +147,9 @@ object PreActionSyntax {
       protected def executionContext: ExecutionContext = cc.executionContext
       protected def controllerComponent: ControllerComponents = cc
     }
+
+  trait PreActionSyntaxTransformation[R[_], F[_], C] {
+    def apply[P[_]](
+        paf: PreActionFunction[R, P, F, C]): PreActionFunction[R, P, F, C]
+  }
 }

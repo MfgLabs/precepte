@@ -18,20 +18,19 @@ package com.mfglabs
 package precepte
 
 import scala.concurrent.Future
-
 import scalaz.{
-  Monad,
+  -\/,
   Applicative,
+  EitherT,
   Functor,
-  Unapply,
+  ListT,
+  Monad,
+  OptionT,
   Semigroup,
-  ~>,
+  Unapply,
   \/,
   \/-,
-  -\/,
-  EitherT,
-  OptionT,
-  ListT
+  ~>
 }
 import scalaz.Isomorphism.<~>
 

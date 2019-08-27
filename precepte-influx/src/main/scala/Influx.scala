@@ -21,14 +21,14 @@ import java.net.URL
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import default._
 import java.util.concurrent.TimeUnit
 
+import com.mfglabs.precepte.Measure.{TimeMeasure, TimeMeasurement}
 import org.influxdb._
 import org.influxdb.dto.Point
-import shapeless.tag
-import shapeless.tag.@@
+
+import scala.util.Try
 
 final class Influx[C: MetaSemigroup](
     influxdbURL: URL,
@@ -40,20 +40,29 @@ final class Influx[C: MetaSemigroup](
 
   import scala.util.{Try, Failure, Success}
   private lazy val influxDB: Try[InfluxDB] =
-    Try {
-      val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
-      in.createDatabase(dbName)
-      in.enableBatch(2000, 3, TimeUnit.SECONDS)
-    }
+    Influx.createClient(influxdbURL, user, password, dbName)
 
-  private def toSerie(startTime: Long @@ NANOSECONDS.type,
-                      endTime: Long @@ NANOSECONDS.type,
-                      now: Long @@ MILLISECONDS.type,
-                      st: ST[C],
-                      error: Option[Throwable]): Point = {
-    val duration = endTime - startTime
+  @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
+  def monitor(
+      errorHandler: Throwable => Precepte[BaseTags, MS, C, Future, Unit])(
+      implicit ex: ExecutionContext)
+    : SubStepInstrumentation[BaseTags, MS, C, Future] =
+    influxDB match {
+      case Success(in) =>
+        (new TimeMeasure[BaseTags, MS, C, Future]).withConsumer(
+          Influx
+            .timeMeasurementConsumer(in, dbName, retentionPolicy, errorHandler))
+      case Failure(_) => ~~>.id
+    }
+}
+
+object Influx {
+
+  /** Build an Influx measurement */
+  def timeMeasurementToPoint[U](tm: TimeMeasurement[BaseTags, MS, U]): Point = {
+    val duration = tm.endTime - tm.startTime
     val sep = "/"
-    val path = st.managed.path
+    val path = tm.state.managed.path
     val p =
       path
         .map { c =>
@@ -69,18 +78,18 @@ final class Influx[C: MetaSemigroup](
 
     val builder = dto.Point
       .measurement("response_times")
-      .time(now, TimeUnit.MILLISECONDS)
-      .tag("host", st.managed.env.host.value)
-      .tag("environment", st.managed.env.environment.value)
-      .tag("version", st.managed.env.version.value)
+      .time(tm.now, TimeUnit.MILLISECONDS)
+      .tag("host", tm.state.managed.env.host.value)
+      .tag("environment", tm.state.managed.env.environment.value)
+      .tag("version", tm.state.managed.env.version.value)
       .tag("category", category.value)
       // .tag("callees", callees)
       .tag("method", method.value)
-      .field("span", st.managed.span.value)
+      .field("span", tm.state.managed.span.value)
       .field("path", p)
       .field("execution_time", duration)
 
-    error.foreach { e =>
+    tm.exception.foreach { e =>
       builder.field("error", s"${e.getClass.getName}: ${e.getMessage}")
     }
 
@@ -88,27 +97,27 @@ final class Influx[C: MetaSemigroup](
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
-  def monitor(implicit ex: ExecutionContext)
-    : SubStepInstrumentation[BaseTags, MS, C, Future] =
-    influxDB match {
-      case Success(in) =>
-        object P extends Precepte.API[BaseTags, MS, C, Future]
+  def timeMeasurementConsumer[U](
+      client: InfluxDB,
+      dbName: String,
+      retentionPolicy: String,
+      errorHandler: Throwable => Precepte[BaseTags, MS, U, Future, Unit])(
+      tm: TimeMeasurement[BaseTags, MS, U])(
+      implicit executionContext: ExecutionContext)
+    : Precepte[BaseTags, MS, U, Future, Unit] =
+    Precepte
+      .deferredLift(
+        Future(
+          client.write(dbName, retentionPolicy, timeMeasurementToPoint(tm))))
+      .recoverWith(errorHandler)
 
-        new (P.instrumentStep) {
-          def apply[A](p: P.precepte[A]): P.precepte[A] =
-            for {
-              st <- P.get
-              t0 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
-              r <- p.attempt
-              _ <- P.lift(Future {
-                val t1 = tag[NANOSECONDS.type](System.nanoTime())
-                val now = tag[MILLISECONDS.type](System.currentTimeMillis())
-                val serie = toSerie(t0, t1, now, st, r.failed.toOption)
-                in.write(dbName, retentionPolicy, serie)
-              }.recover { case _ => () })
-              x <- P.fromTry(r)
-            } yield x
-        }
-      case Failure(e) => throw e
+  def createClient(influxdbURL: URL,
+                   user: String,
+                   password: String,
+                   dbName: String): Try[InfluxDB] =
+    Try {
+      val in = InfluxDBFactory.connect(influxdbURL.toString, user, password)
+      in.createDatabase(dbName)
+      in.enableBatch(2000, 3, TimeUnit.SECONDS)
     }
 }

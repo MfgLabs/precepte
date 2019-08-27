@@ -19,7 +19,8 @@ package precepte
 
 import java.util.Date
 
-import scala.concurrent.duration._
+import com.mfglabs.precepte.Measure.{TimeMeasure, TimeMeasurement}
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import com.microsoft.applicationinsights._
@@ -30,39 +31,37 @@ import com.microsoft.applicationinsights.telemetry.{
   MetricTelemetry,
   Telemetry
 }
-import shapeless.tag
-import shapeless.tag.@@
-
 import scala.collection.JavaConverters._
 
 final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
                                                   useXML: Boolean = true) {
 
   private lazy val client: Try[TelemetryClient] =
-    Try {
-      val config =
-        if (useXML) TelemetryConfiguration.getActive()
-        else TelemetryConfiguration.createDefault()
-      config.setInstrumentationKey(instrumentationKey)
-      config.setTrackingIsDisabled(false)
-      new TelemetryClient(config)
-    }
+    ApplicationInsights.createClient(instrumentationKey, useXML)
 
-  /** Build a MetricTelemetry instance
-    *
-    * @param startTime since EPOCh in NANOSECONDS
-    * @param endTime since EPOCh in NANOSECONDS
-    * @param now since EPOCh in MILLISECONDS
-    */
+  @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
+  def monitor(
+      errorHandler: Throwable => Precepte[BaseTags, MS, C, Future, Unit])(
+      implicit ec: ExecutionContext)
+    : SubStepInstrumentation[BaseTags, MS, C, Future] =
+    client match {
+      case Success(clt) =>
+        (new TimeMeasure[BaseTags, MS, C, Future])
+          .withConsumer(
+            ApplicationInsights.timeMeasurementConsumer(clt, errorHandler))
+      case Failure(_) => ~~>.id
+    }
+}
+
+object ApplicationInsights {
+
+  /** Build a MetricTelemetry instance */
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  private def toTelemetry(startTime: Long @@ NANOSECONDS.type,
-                          endTime: Long @@ NANOSECONDS.type,
-                          now: Long @@ MILLISECONDS.type,
-                          st: ST[C],
-                          error: Option[Throwable]): Telemetry = {
-    val duration = endTime - startTime
+  def timeMesurementToTelemetry[U](
+      tm: TimeMeasurement[BaseTags, MS, U]): Telemetry = {
+    val duration = tm.endTime - tm.startTime
     val sep = "/"
-    val path = st.managed.path
+    val path = tm.state.managed.path
     val p =
       path
         .map { c =>
@@ -77,23 +76,21 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
       }
 
     val properties: java.util.Map[String, String] = Map(
-      "host" -> st.managed.env.host.value,
-      "environment" -> st.managed.env.environment.value,
-      "version" -> st.managed.env.version.value,
+      "host" -> tm.state.managed.env.host.value,
+      "environment" -> tm.state.managed.env.environment.value,
+      "version" -> tm.state.managed.env.version.value,
       "category" -> category.value,
       "method" -> method.value,
-      "span" -> st.managed.span.value,
+      "span" -> tm.state.managed.span.value,
       "path" -> p
     ).asJava
 
-    val executionTimeField = "execution_time"
-
     val metrics: java.util.Map[String, java.lang.Double] =
       Map[String, java.lang.Double](
-        executionTimeField -> duration.toDouble
+        "execution_time" -> duration.toDouble
       ).asJava
 
-    error match {
+    tm.exception match {
       case Some(err) =>
         val exceptionTelemetry = new ExceptionTelemetry(err)
         MapUtil.copy(properties, exceptionTelemetry.getContext.getProperties)
@@ -102,39 +99,36 @@ final class ApplicationInsights[C: MetaSemigroup](instrumentationKey: String,
 
       case _ =>
         val metricTelemetry =
-          new MetricTelemetry(executionTimeField, duration.toDouble)
+          new MetricTelemetry(method.value, duration.toDouble)
         metricTelemetry.setCount(null)
         metricTelemetry.setMin(null)
         metricTelemetry.setMax(null)
         metricTelemetry.setStandardDeviation(null)
-        metricTelemetry.setTimestamp(new Date(now))
+        metricTelemetry.setTimestamp(new Date(tm.now))
         MapUtil.copy(properties, metricTelemetry.getProperties)
         metricTelemetry
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ImplicitParameter"))
-  def monitor(implicit ec: ExecutionContext)
-    : SubStepInstrumentation[BaseTags, MS, C, Future] =
-    client match {
-      case Success(clt) =>
-        object P extends Precepte.API[BaseTags, MS, C, Future]
+  def timeMeasurementConsumer[U](
+      client: TelemetryClient,
+      errorHandler: Throwable => Precepte[BaseTags, MS, U, Future, Unit])(
+      tm: TimeMeasurement[BaseTags, MS, U])(
+      implicit executionContext: ExecutionContext)
+    : Precepte[BaseTags, MS, U, Future, Unit] =
+    Precepte
+      .deferredLift(Future(client.track(timeMesurementToTelemetry(tm))))
+      .recoverWith(errorHandler)
 
-        new (P.instrumentStep) {
-          def apply[A](p: P.precepte[A]): P.precepte[A] =
-            for {
-              st <- P.get
-              t0 <- P.lift(Future(tag[NANOSECONDS.type](System.nanoTime())))
-              r <- p.attempt
-              _ <- P.lift(Future {
-                val t1 = tag[NANOSECONDS.type](System.nanoTime())
-                val now = tag[MILLISECONDS.type](System.currentTimeMillis())
-                val telemetry = toTelemetry(t0, t1, now, st, r.failed.toOption)
-                clt.track(telemetry)
-              }.recover { case _ => () })
-              x <- P.fromTry(r)
-            } yield x
-        }
-      case Failure(e) => throw e
+  def createClient(instrumentationKey: String,
+                   useXML: Boolean): Try[TelemetryClient] =
+    Try {
+      val config =
+        if (useXML) TelemetryConfiguration.getActive()
+        else TelemetryConfiguration.createDefault()
+      config.setInstrumentationKey(instrumentationKey)
+      config.setTrackingIsDisabled(false)
+      new TelemetryClient(config)
     }
 }

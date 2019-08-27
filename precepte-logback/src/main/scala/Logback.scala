@@ -49,6 +49,8 @@ final class Logback(val env: BaseEnv, val loggerName: String) {
       ).asJava
     }
 
+    val underlyingLogger: org.slf4j.Logger = logger
+
     def debug(message: => String, params: Seq[(String, String)] = Nil): Unit =
       logger.debug(appendEntries(p(params)), message)
     def info(message: => String, params: Seq[(String, String)] = Nil): Unit =
