@@ -1,15 +1,20 @@
+package com.mfglabs
+package precepte
+package test
+
 import org.specs2.execute._
 import org.specs2.mutable._
 import org.specs2.specification.Scope
-
 import play.api._
 
 abstract class WithApplication extends Around with Scope {
-  lazy val context = ApplicationLoader.createContext(
-    new Environment(new java.io.File("."),
-                    ApplicationLoader.getClass.getClassLoader,
-                    Mode.Test)
-  )
+  lazy val context = ApplicationLoader.Context.create {
+    new Environment(
+      new java.io.File("."),
+      ApplicationLoader.getClass.getClassLoader,
+      Mode.Test
+    )
+  }
 
   lazy val applicationEnv = new env.ApplicationEnv(context)
   implicit lazy val app = applicationEnv.application

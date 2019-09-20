@@ -118,7 +118,8 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
           _ <- s.unmanaged.metric
             .metric(s"$stuff going to pay $amount")
             .unify(s)
-          r <- Precepte.liftF(Future(Paid(stuff.id, amount)))
+          r <- Precepte.liftF[BaseTags, MS, PayCtx, Future, Paid](
+            Future(Paid(stuff.id, amount)))
           _ <- s.unmanaged.logger.info(s"$stuff paid $amount").unify(s)
         } yield (r)
       }

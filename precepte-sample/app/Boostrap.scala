@@ -1,7 +1,7 @@
 package env
 
 import play.api.ApplicationLoader.Context
-import play.api.db.{DBComponents}
+import play.api.db.DBComponents
 import play.api.db.evolutions.EvolutionsComponents
 import router.Routes
 import play.api.{Application, ApplicationLoader, Environment, Logger}
@@ -9,7 +9,7 @@ import play.api.{Application, ApplicationLoader, Environment, Logger}
 final class BootstrapLoader extends ApplicationLoader {
   def load(context: Context): Application = {
     // Bootstrap the injected application
-    Logger.info("All good")
+    Logger("application").info("All good")
     new env.ApplicationEnv(context).application
   }
 }

@@ -1,8 +1,7 @@
+import com.mfglabs.precepte
 import org.specs2.runner._
 import org.junit.runner._
-
 import play.api.test._
-
 import org.fluentlenium.core.filter.FilterConstructor._
 
 @RunWith(classOf[JUnitRunner])
@@ -10,7 +9,7 @@ class IntegrationSpec extends PlaySpecification {
 
   "Application" should {
 
-    "work from within a browser" in new WithApplication {
+    "work from within a browser" in new precepte.test.WithApplication {
       new WithBrowser(webDriver = WebDriverFactory(HTMLUNIT), app = app) {
         browser.goTo("http://localhost:19001/")
 

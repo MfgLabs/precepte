@@ -10,14 +10,15 @@ lazy val warts = Warts.allBut(
   Wart.Nothing
 )
 
-lazy val catsVersion = "2.0.0-RC1"
-lazy val catsMTLVersion = "0.6.0"
-lazy val silencerVersion = "1.4.2"
+lazy val applicationInsightsVersion = "2.5.0"
+lazy val catsVersion = "2.0.0"
+lazy val catsMTLVersion = "0.7.0"
+lazy val silencerVersion = "1.4.3"
 lazy val scalaTestVersion = "3.0.8"
-lazy val akkaStreamVersion = "2.5.23"
-lazy val playVersion = "2.6.23"
+lazy val akkaStreamVersion = "2.5.25"
+lazy val playVersion = "2.7.3"
 lazy val anormVersion = "2.6.4"
-lazy val specs2Version = "4.7.0"
+lazy val specs2Version = "4.7.1"
 
 val safeScalaOptionsCommon =
   Seq(
@@ -27,6 +28,12 @@ val safeScalaOptionsCommon =
   )
 
 val safeScalaOptionsCommon_2_12 =
+  Seq(
+    "-Ywarn-macros:both",
+    "-Ywarn-self-implicit",
+  )
+
+val safeScalaOptionsCommon_2_13 =
   Seq(
     "-Ywarn-macros:both",
     "-Ywarn-self-implicit",
@@ -43,13 +50,13 @@ lazy val publishSettings = Seq(
 
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.5.0-rc2"
+  , version := "0.5.0-rc3"
   , isSnapshot := false
-  , crossScalaVersions := Seq("2.12.8")
+  , crossScalaVersions := List("2.13.0", "2.12.10")
   , resolvers ++= Seq(
-      "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
-    , "Oncue Bintray Repo" at "http://dl.bintray.com/oncue/releases"
-    , "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/"  //for play 2.3.9
+      "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases"
+    , "Oncue Bintray Repo" at "https://dl.bintray.com/oncue/releases"
+    , "Typesafe Releases" at "https://repo.typesafe.com/typesafe/releases/"  //for play 2.3.9
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn  
@@ -58,13 +65,14 @@ lazy val commonSettings =  Seq(
   , scalacOptions ++= safeScalaOptionsCommon ++ {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 12)) => safeScalaOptionsCommon_2_12
+      case Some((2, 13)) => safeScalaOptionsCommon_2_13
       case Some((p,s)) => throw new Exception(s"Uknown scala binary version $p.$s")
       case _ => throw new Exception(s"Bad scala version: ${scalaVersion.value}")
     }
   }
   , addCompilerPlugin("io.tryp" % "splain" % "0.4.1" cross CrossVersion.patch)
   , addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3" cross CrossVersion.binary)
-  , addCompilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion)
+  , addCompilerPlugin("com.github.ghik" %  "silencer-plugin" % silencerVersion cross CrossVersion.patch)
   , scalacOptions += "-P:silencer:globalFilters=The outer reference in this type test cannot be checked at run time"
   , scalafmtOnCompile := true
   , wartremoverErrors in (Compile, compile) := warts
@@ -162,7 +170,7 @@ lazy val applicationinsights =
     .settings(commonSettings:_*)
     .settings(
       name := "precepte-applicationinsights",
-      libraryDependencies += "com.microsoft.azure" % "applicationinsights-core" % "2.4.1"
+      libraryDependencies += "com.microsoft.azure" % "applicationinsights-core" % applicationInsightsVersion
     )
     .dependsOn(core)
 
@@ -173,7 +181,7 @@ lazy val logback =
       name := "precepte-logback",
       libraryDependencies ++= Seq(
         "ch.qos.logback" % "logback-classic" % "1.2.3",
-        "net.logstash.logback" % "logstash-logback-encoder" % "6.1"))
+        "net.logstash.logback" % "logstash-logback-encoder" % "6.2"))
     .dependsOn(core)
 
 lazy val play =

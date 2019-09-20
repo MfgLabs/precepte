@@ -48,12 +48,12 @@ final class Application(
   /**
     * This result directly redirect to the application home.
     */
-  val Home = Redirect(routes.Application.list(0, 2, ""))
+  val Home: Result = Redirect(routes.Application.list(0, 2, ""))
 
   /**
     * Describe the computer form (used in both edit and create screens).
     */
-  val computerForm = Form(
+  val computerForm: Form[Computer] = Form(
     mapping(
       "id" -> ignored[Option[Long]](None),
       "name" -> nonEmptyText,
@@ -80,22 +80,22 @@ final class Application(
     * @param orderBy Column to be sorted
     * @param filter Filter applied on computer names
     */
-  def list(page: Int, orderBy: Int, filter: String) = async(TimedAction) {
-    req =>
+  def list(page: Int, orderBy: Int, filter: String): Action[AnyContent] =
+    async(TimedAction) { req =>
       implicit val r = req._2
       for {
         cs <- computerDB.list(page = page,
                               orderBy = orderBy,
                               filter = ("%" + filter + "%"))
       } yield Ok(html.list(cs, orderBy, filter))
-  }
+    }
 
   /**
     * Display the 'edit form' of a existing Computer.
     *
     * @param id Id of the computer to edit
     */
-  def edit(id: Long) = async(TimedAction) { req =>
+  def edit(id: Long): Action[AnyContent] = async(TimedAction) { req =>
     implicit val r = req._2
 
     (for {
@@ -111,7 +111,7 @@ final class Application(
     *
     * @param id Id of the computer to edit
     */
-  def update(id: Long) = async(TimedAction) { req =>
+  def update(id: Long): Action[AnyContent] = async(TimedAction) { req =>
     implicit val r = req._2
     computerForm.bindFromRequest.fold(
       formWithErrors =>
@@ -130,7 +130,7 @@ final class Application(
   /**
     * Display the 'new computer form'.
     */
-  def create = async(TimedAction) { req =>
+  def create: Action[AnyContent] = async(TimedAction) { req =>
     implicit val r = req._2
     for {
       options <- companyDB.options
@@ -140,7 +140,7 @@ final class Application(
   /**
     * Handle the 'new computer form' submission.
     */
-  def save = async(TimedAction) { req =>
+  def save: Action[AnyContent] = async(TimedAction) { req =>
     implicit val r = req._2
     computerForm.bindFromRequest.fold(
       formWithErrors =>
@@ -160,7 +160,7 @@ final class Application(
   /**
     * Handle computer deletion.
     */
-  def delete(id: Long) = async(TimedAction) { _ =>
+  def delete(id: Long): Action[AnyContent] = async(TimedAction) { _ =>
     for {
       _ <- computerDB.delete(id)
     } yield Home.flashing("success" -> "Computer has been deleted")

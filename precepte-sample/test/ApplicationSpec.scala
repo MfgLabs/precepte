@@ -1,3 +1,5 @@
+import com.mfglabs.precepte
+import play.api.mvc.{Action, AnyContent}
 import play.api.test._
 
 class ApplicationSpec extends PlaySpecification {
@@ -10,28 +12,31 @@ class ApplicationSpec extends PlaySpecification {
 
   "Application" should {
 
-    "redirect to the computer list on /" in new WithApplication {
+    "redirect to the computer list on /" in new precepte.test.WithApplication {
       val result = Controllers.application.index(FakeRequest())
 
       status(result) must equalTo(SEE_OTHER)
       redirectLocation(result) must beSome.which(_ == "/computers")
     }
 
-    "list computers on the the first page" in new WithApplication {
-      val result = Controllers.application.list(0, 2, "")(FakeRequest())
+    "list computers on the the first page" in new precepte.test.WithApplication {
+      val action: Action[AnyContent] = Controllers.application.list(0, 2, "")
+      val result = action(FakeRequest())
 
       status(result) must equalTo(OK)
       contentAsString(result) must contain("574 computers found")
     }
 
-    "filter computer by name" in new WithApplication {
-      val result = Controllers.application.list(0, 2, "Apple")(FakeRequest())
+    "filter computer by name" in new precepte.test.WithApplication {
+      val action: Action[AnyContent] =
+        Controllers.application.list(0, 2, "Apple")
+      val result = action(FakeRequest())
 
       status(result) must equalTo(OK)
       contentAsString(result) must contain("13 computers found")
     }
 
-    "create new computer" in new WithApplication {
+    "create new computer" in new precepte.test.WithApplication {
       val badResult = Controllers.application.save(FakeRequest())
 
       status(badResult) must equalTo(BAD_REQUEST)
@@ -61,7 +66,11 @@ class ApplicationSpec extends PlaySpecification {
       flash(result).get("success") must beSome.which(
         _ == "Computer FooBar has been created")
 
-      val list = Controllers.application.list(0, 2, "FooBar")(FakeRequest())
+      val list = {
+        val action: Action[AnyContent] =
+          Controllers.application.list(0, 2, "FooBar")
+        action(FakeRequest())
+      }
 
       status(list) must equalTo(OK)
       contentAsString(list) must contain("One computer found")

@@ -60,9 +60,8 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
     // Type alias are always advised to make syntax nicer and help sometimes scalac with HK types
     type Pre[A] = DefaultPre[Future, Unit, A]
 
-    // using a Precepte of future for the logger... yes this is expensive as it will as the exectx for a thread
-    // but let's be pure for samples :D
-    @inline def info(m: String): Pre[Unit] = println(m).point[Pre]
+    @inline def info(m: String): Pre[Unit] =
+      Precepte.delay(println(m))
   }
 
   final case class Stuff(id: Long, name: String)
@@ -113,7 +112,8 @@ class SamplesSpec extends FlatSpec with ScalaFutures {
           _ <- s.unmanaged.metric
             .metric(s"$stuff going to pay $amount")
             .unify(s)
-          r <- Precepte.liftF(Future(Paid(stuff.id, amount)))
+          r <- Precepte.liftF[BaseTags, MS, PayCtx, Future, Paid](
+            Future(Paid(stuff.id, amount)))
           _ <- s.unmanaged.logger.info(s"$stuff paid $amount").unify(s)
         } yield (r)
       }

@@ -1,3 +1,4 @@
+import com.mfglabs.precepte
 import org.specs2.mutable._
 
 import scala.concurrent.Await
@@ -31,7 +32,7 @@ class ModelSpec extends Specification {
 
   "Computer model" should {
 
-    "be retrieved by id" in new WithApplication {
+    "be retrieved by id" in new precepte.test.WithApplication {
       val Some(macintosh) =
         Await.result(Services.computerDB.findById(21).eval(nostate),
                      Duration.Inf)
@@ -40,7 +41,7 @@ class ModelSpec extends Specification {
       macintosh.introduced must beSome.which(dateIs(_, "1984-01-24"))
     }
 
-    "be listed along its companies" in new WithApplication {
+    "be listed along its companies" in new precepte.test.WithApplication {
       val computers =
         Await.result(Services.computerDB.list().eval(nostate), Duration.Inf)
 
@@ -48,7 +49,7 @@ class ModelSpec extends Specification {
       computers.items must have length (10)
     }
 
-    "be updated if needed" in new WithApplication {
+    "be updated if needed" in new precepte.test.WithApplication {
       Await.result(
         Services.computerDB
           .update(21,

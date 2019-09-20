@@ -118,7 +118,8 @@ object ApplicationInsights {
       implicit executionContext: ExecutionContext)
     : Precepte[BaseTags, MS, U, Future, Unit] =
     Precepte
-      .deferredLift(Future(client.track(timeMesurementToTelemetry(tm))))
+      .deferredLift[BaseTags, MS, U, Future, Unit](
+        Future(client.track(timeMesurementToTelemetry(tm))))
       .recoverWith(errorHandler)
 
   def createClient(instrumentationKey: String,

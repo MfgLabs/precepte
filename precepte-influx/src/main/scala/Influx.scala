@@ -106,7 +106,7 @@ object Influx {
       implicit executionContext: ExecutionContext)
     : Precepte[BaseTags, MS, U, Future, Unit] =
     Precepte
-      .deferredLift(
+      .deferredLift[BaseTags, MS, U, Future, Unit](
         Future(
           client.write(dbName, retentionPolicy, timeMeasurementToPoint(tm))))
       .recoverWith(errorHandler)
