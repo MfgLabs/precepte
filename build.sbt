@@ -49,7 +49,7 @@ lazy val commonSettings =  Seq(
   , resolvers ++= Seq(
       "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
     , "Oncue Bintray Repo" at "http://dl.bintray.com/oncue/releases"
-    , "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/"  //for play 2.3.9
+    , "Typesafe Releases" at "https://repo.typesafe.com/typesafe/releases/"  //for play 2.3.9
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn  
