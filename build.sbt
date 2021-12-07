@@ -50,13 +50,13 @@ lazy val publishSettings = Seq(
 
 lazy val commonSettings =  Seq(
     organization := "com.mfglabs"
-  , version := "0.5.0-rc3"
+  , version := "0.5.0-rc4"
   , isSnapshot := false
   , crossScalaVersions := List("2.13.0", "2.12.10")
   , resolvers ++= Seq(
-      "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases"
-    , "Oncue Bintray Repo" at "https://dl.bintray.com/oncue/releases"
-    , "Typesafe Releases" at "https://repo.typesafe.com/typesafe/releases/"  //for play 2.3.9
+//      "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases"
+ //   , "Oncue Bintray Repo" at "https://dl.bintray.com/oncue/releases"
+     "Typesafe Releases" at "https://repo.typesafe.com/typesafe/releases/"  //for play 2.3.9
     , "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots" //for play 2.3.9
   )
   , logLevel in update := Level.Warn  
@@ -77,7 +77,7 @@ lazy val commonSettings =  Seq(
   , scalafmtOnCompile := true
   , wartremoverErrors in (Compile, compile) := warts
   , wartremoverWarnings in (Compile, console) := warts
-) ++ publishSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
+)// ++ publishSettings :+ (tutTargetDirectory := baseDirectory.value / ".." / "documentation")
 
 
 
@@ -203,16 +203,20 @@ lazy val stream =
       name := "precepte-stream")
     .dependsOn(coreScalaz)
 
+/*
 lazy val doc =
   project.in(file("precepte-tut"))
     .enablePlugins(TutPlugin)
     .settings(commonSettings:_*)
     .settings(noPublishSettings:_*)
     .dependsOn(core, play, influx, logback, sample, stream)
+*/
 
 lazy val root = project.in(file("."))
   .settings(commonSettings:_*)
   .settings(noPublishSettings:_*)
   .settings(name := "precepte-root")
-  .dependsOn(core, play, influx, applicationinsights, logback, sample, stream, doc, coreScalaz, coreCats)
-  .aggregate(core, play, influx, applicationinsights, logback, sample, stream, doc, coreScalaz, coreCats)
+  //.dependsOn(core, play, influx, applicationinsights, logback, sample, stream, doc, coreScalaz, coreCats)
+  //.aggregate(core, play, influx, applicationinsights, logback, sample, stream, doc, coreScalaz, coreCats)
+  .dependsOn(core, play, influx, applicationinsights, logback, sample, stream, coreScalaz, coreCats)
+  .aggregate(core, play, influx, applicationinsights, logback, sample, stream, coreScalaz, coreCats)
